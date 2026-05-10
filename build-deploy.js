@@ -2,6 +2,7 @@ const fs = require("fs");
 
 const sharedCss = fs.readFileSync("css/styles.css", "utf8");
 const mobileCss = fs.readFileSync("css/mobile.css", "utf8");
+const configJs = fs.readFileSync("js/config.js", "utf8");
 const appJs = fs.readFileSync("js/app.js", "utf8");
 const redirectJs = fs.readFileSync("js/device-redirect.js", "utf8");
 
@@ -31,6 +32,10 @@ function buildPage({ source, target, extraCss, includeRedirect }) {
     `    <style>\n${sharedCss}\n${extraCss}\n    </style>\n`,
   );
   html = html.replace(/    <link rel="stylesheet" href="css\/mobile\.css" \/>\n?/, "");
+  html = html.replace(
+    /    <script src="js\/config\.js"><\/script>/,
+    `    <script>\n${configJs}\n    </script>`,
+  );
 
   if (includeRedirect) {
     html = html.replace(

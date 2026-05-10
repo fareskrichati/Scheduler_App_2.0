@@ -37,6 +37,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   color-scheme: light;
   scroll-behavior: smooth;
@@ -994,6 +998,14 @@ body.is-authenticated .auth-screen {
 
 
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+window.DAILY_PLANNER_SUPABASE = {
+  url: "PASTE_YOUR_SUPABASE_PROJECT_URL_HERE",
+  anonKey: "PASTE_YOUR_SUPABASE_ANON_KEY_HERE",
+};
+
+    </script>
     <script>
 (function redirectPhoneVisitors() {
   const path = window.location.pathname;
@@ -2026,13 +2038,15 @@ const COLOR_MATCH_PREFIXES = ["class", "event", "homework", "exam", "reminder"];
 const DONE_DISAPPEAR_DELAY_MS = 30000;
 const NOTIFICATION_CHECK_INTERVAL_MS = 60000;
 const FOREVER_REPEAT_YEARS = 5;
+const SUPABASE_TABLE = "planner_profiles";
 
 let completionSweepTimer = null;
 let notificationTimer = null;
 let schoolImportItems = [];
 let pendingFirstLogin = null;
+const supabaseClient = createSupabaseClient();
 const savedAuthProfile = loadAuthProfile();
-let authMode = savedAuthProfile ? "login" : "signup";
+let authMode = supabaseClient || savedAuthProfile ? "login" : "signup";
 
 const state = {
   activeTab: "calendar",
@@ -2043,7 +2057,10 @@ const state = {
 
 const authState = {
   profile: savedAuthProfile,
-  isAuthenticated: Boolean(savedAuthProfile && localStorage.getItem(SESSION_KEY) === "active"),
+  userId: "",
+  isAuthenticated: supabaseClient
+    ? false
+    : Boolean(savedAuthProfile && localStorage.getItem(SESSION_KEY) === "active"),
 };
 
 const elements = {
@@ -2221,10 +2238,11 @@ const elements = {
 
 initialize();
 
-function initialize() {
+async function initialize() {
   pruneExpiredCompletedItems();
   renderWeekdays();
   bindEvents();
+  await restoreSupabaseSession();
   syncSettingsFromAuthProfile();
   toggleRepeatOptions("class");
   toggleRepeatOptions("event");
@@ -2394,7 +2412,7 @@ function bindEvents() {
   });
 }
 
-function handleLoginSubmit() {
+async function handleLoginSubmit() {
   const email = elements.loginEmail.value.trim().toLowerCase();
   const password = elements.loginPassword.value;
 
@@ -2423,6 +2441,11 @@ function handleLoginSubmit() {
     return;
   }
 
+  if (supabaseClient) {
+    await loginWithSupabase(email, password);
+    return;
+  }
+
   if (!authState.profile) {
     elements.loginStatus.textContent = "No saved login was found on this device. Choose Sign up to create one.";
     setAuthMode("login", { keepStatus: true });
@@ -2442,7 +2465,7 @@ function handleLoginSubmit() {
   updateAuthView();
 }
 
-function finishFirstLoginSetup() {
+async function finishFirstLoginSetup() {
   const fullName = elements.setupName.value.trim();
   const phone = elements.setupPhone.value.trim();
 
@@ -2468,6 +2491,11 @@ function finishFirstLoginSetup() {
     return;
   }
 
+  if (supabaseClient) {
+    await signUpWithSupabase(fullName, phone);
+    return;
+  }
+
   authState.profile = {
     email: pendingFirstLogin.email,
     password: pendingFirstLogin.password,
@@ -2487,9 +2515,13 @@ function finishFirstLoginSetup() {
   updateAuthView();
 }
 
-function logout() {
+async function logout() {
   authState.isAuthenticated = false;
+  authState.userId = "";
   pendingFirstLogin = null;
+  if (supabaseClient) {
+    await supabaseClient.auth.signOut();
+  }
   localStorage.removeItem(SESSION_KEY);
   elements.loginPassword.value = "";
   elements.loginStatus.textContent = "Logged out.";
@@ -2543,6 +2575,178 @@ function updateAuthView() {
   elements.loginEmail.focus();
 }
 
+function createSupabaseClient() {
+  const config = window.DAILY_PLANNER_SUPABASE || {};
+  const hasConfig =
+    typeof config.url === "string" &&
+    typeof config.anonKey === "string" &&
+    config.url.startsWith("https://") &&
+    !config.url.includes("PASTE_") &&
+    !config.anonKey.includes("PASTE_");
+
+  if (!hasConfig || !window.supabase?.createClient) {
+    return null;
+  }
+
+  return window.supabase.createClient(config.url, config.anonKey);
+}
+
+async function restoreSupabaseSession() {
+  if (!supabaseClient) {
+    return;
+  }
+
+  const { data, error } = await supabaseClient.auth.getSession();
+  if (error || !data.session?.user) {
+    return;
+  }
+
+  await applySupabaseUser(data.session.user);
+}
+
+async function loginWithSupabase(email, password) {
+  elements.loginSubmit.disabled = true;
+  elements.loginStatus.textContent = "Logging in...";
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+  elements.loginSubmit.disabled = false;
+
+  if (error || !data.user) {
+    elements.loginStatus.textContent = error?.message || "Login failed.";
+    return;
+  }
+
+  await applySupabaseUser(data.user);
+  saveLoginSession();
+  elements.loginStatus.textContent = "";
+  renderSettings("Logged in.");
+  updateAuthView();
+}
+
+async function signUpWithSupabase(fullName, phone) {
+  elements.setupStatus.textContent = "Creating account...";
+
+  const { data, error } = await supabaseClient.auth.signUp({
+    email: pendingFirstLogin.email,
+    password: pendingFirstLogin.password,
+    options: {
+      data: {
+        name: fullName,
+        phone,
+      },
+    },
+  });
+
+  if (error || !data.user) {
+    elements.setupStatus.textContent = error?.message || "Sign up failed.";
+    return;
+  }
+
+  authState.profile = {
+    email: data.user.email || pendingFirstLogin.email,
+    name: fullName,
+    phone,
+    createdAt: data.user.created_at || new Date().toISOString(),
+  };
+  authState.userId = data.user.id;
+  authState.isAuthenticated = Boolean(data.session);
+  pendingFirstLogin = null;
+  authMode = "login";
+  syncSettingsFromAuthProfile();
+
+  if (!data.session) {
+    elements.loginForm.hidden = false;
+    elements.profileSetupForm.hidden = true;
+    elements.loginStatus.textContent = "Check your email to confirm your account, then log in.";
+    updateAuthView();
+    return;
+  }
+
+  await saveDataToSupabase();
+  saveLoginSession();
+  renderSettings("Profile details were added from login.");
+  updateAuthView();
+}
+
+async function applySupabaseUser(user) {
+  authState.userId = user.id;
+  authState.profile = {
+    email: user.email || "",
+    name: user.user_metadata?.name || "",
+    phone: user.user_metadata?.phone || "",
+    createdAt: user.created_at || "",
+  };
+  authState.isAuthenticated = true;
+  authMode = "login";
+
+  const cloudData = await loadDataFromSupabase(user.id);
+  if (cloudData) {
+    state.data = cloudData;
+  } else {
+    syncSettingsFromAuthProfile();
+    await saveDataToSupabase();
+  }
+
+  syncSettingsFromAuthProfile();
+  saveDataLocally();
+}
+
+async function loadDataFromSupabase(userId) {
+  const { data, error } = await supabaseClient
+    .from(SUPABASE_TABLE)
+    .select("profile,data")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to load Supabase planner data", error);
+    return null;
+  }
+
+  if (!data?.data) {
+    return null;
+  }
+
+  if (data.profile) {
+    authState.profile = {
+      ...authState.profile,
+      ...normalizeCloudProfile(data.profile),
+    };
+  }
+
+  return normalizePlannerData(data.data);
+}
+
+async function saveDataToSupabase() {
+  if (!supabaseClient || !authState.userId) {
+    return;
+  }
+
+  const { error } = await supabaseClient.from(SUPABASE_TABLE).upsert({
+    user_id: authState.userId,
+    profile: {
+      email: authState.profile?.email || getSettings().email,
+      name: authState.profile?.name || getSettings().name,
+      phone: authState.profile?.phone || getSettings().phone,
+    },
+    data: state.data,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (error) {
+    console.error("Failed to save Supabase planner data", error);
+    elements.settingsStatus.textContent = "Could not save online. Changes are saved on this device.";
+  }
+}
+
+function normalizeCloudProfile(profile) {
+  return {
+    email: typeof profile.email === "string" ? profile.email.trim().toLowerCase() : "",
+    name: typeof profile.name === "string" ? profile.name : "",
+    phone: typeof profile.phone === "string" ? profile.phone : "",
+  };
+}
+
 function syncSettingsFromAuthProfile() {
   if (!authState.profile) {
     return;
@@ -2569,6 +2773,17 @@ function syncAuthProfileFromSettings() {
     name: settings.name || authState.profile.name,
     phone: settings.phone || authState.profile.phone,
   };
+
+  if (supabaseClient) {
+    supabaseClient.auth.updateUser({
+      data: {
+        name: authState.profile.name,
+        phone: authState.profile.phone,
+      },
+    });
+    return;
+  }
+
   localStorage.setItem(AUTH_KEY, JSON.stringify(authState.profile));
 }
 
@@ -4433,6 +4648,11 @@ function persistAndRender() {
 }
 
 function saveData() {
+  saveDataLocally();
+  saveDataToSupabase();
+}
+
+function saveDataLocally() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
 }
 
@@ -4444,17 +4664,21 @@ function loadData() {
     }
 
     const parsed = JSON.parse(stored);
-    return {
-      homework: Array.isArray(parsed.homework) ? parsed.homework : [],
-      exams: Array.isArray(parsed.exams) ? parsed.exams : [],
-      schedule: Array.isArray(parsed.schedule) ? parsed.schedule : [],
-      reminders: Array.isArray(parsed.reminders) ? parsed.reminders : [],
-      settings: normalizeSettings(parsed.settings),
-    };
+    return normalizePlannerData(parsed);
   } catch (error) {
     console.error("Failed to load planner data", error);
     return seedData();
   }
+}
+
+function normalizePlannerData(data) {
+  return {
+    homework: Array.isArray(data?.homework) ? data.homework : [],
+    exams: Array.isArray(data?.exams) ? data.exams : [],
+    schedule: Array.isArray(data?.schedule) ? data.schedule : [],
+    reminders: Array.isArray(data?.reminders) ? data.reminders : [],
+    settings: normalizeSettings(data?.settings),
+  };
 }
 
 function loadAuthProfile() {

@@ -12,6 +12,7 @@ let completionSweepTimer = null;
 let notificationTimer = null;
 let schoolImportItems = [];
 let pendingFirstLogin = null;
+let lastCloudSyncMessage = "";
 const supabaseClient = createSupabaseClient();
 const savedAuthProfile = loadAuthProfile();
 let authMode = supabaseClient || savedAuthProfile ? "login" : "signup";
@@ -378,6 +379,16 @@ function bindEvents() {
     schoolImportItems = [];
     renderSchoolImportItems("Import results cleared.");
   });
+
+  window.addEventListener("focus", () => {
+    refreshCloudData();
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      refreshCloudData();
+    }
+  });
 }
 
 async function handleLoginSubmit() {
@@ -657,6 +668,7 @@ async function applySupabaseUser(user) {
 
   syncSettingsFromAuthProfile();
   saveDataLocally();
+  lastCloudSyncMessage = `Cloud sync active for ${authState.profile.email}.`;
 }
 
 async function loadDataFromSupabase(userId) {
@@ -668,6 +680,7 @@ async function loadDataFromSupabase(userId) {
 
   if (error) {
     console.error("Failed to load Supabase planner data", error);
+    lastCloudSyncMessage = "Cloud sync could not load. Check Supabase setup.";
     return null;
   }
 
@@ -703,8 +716,35 @@ async function saveDataToSupabase() {
 
   if (error) {
     console.error("Failed to save Supabase planner data", error);
-    elements.settingsStatus.textContent = "Could not save online. Changes are saved on this device.";
+    lastCloudSyncMessage = "Could not save online. Changes are saved on this device.";
+    elements.settingsStatus.textContent = lastCloudSyncMessage;
+    return;
   }
+
+  lastCloudSyncMessage = `Cloud synced ${new Date().toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  })}.`;
+}
+
+async function refreshCloudData() {
+  if (!supabaseClient || !authState.isAuthenticated || !authState.userId) {
+    return;
+  }
+
+  const cloudData = await loadDataFromSupabase(authState.userId);
+  if (!cloudData) {
+    return;
+  }
+
+  state.data = cloudData;
+  syncSettingsFromAuthProfile();
+  saveDataLocally();
+  lastCloudSyncMessage = `Cloud refreshed ${new Date().toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  })}.`;
+  render();
 }
 
 function normalizeCloudProfile(profile) {
@@ -2113,6 +2153,7 @@ function renderSettings(statusMessage = "") {
   elements.settingsSummary.innerHTML = "";
 
   [
+    ["Storage", getStorageStatus()],
     ["Email", settings.email || "Not added"],
     ["Phone", settings.phone || "Not added"],
     ["Preference", formatNotificationPreference(settings.notificationPreference)],
@@ -2127,7 +2168,19 @@ function renderSettings(statusMessage = "") {
 
   renderPasswordSummary();
   renderSchoolAccountSummary();
-  elements.settingsStatus.textContent = statusMessage;
+  elements.settingsStatus.textContent = statusMessage || lastCloudSyncMessage;
+}
+
+function getStorageStatus() {
+  if (!supabaseClient) {
+    return "Device only - add Supabase URL and anon key";
+  }
+
+  if (!authState.isAuthenticated) {
+    return "Cloud ready - log in with the same account";
+  }
+
+  return lastCloudSyncMessage || `Cloud sync active for ${authState.profile?.email || "this account"}`;
 }
 
 function changeLoginPassword() {

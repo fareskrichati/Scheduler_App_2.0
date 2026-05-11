@@ -13,6 +13,7 @@ let notificationTimer = null;
 let schoolImportItems = [];
 let pendingFirstLogin = null;
 let lastCloudSyncMessage = "";
+let supabaseSetupMessage = "";
 const supabaseClient = createSupabaseClient();
 const savedAuthProfile = loadAuthProfile();
 let authMode = supabaseClient || savedAuthProfile ? "login" : "signup";
@@ -197,6 +198,7 @@ const elements = {
   settingsStatus: document.querySelector("#settings-status"),
   settingsSummaryTitle: document.querySelector("#settings-summary-title"),
   settingsSummary: document.querySelector("#settings-summary"),
+  syncNow: document.querySelector("#sync-now"),
   passwordSummary: document.querySelector("#password-summary"),
   schoolAccountSummary: document.querySelector("#school-account-summary"),
   fetchSchoolItems: document.querySelector("#fetch-school-items"),
@@ -374,6 +376,7 @@ function bindEvents() {
   elements.settingsAddSchoolAccount.addEventListener("click", saveSchoolAccountFromForm);
   elements.settingsClearSchoolAccount.addEventListener("click", clearSchoolAccountForm);
   elements.sendDaySchedulePdf.addEventListener("click", sendDaySchedulePdf);
+  elements.syncNow.addEventListener("click", syncNow);
   elements.fetchSchoolItems.addEventListener("click", fetchSchoolItems);
   elements.clearSchoolImports.addEventListener("click", () => {
     schoolImportItems = [];
@@ -426,7 +429,9 @@ async function handleLoginSubmit() {
   }
 
   if (!authState.profile) {
-    elements.loginStatus.textContent = "No saved login was found on this device. Choose Sign up to create one.";
+    elements.loginStatus.textContent =
+      supabaseSetupMessage ||
+      "No cloud login is connected on this site yet. Choose Sign up to create an account.";
     setAuthMode("login", { keepStatus: true });
     return;
   }
@@ -563,7 +568,13 @@ function createSupabaseClient() {
     !config.url.includes("PASTE_") &&
     !config.anonKey.includes("PASTE_");
 
-  if (!hasConfig || !window.supabase?.createClient) {
+  if (!hasConfig) {
+    supabaseSetupMessage = "Supabase config is missing on this deployed site.";
+    return null;
+  }
+
+  if (!window.supabase?.createClient) {
+    supabaseSetupMessage = "Supabase library did not load. Check the deployed script/CDN.";
     return null;
   }
 
@@ -700,6 +711,9 @@ async function loadDataFromSupabase(userId) {
 
 async function saveDataToSupabase() {
   if (!supabaseClient || !authState.userId) {
+    lastCloudSyncMessage = supabaseClient
+      ? "Cloud is connected, but you are not logged in."
+      : "Device only - Supabase is not configured.";
     return;
   }
 
@@ -716,7 +730,7 @@ async function saveDataToSupabase() {
 
   if (error) {
     console.error("Failed to save Supabase planner data", error);
-    lastCloudSyncMessage = "Could not save online. Changes are saved on this device.";
+    lastCloudSyncMessage = `Cloud save failed: ${error.message}`;
     elements.settingsStatus.textContent = lastCloudSyncMessage;
     return;
   }
@@ -725,6 +739,34 @@ async function saveDataToSupabase() {
     hour: "numeric",
     minute: "2-digit",
   })}.`;
+}
+
+async function syncNow() {
+  if (!supabaseClient) {
+    renderSettings("Supabase is not connected. Add the URL and anon key in js/config.js.");
+    return;
+  }
+
+  if (!authState.isAuthenticated || !authState.userId) {
+    renderSettings("Log in before syncing.");
+    return;
+  }
+
+  elements.syncNow.disabled = true;
+  elements.settingsStatus.textContent = "Syncing...";
+  await saveDataToSupabase();
+
+  const savedMessage = lastCloudSyncMessage;
+  const cloudData = await loadDataFromSupabase(authState.userId);
+  if (cloudData) {
+    state.data = cloudData;
+    syncSettingsFromAuthProfile();
+    saveDataLocally();
+  }
+
+  elements.syncNow.disabled = false;
+  render();
+  renderSettings(savedMessage || lastCloudSyncMessage || "Sync complete.");
 }
 
 async function refreshCloudData() {
@@ -2173,7 +2215,7 @@ function renderSettings(statusMessage = "") {
 
 function getStorageStatus() {
   if (!supabaseClient) {
-    return "Device only - add Supabase URL and anon key";
+    return supabaseSetupMessage || "Device only - add Supabase URL and anon key";
   }
 
   if (!authState.isAuthenticated) {

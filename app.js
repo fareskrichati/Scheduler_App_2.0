@@ -15,7 +15,10 @@ let pendingFirstLogin = null;
 let lastCloudSyncMessage = "";
 let supabaseSetupMessage = "";
 const supabaseClient = createSupabaseClient();
-const savedAuthProfile = loadAuthProfile();
+if (supabaseClient) {
+  clearLegacyLocalLogin();
+}
+const savedAuthProfile = supabaseClient ? null : loadAuthProfile();
 let authMode = supabaseClient || savedAuthProfile ? "login" : "signup";
 
 const state = {
@@ -838,7 +841,17 @@ function syncAuthProfileFromSettings() {
 }
 
 function saveLoginSession() {
+  if (supabaseClient) {
+    localStorage.removeItem(SESSION_KEY);
+    return;
+  }
+
   localStorage.setItem(SESSION_KEY, "active");
+}
+
+function clearLegacyLocalLogin() {
+  localStorage.removeItem(AUTH_KEY);
+  localStorage.removeItem(SESSION_KEY);
 }
 
 function render() {
@@ -2234,6 +2247,11 @@ function changeLoginPassword() {
     return;
   }
 
+  if (supabaseClient) {
+    changeSupabasePassword(nextPassword);
+    return;
+  }
+
   if (currentPassword !== authState.profile.password) {
     elements.settingsStatus.textContent = "Original password does not match.";
     elements.settingsCurrentPassword.focus();
@@ -2251,6 +2269,28 @@ function changeLoginPassword() {
     password: nextPassword,
   };
   localStorage.setItem(AUTH_KEY, JSON.stringify(authState.profile));
+  elements.settingsCurrentPassword.value = "";
+  elements.settingsNewPassword.value = "";
+  renderSettings("Login password changed.");
+}
+
+async function changeSupabasePassword(nextPassword) {
+  if (nextPassword.trim().length < 6) {
+    elements.settingsStatus.textContent = "New password needs at least 6 characters.";
+    elements.settingsNewPassword.focus();
+    return;
+  }
+
+  elements.settingsChangePassword.disabled = true;
+  elements.settingsStatus.textContent = "Updating password...";
+  const { error } = await supabaseClient.auth.updateUser({ password: nextPassword });
+  elements.settingsChangePassword.disabled = false;
+
+  if (error) {
+    elements.settingsStatus.textContent = error.message || "Password update failed.";
+    return;
+  }
+
   elements.settingsCurrentPassword.value = "";
   elements.settingsNewPassword.value = "";
   renderSettings("Login password changed.");
@@ -2343,6 +2383,14 @@ function clearSchoolAccountForm() {
 
 function renderPasswordSummary() {
   elements.passwordSummary.innerHTML = "";
+
+  if (supabaseClient) {
+    const row = document.createElement("div");
+    row.className = "settings-summary-row";
+    row.innerHTML = "<span>Login password</span><strong>Managed by Supabase</strong>";
+    elements.passwordSummary.appendChild(row);
+    return;
+  }
 
   [
     ["Login password", authState.profile?.password || "Not created"],

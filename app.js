@@ -15,11 +15,9 @@ let pendingFirstLogin = null;
 let lastCloudSyncMessage = "";
 let supabaseSetupMessage = "";
 const supabaseClient = createSupabaseClient();
-if (supabaseClient) {
-  clearLegacyLocalLogin();
-}
-const savedAuthProfile = supabaseClient ? null : loadAuthProfile();
-let authMode = supabaseClient || savedAuthProfile ? "login" : "signup";
+clearLegacyLocalLogin();
+const savedAuthProfile = null;
+let authMode = "login";
 
 const state = {
   activeTab: "calendar",
@@ -426,30 +424,14 @@ async function handleLoginSubmit() {
     return;
   }
 
-  if (supabaseClient) {
-    await loginWithSupabase(email, password);
-    return;
-  }
-
-  if (!authState.profile) {
+  if (!supabaseClient) {
     elements.loginStatus.textContent =
-      supabaseSetupMessage ||
-      "No cloud login is connected on this site yet. Choose Sign up to create an account.";
+      supabaseSetupMessage || "Supabase is not connected. Check the site scripts and config.";
     setAuthMode("login", { keepStatus: true });
     return;
   }
 
-  if (email !== authState.profile.email || password !== authState.profile.password) {
-    elements.loginStatus.textContent = "Email or password does not match.";
-    return;
-  }
-
-  authState.isAuthenticated = true;
-  saveLoginSession();
-  syncSettingsFromAuthProfile();
-  saveData();
-  renderSettings("Logged in.");
-  updateAuthView();
+  await loginWithSupabase(email, password);
 }
 
 async function finishFirstLoginSetup() {
@@ -478,28 +460,13 @@ async function finishFirstLoginSetup() {
     return;
   }
 
-  if (supabaseClient) {
-    await signUpWithSupabase(fullName, phone);
+  if (!supabaseClient) {
+    elements.setupStatus.textContent =
+      supabaseSetupMessage || "Supabase is not connected. Check the site scripts and config.";
     return;
   }
 
-  authState.profile = {
-    email: pendingFirstLogin.email,
-    password: pendingFirstLogin.password,
-    name: fullName,
-    phone,
-    createdAt: new Date().toISOString(),
-  };
-  authState.isAuthenticated = true;
-  pendingFirstLogin = null;
-
-  localStorage.setItem(AUTH_KEY, JSON.stringify(authState.profile));
-  saveLoginSession();
-  authMode = "login";
-  syncSettingsFromAuthProfile();
-  saveData();
-  renderSettings("Profile details were added from login.");
-  updateAuthView();
+  await signUpWithSupabase(fullName, phone);
 }
 
 async function logout() {
@@ -827,26 +794,20 @@ function syncAuthProfileFromSettings() {
     phone: settings.phone || authState.profile.phone,
   };
 
-  if (supabaseClient) {
-    supabaseClient.auth.updateUser({
-      data: {
-        name: authState.profile.name,
-        phone: authState.profile.phone,
-      },
-    });
+  if (!supabaseClient) {
     return;
   }
 
-  localStorage.setItem(AUTH_KEY, JSON.stringify(authState.profile));
+  supabaseClient.auth.updateUser({
+    data: {
+      name: authState.profile.name,
+      phone: authState.profile.phone,
+    },
+  });
 }
 
 function saveLoginSession() {
-  if (supabaseClient) {
-    localStorage.removeItem(SESSION_KEY);
-    return;
-  }
-
-  localStorage.setItem(SESSION_KEY, "active");
+  localStorage.removeItem(SESSION_KEY);
 }
 
 function clearLegacyLocalLogin() {
@@ -2239,7 +2200,6 @@ function getStorageStatus() {
 }
 
 function changeLoginPassword() {
-  const currentPassword = elements.settingsCurrentPassword.value;
   const nextPassword = elements.settingsNewPassword.value;
 
   if (!authState.profile) {
@@ -2252,26 +2212,7 @@ function changeLoginPassword() {
     return;
   }
 
-  if (currentPassword !== authState.profile.password) {
-    elements.settingsStatus.textContent = "Original password does not match.";
-    elements.settingsCurrentPassword.focus();
-    return;
-  }
-
-  if (nextPassword.trim().length < 6) {
-    elements.settingsStatus.textContent = "New password needs at least 6 characters.";
-    elements.settingsNewPassword.focus();
-    return;
-  }
-
-  authState.profile = {
-    ...authState.profile,
-    password: nextPassword,
-  };
-  localStorage.setItem(AUTH_KEY, JSON.stringify(authState.profile));
-  elements.settingsCurrentPassword.value = "";
-  elements.settingsNewPassword.value = "";
-  renderSettings("Login password changed.");
+  elements.settingsStatus.textContent = "Supabase is not connected. Password changes are unavailable.";
 }
 
 async function changeSupabasePassword(nextPassword) {
@@ -2384,22 +2325,12 @@ function clearSchoolAccountForm() {
 function renderPasswordSummary() {
   elements.passwordSummary.innerHTML = "";
 
-  if (supabaseClient) {
-    const row = document.createElement("div");
-    row.className = "settings-summary-row";
-    row.innerHTML = "<span>Login password</span><strong>Managed by Supabase</strong>";
-    elements.passwordSummary.appendChild(row);
-    return;
-  }
-
-  [
-    ["Login password", authState.profile?.password || "Not created"],
-  ].forEach(([label, value]) => {
-    const row = document.createElement("div");
-    row.className = "settings-summary-row";
-    row.innerHTML = `<span>${label}</span><strong>${escapeHtml(value)}</strong>`;
-    elements.passwordSummary.appendChild(row);
-  });
+  const row = document.createElement("div");
+  row.className = "settings-summary-row";
+  row.innerHTML = `<span>Login password</span><strong>${
+    supabaseClient ? "Managed by Supabase" : "Supabase unavailable"
+  }</strong>`;
+  elements.passwordSummary.appendChild(row);
 }
 
 function renderSchoolAccountSummary() {
@@ -2790,35 +2721,6 @@ function normalizePlannerData(data) {
     reminders: Array.isArray(data?.reminders) ? data.reminders : [],
     settings: normalizeSettings(data?.settings),
   };
-}
-
-function loadAuthProfile() {
-  try {
-    const stored = localStorage.getItem(AUTH_KEY);
-    if (!stored) {
-      return null;
-    }
-
-    const parsed = JSON.parse(stored);
-    if (
-      typeof parsed?.email !== "string" ||
-      typeof parsed?.password !== "string" ||
-      !isValidEmail(parsed.email)
-    ) {
-      return null;
-    }
-
-    return {
-      email: parsed.email.trim().toLowerCase(),
-      password: parsed.password,
-      name: typeof parsed.name === "string" ? parsed.name : "",
-      phone: typeof parsed.phone === "string" ? parsed.phone : "",
-      createdAt: typeof parsed.createdAt === "string" ? parsed.createdAt : "",
-    };
-  } catch (error) {
-    console.error("Failed to load login profile", error);
-    return null;
-  }
 }
 
 function seedData() {

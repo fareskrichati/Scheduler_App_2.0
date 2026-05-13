@@ -53,6 +53,7 @@ const elements = {
   openSettings: document.querySelector("#open-settings"),
   jumpToday: document.querySelector("#jump-today"),
   quickAdd: document.querySelector("#quick-add"),
+  topbarSync: document.querySelector("#topbar-sync"),
   tabShell: document.querySelector(".tab-shell"),
   homeworkCount: document.querySelector("#homework-count"),
   examCount: document.querySelector("#exam-count"),
@@ -275,6 +276,8 @@ function bindEvents() {
     setActiveTab("classes");
     elements.classTitle.focus();
   });
+
+  elements.topbarSync.addEventListener("click", syncNow);
 
   elements.prevMonth.addEventListener("click", () => {
     state.visibleMonth = offsetMonth(state.visibleMonth, -1);
@@ -722,7 +725,7 @@ async function syncNow() {
     return;
   }
 
-  elements.syncNow.disabled = true;
+  setSyncButtonsDisabled(true);
   elements.settingsStatus.textContent = "Syncing...";
   await saveDataToSupabase();
 
@@ -734,9 +737,14 @@ async function syncNow() {
     saveDataLocally();
   }
 
-  elements.syncNow.disabled = false;
+  setSyncButtonsDisabled(false);
   render();
   renderSettings(savedMessage || lastCloudSyncMessage || "Sync complete.");
+}
+
+function setSyncButtonsDisabled(isDisabled) {
+  elements.syncNow.disabled = isDisabled;
+  elements.topbarSync.disabled = isDisabled;
 }
 
 async function refreshCloudData() {

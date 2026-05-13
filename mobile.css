@@ -114,6 +114,12 @@ body {
   width: 100%;
 }
 
+.topbar-action-row {
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+}
+
 .dashboard {
   gap: 14px;
   margin-top: 14px;

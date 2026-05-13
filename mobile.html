@@ -267,6 +267,7 @@ body.is-authenticated .auth-screen {
 
 .topbar-actions,
 .topbar-stats,
+.topbar-action-row,
 .tab-row,
 .nav-actions,
 .field-row,
@@ -280,6 +281,12 @@ body.is-authenticated .auth-screen {
 
 .topbar-stats {
   width: 100%;
+}
+
+.topbar-actions {
+  display: grid;
+  gap: 8px;
+  transform: translateY(-6px);
 }
 
 .dashboard {
@@ -888,6 +895,16 @@ body.is-authenticated .auth-screen {
     width: 100%;
   }
 
+  .topbar-actions {
+    transform: none;
+  }
+
+  .topbar-action-row {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
   .mini-stat {
     min-width: 0;
     border-radius: 18px;
@@ -1109,6 +1126,12 @@ body {
 .form-actions .ghost-button,
 .form-actions .primary-button,
 .settings-change-password {
+  width: 100%;
+}
+
+.topbar-action-row {
+  flex-direction: column;
+  align-items: stretch;
   width: 100%;
 }
 
@@ -1391,8 +1414,11 @@ window.DAILY_PLANNER_SUPABASE = {
         </div>
 
         <div class="topbar-actions">
-          <button class="ghost-button" id="jump-today" type="button">Today</button>
-          <button class="primary-button" id="quick-add" type="button">Quick add</button>
+          <div class="topbar-action-row">
+            <button class="ghost-button" id="jump-today" type="button">Today</button>
+            <button class="primary-button" id="quick-add" type="button">Quick add</button>
+          </div>
+          <button class="ghost-button" id="topbar-sync" type="button">Sync now</button>
         </div>
       </header>
 
@@ -2366,6 +2392,7 @@ const elements = {
   openSettings: document.querySelector("#open-settings"),
   jumpToday: document.querySelector("#jump-today"),
   quickAdd: document.querySelector("#quick-add"),
+  topbarSync: document.querySelector("#topbar-sync"),
   tabShell: document.querySelector(".tab-shell"),
   homeworkCount: document.querySelector("#homework-count"),
   examCount: document.querySelector("#exam-count"),
@@ -2588,6 +2615,8 @@ function bindEvents() {
     setActiveTab("classes");
     elements.classTitle.focus();
   });
+
+  elements.topbarSync.addEventListener("click", syncNow);
 
   elements.prevMonth.addEventListener("click", () => {
     state.visibleMonth = offsetMonth(state.visibleMonth, -1);
@@ -3035,7 +3064,7 @@ async function syncNow() {
     return;
   }
 
-  elements.syncNow.disabled = true;
+  setSyncButtonsDisabled(true);
   elements.settingsStatus.textContent = "Syncing...";
   await saveDataToSupabase();
 
@@ -3047,9 +3076,14 @@ async function syncNow() {
     saveDataLocally();
   }
 
-  elements.syncNow.disabled = false;
+  setSyncButtonsDisabled(false);
   render();
   renderSettings(savedMessage || lastCloudSyncMessage || "Sync complete.");
+}
+
+function setSyncButtonsDisabled(isDisabled) {
+  elements.syncNow.disabled = isDisabled;
+  elements.topbarSync.disabled = isDisabled;
 }
 
 async function refreshCloudData() {

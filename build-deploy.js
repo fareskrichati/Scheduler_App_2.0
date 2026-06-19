@@ -7,6 +7,7 @@ const appJs = fs.readFileSync("js/app.js", "utf8");
 const redirectJs = fs.readFileSync("js/device-redirect.js", "utf8");
 
 fs.mkdirSync("deploy", { recursive: true });
+fs.mkdirSync("deploy/scriptable", { recursive: true });
 
 buildPage({
   source: "index.html",
@@ -23,6 +24,8 @@ buildPage({
 });
 
 fs.writeFileSync("deploy/netlify.toml", '[build]\n  publish = "."\n');
+fs.copyFileSync("scriptable/DailyPlannerWidget.js", "deploy/scriptable/DailyPlannerWidget.js");
+fs.copyFileSync("SCRIPTABLE_SETUP.md", "deploy/SCRIPTABLE_SETUP.md");
 
 function buildPage({ source, target, extraCss, includeRedirect }) {
   let html = fs.readFileSync(source, "utf8");

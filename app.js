@@ -5,11 +5,14 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const COLOR_MATCH_PREFIXES = ["class", "event", "homework", "exam", "reminder"];
 const DONE_DISAPPEAR_DELAY_MS = 30000;
 const NOTIFICATION_CHECK_INTERVAL_MS = 60000;
+const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const FOREVER_REPEAT_YEARS = 5;
 const SUPABASE_TABLE = "planner_profiles";
 
 let completionSweepTimer = null;
 let notificationTimer = null;
+let autoSyncTimer = null;
+let syncInProgress = false;
 let schoolImportItems = [];
 let pendingFirstLogin = null;
 let lastCloudSyncMessage = "";
@@ -53,6 +56,9 @@ const elements = {
   openSettings: document.querySelector("#open-settings"),
   jumpToday: document.querySelector("#jump-today"),
   quickAdd: document.querySelector("#quick-add"),
+  quickAddDialog: document.querySelector("#quick-add-dialog"),
+  quickAddType: document.querySelector("#quick-add-type"),
+  quickAddContinue: document.querySelector("#quick-add-continue"),
   topbarSync: document.querySelector("#topbar-sync"),
   tabShell: document.querySelector(".tab-shell"),
   homeworkCount: document.querySelector("#homework-count"),
@@ -215,6 +221,7 @@ async function initialize() {
   pruneExpiredCompletedItems();
   renderWeekdays();
   bindEvents();
+  setupMobileAddForms();
   await restoreSupabaseSession();
   syncSettingsFromAuthProfile();
   toggleRepeatOptions("class");
@@ -228,6 +235,7 @@ async function initialize() {
   updateAuthView();
   scheduleCompletionSweep();
   scheduleNotificationCheck();
+  scheduleAutomaticSync();
 }
 
 function bindEvents() {
@@ -273,11 +281,18 @@ function bindEvents() {
   });
 
   elements.quickAdd.addEventListener("click", () => {
-    setActiveTab("classes");
-    elements.classTitle.focus();
+    elements.quickAddDialog.showModal();
   });
 
-  elements.topbarSync.addEventListener("click", syncNow);
+  elements.quickAddContinue.addEventListener("click", (event) => {
+    event.preventDefault();
+    const tabId = elements.quickAddType.value;
+    elements.quickAddDialog.close();
+    setActiveTab(tabId);
+    openMobileAddForm(tabId);
+    getPrimaryFieldForTab(tabId)?.focus();
+    elements.tabShell?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 
   elements.prevMonth.addEventListener("click", () => {
     state.visibleMonth = offsetMonth(state.visibleMonth, -1);
@@ -393,9 +408,83 @@ function bindEvents() {
 
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
-      refreshCloudData();
+      automaticSync();
     }
   });
+
+  window.addEventListener("online", automaticSync);
+}
+
+function setupMobileAddForms() {
+  if (!document.body.classList.contains("mobile-preview") && !window.matchMedia("(max-width: 760px)").matches) {
+    return;
+  }
+
+  const labels = {
+    classes: "class",
+    events: "event",
+    homework: "homework",
+    exams: "exam",
+    reminders: "reminder",
+  };
+
+  Object.entries(labels).forEach(([tabId, label]) => {
+    const form = document.querySelector(`#${label === "class" ? "class" : label}-form`);
+    if (!form) {
+      return;
+    }
+
+    form.hidden = true;
+    form.classList.add("mobile-collapsible-form");
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "primary-button mobile-add-toggle";
+    toggle.dataset.addForm = tabId;
+    toggle.setAttribute("aria-controls", form.id);
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.textContent = `Add ${label}`;
+    toggle.addEventListener("click", () => {
+      const shouldOpen = form.hidden;
+      setMobileAddFormState(tabId, shouldOpen);
+      if (shouldOpen) {
+        getPrimaryFieldForTab(tabId)?.focus();
+      }
+    });
+
+    form.parentElement.insertBefore(toggle, form);
+  });
+}
+
+function openMobileAddForm(tabId) {
+  setMobileAddFormState(tabId, true);
+}
+
+function setMobileAddFormState(tabId, isOpen) {
+  const formIds = {
+    classes: "class-form",
+    events: "event-form",
+    homework: "homework-form",
+    exams: "exam-form",
+    reminders: "reminder-form",
+  };
+  const labels = {
+    classes: "class",
+    events: "event",
+    homework: "homework",
+    exams: "exam",
+    reminders: "reminder",
+  };
+  const form = document.querySelector(`#${formIds[tabId] || ""}`);
+  const toggle = document.querySelector(`[data-add-form="${tabId}"]`);
+
+  if (!form || !toggle) {
+    return;
+  }
+
+  form.hidden = !isOpen;
+  toggle.setAttribute("aria-expanded", String(isOpen));
+  toggle.textContent = isOpen ? `Hide ${labels[tabId]} form` : `Add ${labels[tabId]}`;
 }
 
 async function handleLoginSubmit() {
@@ -715,6 +804,10 @@ async function saveDataToSupabase() {
 }
 
 async function syncNow() {
+  if (syncInProgress) {
+    return;
+  }
+
   if (!supabaseClient) {
     renderSettings("Supabase is not connected. Add the URL and anon key in js/config.js.");
     return;
@@ -725,6 +818,7 @@ async function syncNow() {
     return;
   }
 
+  syncInProgress = true;
   setSyncButtonsDisabled(true);
   elements.settingsStatus.textContent = "Syncing...";
   await saveDataToSupabase();
@@ -738,13 +832,46 @@ async function syncNow() {
   }
 
   setSyncButtonsDisabled(false);
+  syncInProgress = false;
   render();
   renderSettings(savedMessage || lastCloudSyncMessage || "Sync complete.");
 }
 
 function setSyncButtonsDisabled(isDisabled) {
   elements.syncNow.disabled = isDisabled;
-  elements.topbarSync.disabled = isDisabled;
+  if (elements.topbarSync) {
+    elements.topbarSync.disabled = isDisabled;
+  }
+}
+
+function scheduleAutomaticSync() {
+  if (autoSyncTimer) {
+    window.clearInterval(autoSyncTimer);
+  }
+
+  autoSyncTimer = window.setInterval(automaticSync, AUTO_SYNC_INTERVAL_MS);
+}
+
+async function automaticSync() {
+  if (document.hidden || !navigator.onLine || syncInProgress) {
+    return;
+  }
+
+  if (!supabaseClient || !authState.isAuthenticated || !authState.userId) {
+    return;
+  }
+
+  await syncNow();
+}
+
+function getPrimaryFieldForTab(tabId) {
+  return {
+    classes: elements.classTitle,
+    events: elements.eventTitle,
+    homework: elements.homeworkTitle,
+    exams: elements.examTitle,
+    reminders: elements.reminderTitle,
+  }[tabId];
 }
 
 async function refreshCloudData() {
@@ -1699,6 +1826,7 @@ function editHomework(id) {
   const item = sortedMatches[0];
 
   setActiveTab("homework");
+  openMobileAddForm("homework");
   elements.homeworkForm.dataset.seriesId = item.seriesId || "";
   elements.homeworkId.value = item.id;
   elements.homeworkTitle.value = item.title;
@@ -1728,6 +1856,7 @@ function editExam(id) {
   }
 
   setActiveTab("exams");
+  openMobileAddForm("exams");
   elements.examId.value = item.id;
   elements.examTitle.value = item.title;
   elements.examCourse.value = item.course;
@@ -1750,6 +1879,7 @@ function editClassItem(id) {
   const item = sortedMatches[0];
 
   setActiveTab("classes");
+  openMobileAddForm("classes");
   elements.classForm.dataset.seriesId = item.seriesId || "";
   elements.classId.value = item.id;
   elements.classTitle.value = item.title;
@@ -1784,6 +1914,7 @@ function editEventItem(id) {
   const item = sortedMatches[0];
 
   setActiveTab("events");
+  openMobileAddForm("events");
   elements.eventForm.dataset.seriesId = item.seriesId || "";
   elements.eventId.value = item.id;
   elements.eventTitle.value = item.title;
@@ -1818,6 +1949,7 @@ function editReminder(id) {
   const item = sortedMatches[0];
 
   setActiveTab("reminders");
+  openMobileAddForm("reminders");
   elements.reminderForm.dataset.seriesId = item.seriesId || "";
   elements.reminderId.value = item.id;
   elements.reminderTitle.value = item.title;
@@ -2173,15 +2305,13 @@ function renderSettings(statusMessage = "") {
   elements.notifySettings.checked = settings.notificationSchedule.settings;
   elements.notifyCalendar.checked = settings.notificationSchedule.calendar;
 
-  elements.settingsSummaryTitle.textContent = settings.name || "No contact saved";
+  elements.settingsSummaryTitle.textContent = settings.name || "Your planner";
   elements.settingsSummary.innerHTML = "";
 
   [
     ["Storage", getStorageStatus()],
-    ["Email", settings.email || "Not added"],
-    ["Phone", settings.phone || "Not added"],
-    ["Preference", formatNotificationPreference(settings.notificationPreference)],
-    ["Notify", formatNotificationSchedule(settings.notificationSchedule)],
+    ["Automatic sync", authState.isAuthenticated ? "Every 5 minutes" : "Available after login"],
+    ["Last sync", lastCloudSyncMessage || "Waiting for first sync"],
     ["School accounts", String(settings.schoolAccounts.length)],
   ].forEach(([label, value]) => {
     const row = document.createElement("div");
@@ -2367,11 +2497,9 @@ function renderSchoolAccountSummary() {
           <button class="small-button delete-school-account" type="button">Delete</button>
         </div>
       </div>
-      <div class="settings-summary-row"><span>Username</span><strong>${escapeHtml(account.username || "Not added")}</strong></div>
-      <div class="settings-summary-row"><span>School password</span><strong>${escapeHtml(account.password || "Not added")}</strong></div>
       <div class="settings-summary-row"><span>Canvas URL</span><strong>${escapeHtml(account.canvasUrl || "Not added")}</strong></div>
-      <div class="settings-summary-row"><span>Canvas token</span><strong>${escapeHtml(account.canvasToken || "Not added")}</strong></div>
-      <div class="settings-summary-row"><span>Classroom token</span><strong>${escapeHtml(account.classroomToken || "Not added")}</strong></div>
+      <div class="settings-summary-row"><span>Canvas API</span><strong>${account.canvasToken ? "Connected" : "Not connected"}</strong></div>
+      <div class="settings-summary-row"><span>Google Classroom API</span><strong>${account.classroomToken ? "Connected" : "Not connected"}</strong></div>
     `;
 
     card.querySelector(".edit-school-account").addEventListener("click", () => editSchoolAccount(account.id));

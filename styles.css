@@ -502,6 +502,29 @@ body.is-authenticated .auth-screen {
   text-overflow: ellipsis;
 }
 
+.quick-add-dialog {
+  width: min(92vw, 480px);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--surface-strong);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.quick-add-dialog::backdrop {
+  background: rgba(22, 30, 40, 0.48);
+  backdrop-filter: blur(4px);
+}
+
+.quick-add-card {
+  padding: 22px;
+}
+
+.mobile-add-toggle {
+  display: none;
+}
+
 .marker-homework {
   background: var(--accent-soft);
   color: var(--accent-deep);
@@ -626,6 +649,13 @@ body.is-authenticated .auth-screen {
 .pdf-button {
   width: 100%;
   margin-top: 14px;
+}
+
+.settings-download-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
 }
 
 .preference-options label {
@@ -944,17 +974,33 @@ body.is-authenticated .auth-screen {
     font-size: 1.35rem;
   }
 
-  .calendar-weekdays {
-    display: none;
-  }
-
-  .calendar-grid {
-    grid-template-columns: 1fr;
+  .mobile-add-toggle {
+    display: block;
+    width: 100%;
+    margin-bottom: 4px;
   }
 
   .calendar-day {
-    min-height: 86px;
-    border-radius: 16px;
+    min-height: 92px;
+    border-radius: 12px;
+    padding: 6px;
+  }
+
+  .calendar-weekdays,
+  .calendar-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .weekday-pill {
+    font-size: 0.68rem;
+  }
+
+  .calendar-marker {
+    padding: 3px 4px;
+    border-radius: 5px;
+    font-size: 0.58rem;
+    line-height: 1.2;
   }
 
   .preference-options,

@@ -173,6 +173,12 @@ body {
   font-size: 1.35rem;
 }
 
+.mobile-add-toggle {
+  display: block;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
 .calendar-weekdays,
 .calendar-grid {
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -189,8 +195,7 @@ body {
 }
 
 .calendar-day {
-  aspect-ratio: 1;
-  min-height: 0;
+  min-height: 92px;
   border-radius: 10px;
   gap: 3px;
   padding: 5px;
@@ -202,11 +207,12 @@ body {
 }
 
 .calendar-marker {
-  min-height: 5px;
-  padding: 0;
-  border-radius: 999px;
-  color: transparent;
-  font-size: 0;
+  min-height: 0;
+  padding: 3px 4px;
+  border-radius: 5px;
+  color: var(--ink);
+  font-size: 0.58rem;
+  line-height: 1.2;
 }
 
 .field input,

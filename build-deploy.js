@@ -1,13 +1,15 @@
 const fs = require("fs");
+const path = require("path");
 
-const sharedCss = fs.readFileSync("css/styles.css", "utf8");
-const mobileCss = fs.readFileSync("css/mobile.css", "utf8");
-const configJs = fs.readFileSync("js/config.js", "utf8");
-const appJs = fs.readFileSync("js/app.js", "utf8");
-const redirectJs = fs.readFileSync("js/device-redirect.js", "utf8");
+const root = __dirname;
+const sharedCss = readSource(["css/styles.css", "styles.css"]);
+const mobileCss = readSource(["css/mobile.css", "mobile.css"]);
+const configJs = readSource(["js/config.js", "config.js"]);
+const appJs = readSource(["js/app.js", "app.js"]);
+const redirectJs = readSource(["js/device-redirect.js", "device-redirect.js"]);
 
-fs.mkdirSync("deploy", { recursive: true });
-fs.mkdirSync("deploy/scriptable", { recursive: true });
+fs.mkdirSync(resolvePath("deploy"), { recursive: true });
+fs.mkdirSync(resolvePath("deploy/scriptable"), { recursive: true });
 
 buildPage({
   source: "index.html",
@@ -23,12 +25,32 @@ buildPage({
   includeRedirect: false,
 });
 
-fs.writeFileSync("deploy/netlify.toml", '[build]\n  publish = "."\n');
-fs.copyFileSync("scriptable/DailyPlannerWidget.js", "deploy/scriptable/DailyPlannerWidget.js");
-fs.copyFileSync("SCRIPTABLE_SETUP.md", "deploy/SCRIPTABLE_SETUP.md");
+fs.writeFileSync(resolvePath("deploy/netlify.toml"), '[build]\n  publish = "."\n');
+fs.copyFileSync(
+  findSource(["scriptable/DailyPlannerWidget.js", "DailyPlannerWidget.js"]),
+  resolvePath("deploy/scriptable/DailyPlannerWidget.js"),
+);
+fs.copyFileSync(resolvePath("SCRIPTABLE_SETUP.md"), resolvePath("deploy/SCRIPTABLE_SETUP.md"));
+
+function resolvePath(relativePath) {
+  return path.resolve(root, relativePath);
+}
+
+function findSource(candidates) {
+  const match = candidates.map(resolvePath).find((candidate) => fs.existsSync(candidate));
+  if (match) {
+    return match;
+  }
+
+  throw new Error(`Missing build source. Checked: ${candidates.join(", ")}`);
+}
+
+function readSource(candidates) {
+  return fs.readFileSync(findSource(candidates), "utf8");
+}
 
 function buildPage({ source, target, extraCss, includeRedirect }) {
-  let html = fs.readFileSync(source, "utf8");
+  let html = fs.readFileSync(resolvePath(source), "utf8");
 
   html = html.replace(
     /    <link rel="stylesheet" href="css\/styles\.css" \/>\n?/,
@@ -54,5 +76,5 @@ function buildPage({ source, target, extraCss, includeRedirect }) {
     `    <script>\n${appJs}\n    </script>`,
   );
 
-  fs.writeFileSync(target, html);
+  fs.writeFileSync(resolvePath(target), html);
 }

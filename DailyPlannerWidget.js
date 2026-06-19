@@ -8,15 +8,28 @@ const CONFIG = {
 };
 
 const SESSION_KEY = "daily-planner-scriptable-session-v1";
+const APP_URL_KEY = "daily-planner-scriptable-app-url-v1";
 const CACHE_FILE = "daily-planner-widget-cache.json";
 
 async function main() {
-  if (config.runsInApp) {
-    await showSetupMenu();
+  if (args.queryParameters && args.queryParameters.action === "open-app") {
+    try {
+      await openFullPlanner();
+    } catch (error) {
+      await showSetupMenu(error);
+    }
     return;
   }
 
-  const view = normalizeView(args.widgetParameter);
+  if (config.runsInApp) {
+    try {
+      await openFullPlanner();
+    } catch (error) {
+      await showSetupMenu(error);
+    }
+    return;
+  }
+
   let result;
 
   try {
@@ -32,41 +45,59 @@ async function main() {
     result = { data: cached, cached: true };
   }
 
-  const widget = buildPlannerWidget(result.data, view, Boolean(result.cached));
+  const preferences = getWidgetPreferences(result.data);
+  const view = normalizeView(args.widgetParameter, preferences.defaultView);
+  const widget = buildPlannerWidget(result.data, view, Boolean(result.cached), preferences);
+  widget.url = `${URLScheme.forRunningScript()}?action=open-app`;
   widget.refreshAfterDate = new Date(Date.now() + CONFIG.refreshMinutes * 60 * 1000);
   Script.setWidget(widget);
   Script.complete();
 }
 
-async function showSetupMenu() {
+async function showSetupMenu(error = null) {
   const menu = new Alert();
   menu.title = "Daily Planner Widget";
-  menu.message = Keychain.contains(SESSION_KEY)
+  menu.message = error
+    ? String(error.message || error)
+    : Keychain.contains(SESSION_KEY)
     ? "Your planner account is connected."
     : "Connect the same account used in Daily Planner.";
+  menu.addAction("Open full planner");
   menu.addAction(Keychain.contains(SESSION_KEY) ? "Reconnect account" : "Connect account");
+  menu.addAction("Set planner website URL");
   menu.addAction("Preview widget");
   if (Keychain.contains(SESSION_KEY)) menu.addDestructiveAction("Sign out");
   menu.addCancelAction("Cancel");
   const choice = await menu.presentAlert();
 
   if (choice === 0) {
-    await signInInteractively();
+    await openFullPlanner();
     return;
   }
 
   if (choice === 1) {
+    await signInInteractively();
+    return;
+  }
+
+  if (choice === 2) {
+    await configureAppUrl();
+    return;
+  }
+
+  if (choice === 3) {
     try {
       const result = await loadPlannerData();
       saveCache(result.data);
-      await buildPlannerWidget(result.data, "today", false).presentMedium();
+      const preferences = getWidgetPreferences(result.data);
+      await buildPlannerWidget(result.data, preferences.defaultView, false, preferences).presentMedium();
     } catch (error) {
       await showError(error);
     }
     return;
   }
 
-  if (choice === 2 && Keychain.contains(SESSION_KEY)) {
+  if (choice === 4 && Keychain.contains(SESSION_KEY)) {
     Keychain.remove(SESSION_KEY);
     const alert = new Alert();
     alert.title = "Signed out";
@@ -74,6 +105,46 @@ async function showSetupMenu() {
     alert.addAction("OK");
     await alert.presentAlert();
   }
+}
+
+async function configureAppUrl() {
+  const prompt = new Alert();
+  prompt.title = "Planner website";
+  prompt.message = "Enter the public Netlify URL for Daily Planner. Scriptable will open the complete app in a full-screen WebView.";
+  prompt.addTextField("https://your-site.netlify.app", getAppUrl());
+  prompt.addAction("Save");
+  prompt.addCancelAction("Cancel");
+  const choice = await prompt.presentAlert();
+  if (choice === -1) return "";
+
+  const url = prompt.textFieldValue(0).trim().replace(/\/$/, "");
+  if (!/^https:\/\//i.test(url)) {
+    await showError(new Error("Enter a complete https:// website URL."));
+    return "";
+  }
+
+  Keychain.set(APP_URL_KEY, url);
+  return url;
+}
+
+async function openFullPlanner() {
+  const result = await loadPlannerData();
+  saveCache(result.data);
+  const preferences = getWidgetPreferences(result.data);
+  const syncedUrl = preferences.plannerUrl;
+  if (syncedUrl) Keychain.set(APP_URL_KEY, syncedUrl);
+  const url = syncedUrl || getAppUrl() || (config.runsInApp ? await configureAppUrl() : "");
+  if (!url) {
+    if (config.runsInApp) return;
+    throw new Error("Open the script and set your planner website URL first.");
+  }
+  const separator = url.includes("?") ? "&" : "?";
+  const plannerUrl = `${url}${separator}tab=${encodeURIComponent(preferences.startScreen)}`;
+  await WebView.loadURL(plannerUrl, null, true);
+}
+
+function getAppUrl() {
+  return Keychain.contains(APP_URL_KEY) ? Keychain.get(APP_URL_KEY) : "";
 }
 
 async function signInInteractively() {
@@ -99,12 +170,7 @@ async function signInInteractively() {
     saveSession(session);
     const result = await loadPlannerData();
     saveCache(result.data);
-    const success = new Alert();
-    success.title = "Connected";
-    success.message = "Add a Scriptable widget to your Home Screen and select DailyPlannerWidget.";
-    success.addAction("Preview");
-    await success.presentAlert();
-    await buildPlannerWidget(result.data, "today", false).presentMedium();
+    await openFullPlanner();
   } catch (error) {
     await showError(error);
   }
@@ -160,7 +226,7 @@ function readSession() {
   }
 }
 
-function buildPlannerWidget(data, view, cached) {
+function buildPlannerWidget(data, view, cached, preferences = getWidgetPreferences(data)) {
   const widget = new ListWidget();
   widget.setPadding(14, 14, 12, 14);
   const gradient = new LinearGradient();
@@ -178,8 +244,9 @@ function buildPlannerWidget(data, view, cached) {
   date.font = Font.mediumSystemFont(11);
   date.textColor = new Color("667085");
 
-  const items = getWidgetItems(data, view);
-  const limit = config.widgetFamily === "small" ? 3 : config.widgetFamily === "large" ? 9 : 5;
+  const items = getWidgetItems(data, view, preferences);
+  const familyLimit = config.widgetFamily === "small" ? 3 : config.widgetFamily === "large" ? 10 : 5;
+  const limit = Math.min(preferences.itemLimit, familyLimit);
   widget.addSpacer(8);
 
   if (!items.length) {
@@ -219,8 +286,9 @@ function addItemRow(widget, item) {
   meta.lineLimit = 1;
 }
 
-function getWidgetItems(data, view) {
+function getWidgetItems(data, view, preferences = getWidgetPreferences(data)) {
   const today = isoDate(new Date());
+  const lastDate = offsetIsoDate(today, preferences.daysAhead - 1);
   const schedule = Array.isArray(data.schedule) ? data.schedule : [];
   const homework = Array.isArray(data.homework) ? data.homework : [];
   const exams = Array.isArray(data.exams) ? data.exams : [];
@@ -228,28 +296,30 @@ function getWidgetItems(data, view) {
   const items = [];
 
   schedule.forEach((item) => {
-    if (item.date < today) return;
+    if (item.date < today || item.date > lastDate) return;
     if (view === "classes" && item.type !== "class") return;
     if (view === "homework") return;
     if (view === "events" && item.type !== "event") return;
     if (view === "today" && item.date !== today) return;
+    if (item.type === "class" && !preferences.classes) return;
+    if (item.type === "event" && !preferences.events) return;
     items.push({ title: item.title, date: item.date, time: item.start || "", color: item.color || "#3F76C5", meta: `${dateLabel(item.date, today)} ${formatTime(item.start)}${item.location ? ` - ${item.location}` : ""}`.trim() });
   });
 
   if (view === "today" || view === "homework") {
     homework.forEach((item) => {
-      if (item.status === "done" || item.date < today || (view === "today" && item.date !== today)) return;
+      if (!preferences.homework || item.status === "done" || item.date < today || item.date > lastDate || (view === "today" && item.date !== today)) return;
       items.push({ title: item.title, date: item.date, time: item.time || "23:59", color: item.color || "#7EAED6", meta: `${dateLabel(item.date, today)} ${item.course || "Homework"}${item.time ? ` - ${formatTime(item.time)}` : ""}`.trim() });
     });
   }
 
   if (view === "today" || view === "events") {
     exams.forEach((item) => {
-      if (item.status === "done" || item.date < today || (view === "today" && item.date !== today)) return;
+      if (!preferences.exams || item.status === "done" || item.date < today || item.date > lastDate || (view === "today" && item.date !== today)) return;
       items.push({ title: item.title, date: item.date, time: item.time || "23:58", color: item.color || "#6D9FD0", meta: `${dateLabel(item.date, today)} ${item.course || "Exam"}`.trim() });
     });
     reminders.forEach((item) => {
-      if (item.status === "done" || item.date < today || (view === "today" && item.date !== today)) return;
+      if (!preferences.reminders || item.status === "done" || item.date < today || item.date > lastDate || (view === "today" && item.date !== today)) return;
       items.push({ title: item.title, date: item.date, time: item.time || "23:57", color: item.color || "#9ABBD6", meta: `${dateLabel(item.date, today)} Reminder${item.time ? ` - ${formatTime(item.time)}` : ""}` });
     });
   }
@@ -271,9 +341,32 @@ function buildMessageWidget(titleText, message) {
   return widget;
 }
 
-function normalizeView(value) {
-  const view = String(value || "today").trim().toLowerCase();
-  return ["today", "classes", "homework", "events"].includes(view) ? view : "today";
+function getWidgetPreferences(data) {
+  const saved = data && data.settings && data.settings.widgetPreferences
+    ? data.settings.widgetPreferences
+    : {};
+  return {
+    defaultView: normalizeView(saved.defaultView, "today"),
+    startScreen: normalizeStartScreen(saved.startScreen),
+    plannerUrl: typeof saved.plannerUrl === "string" ? saved.plannerUrl.trim().replace(/\/$/, "") : "",
+    daysAhead: [1, 3, 7, 14].includes(Number(saved.daysAhead)) ? Number(saved.daysAhead) : 7,
+    itemLimit: [3, 5, 8, 10].includes(Number(saved.itemLimit)) ? Number(saved.itemLimit) : 5,
+    classes: typeof saved.classes === "boolean" ? saved.classes : true,
+    homework: typeof saved.homework === "boolean" ? saved.homework : true,
+    events: typeof saved.events === "boolean" ? saved.events : true,
+    exams: typeof saved.exams === "boolean" ? saved.exams : true,
+    reminders: typeof saved.reminders === "boolean" ? saved.reminders : true,
+  };
+}
+
+function normalizeStartScreen(value) {
+  const screens = ["calendar", "day-scheduler", "classes", "events", "homework", "exams", "reminders", "settings"];
+  return screens.includes(value) ? value : "calendar";
+}
+
+function normalizeView(value, fallback = "today") {
+  const view = String(value || "").trim().toLowerCase();
+  return ["today", "classes", "homework", "events"].includes(view) ? view : fallback;
 }
 
 function viewTitle(view) {
@@ -282,6 +375,12 @@ function viewTitle(view) {
 
 function isoDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function offsetIsoDate(dateString, days) {
+  const date = new Date(`${dateString}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return isoDate(date);
 }
 
 function dateLabel(date, today) {

@@ -8,6 +8,7 @@ const NOTIFICATION_CHECK_INTERVAL_MS = 60000;
 const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const FOREVER_REPEAT_YEARS = 5;
 const SUPABASE_TABLE = "planner_profiles";
+const PLANNER_TABS = ["calendar", "day-scheduler", "classes", "events", "homework", "exams", "reminders", "settings"];
 
 let completionSweepTimer = null;
 let notificationTimer = null;
@@ -23,7 +24,7 @@ const savedAuthProfile = null;
 let authMode = "login";
 
 const state = {
-  activeTab: "calendar",
+  activeTab: getInitialTab(),
   selectedDate: todayString(),
   visibleMonth: startOfMonth(todayString()),
   data: loadData(),
@@ -191,6 +192,16 @@ const elements = {
   notificationPreference: Array.from(document.querySelectorAll('input[name="notification-preference"]')),
   notificationFrequency: Array.from(document.querySelectorAll('input[name="notification-frequency"]')),
   sendDaySchedulePdf: document.querySelector("#send-day-schedule-pdf"),
+  widgetDefaultView: document.querySelector("#widget-default-view"),
+  scriptableStartScreen: document.querySelector("#scriptable-start-screen"),
+  widgetPlannerUrl: document.querySelector("#widget-planner-url"),
+  widgetDaysAhead: document.querySelector("#widget-days-ahead"),
+  widgetItemLimit: document.querySelector("#widget-item-limit"),
+  widgetShowClasses: document.querySelector("#widget-show-classes"),
+  widgetShowHomework: document.querySelector("#widget-show-homework"),
+  widgetShowEvents: document.querySelector("#widget-show-events"),
+  widgetShowExams: document.querySelector("#widget-show-exams"),
+  widgetShowReminders: document.querySelector("#widget-show-reminders"),
   notifyHomework: document.querySelector("#notify-homework"),
   notifyEvents: document.querySelector("#notify-events"),
   notifyClasses: document.querySelector("#notify-classes"),
@@ -2244,6 +2255,18 @@ function saveSettings() {
     name: elements.settingsName.value.trim(),
     email: elements.settingsEmail.value.trim(),
     phone: elements.settingsPhone.value.trim(),
+    widgetPreferences: {
+      defaultView: elements.widgetDefaultView.value,
+      startScreen: elements.scriptableStartScreen.value,
+      plannerUrl: elements.widgetPlannerUrl.value.trim(),
+      daysAhead: Number(elements.widgetDaysAhead.value),
+      itemLimit: Number(elements.widgetItemLimit.value),
+      classes: elements.widgetShowClasses.checked,
+      homework: elements.widgetShowHomework.checked,
+      events: elements.widgetShowEvents.checked,
+      exams: elements.widgetShowExams.checked,
+      reminders: elements.widgetShowReminders.checked,
+    },
     notificationPreference,
     notificationSchedule: {
       ...currentSettings.notificationSchedule,
@@ -2285,6 +2308,16 @@ function renderSettings(statusMessage = "") {
   elements.settingsName.value = settings.name;
   elements.settingsEmail.value = settings.email;
   elements.settingsPhone.value = settings.phone;
+  elements.widgetDefaultView.value = settings.widgetPreferences.defaultView;
+  elements.scriptableStartScreen.value = settings.widgetPreferences.startScreen;
+  elements.widgetPlannerUrl.value = settings.widgetPreferences.plannerUrl || getCurrentPlannerUrl();
+  elements.widgetDaysAhead.value = String(settings.widgetPreferences.daysAhead);
+  elements.widgetItemLimit.value = String(settings.widgetPreferences.itemLimit);
+  elements.widgetShowClasses.checked = settings.widgetPreferences.classes;
+  elements.widgetShowHomework.checked = settings.widgetPreferences.homework;
+  elements.widgetShowEvents.checked = settings.widgetPreferences.events;
+  elements.widgetShowExams.checked = settings.widgetPreferences.exams;
+  elements.widgetShowReminders.checked = settings.widgetPreferences.reminders;
   elements.settingsCurrentPassword.value = "";
   elements.settingsNewPassword.value = "";
   clearSchoolAccountForm();
@@ -2960,6 +2993,7 @@ function normalizeSettings(settings) {
     name: typeof settings.name === "string" ? settings.name : defaults.name,
     email: typeof settings.email === "string" ? settings.email : defaults.email,
     phone: typeof settings.phone === "string" ? settings.phone : defaults.phone,
+    widgetPreferences: normalizeWidgetPreferences(settings.widgetPreferences),
     notificationPreference,
     notificationSchedule: normalizeNotificationSchedule(settings.notificationSchedule),
     school: typeof settings.school === "string" ? settings.school : defaults.school,
@@ -2979,6 +3013,18 @@ function getDefaultSettings() {
     name: "",
     email: "",
     phone: "",
+    widgetPreferences: {
+      defaultView: "today",
+      startScreen: "calendar",
+      plannerUrl: "",
+      daysAhead: 7,
+      itemLimit: 5,
+      classes: true,
+      homework: true,
+      events: true,
+      exams: true,
+      reminders: true,
+    },
     notificationPreference: "email",
     notificationSchedule: {
       frequency: "daily",
@@ -3003,6 +3049,41 @@ function getDefaultSettings() {
     },
     schoolAccounts: [],
   };
+}
+
+function normalizeWidgetPreferences(preferences) {
+  const defaults = getDefaultSettings().widgetPreferences;
+  return {
+    defaultView: ["today", "classes", "homework", "events"].includes(preferences?.defaultView)
+      ? preferences.defaultView
+      : defaults.defaultView,
+    startScreen: PLANNER_TABS.includes(preferences?.startScreen)
+      ? preferences.startScreen
+      : defaults.startScreen,
+    plannerUrl: typeof preferences?.plannerUrl === "string"
+      ? preferences.plannerUrl.trim().replace(/\/$/, "")
+      : defaults.plannerUrl,
+    daysAhead: [1, 3, 7, 14].includes(Number(preferences?.daysAhead))
+      ? Number(preferences.daysAhead)
+      : defaults.daysAhead,
+    itemLimit: [3, 5, 8, 10].includes(Number(preferences?.itemLimit))
+      ? Number(preferences.itemLimit)
+      : defaults.itemLimit,
+    classes: typeof preferences?.classes === "boolean" ? preferences.classes : defaults.classes,
+    homework: typeof preferences?.homework === "boolean" ? preferences.homework : defaults.homework,
+    events: typeof preferences?.events === "boolean" ? preferences.events : defaults.events,
+    exams: typeof preferences?.exams === "boolean" ? preferences.exams : defaults.exams,
+    reminders: typeof preferences?.reminders === "boolean" ? preferences.reminders : defaults.reminders,
+  };
+}
+
+function getInitialTab() {
+  const requestedTab = new URLSearchParams(window.location.search).get("tab");
+  return PLANNER_TABS.includes(requestedTab) ? requestedTab : "calendar";
+}
+
+function getCurrentPlannerUrl() {
+  return /^https?:$/.test(window.location.protocol) ? window.location.origin : "";
 }
 
 function normalizeNotificationSchedule(schedule) {

@@ -6,6 +6,7 @@ const COLOR_MATCH_PREFIXES = ["class", "event", "homework", "exam", "reminder"];
 const DONE_DISAPPEAR_DELAY_MS = 30000;
 const NOTIFICATION_CHECK_INTERVAL_MS = 60000;
 const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+const AUTO_SAVE_DELAY_MS = 1000;
 const FOREVER_REPEAT_YEARS = 5;
 const SUPABASE_TABLE = "planner_profiles";
 const PLANNER_TABS = ["calendar", "day-scheduler", "classes", "events", "homework", "exams", "reminders", "settings"];
@@ -13,6 +14,7 @@ const PLANNER_TABS = ["calendar", "day-scheduler", "classes", "events", "homewor
 let completionSweepTimer = null;
 let notificationTimer = null;
 let autoSyncTimer = null;
+let cloudSaveTimer = null;
 let syncInProgress = false;
 let schoolImportItems = [];
 let pendingFirstLogin = null;
@@ -830,6 +832,10 @@ async function syncNow() {
   }
 
   syncInProgress = true;
+  if (cloudSaveTimer) {
+    window.clearTimeout(cloudSaveTimer);
+    cloudSaveTimer = null;
+  }
   setSyncButtonsDisabled(true);
   elements.settingsStatus.textContent = "Syncing...";
   await saveDataToSupabase();
@@ -2343,7 +2349,7 @@ function renderSettings(statusMessage = "") {
 
   [
     ["Storage", getStorageStatus()],
-    ["Automatic sync", authState.isAuthenticated ? "Every 5 minutes" : "Available after login"],
+    ["Automatic sync", authState.isAuthenticated ? "Within 1 second of changes" : "Available after login"],
     ["Last sync", lastCloudSyncMessage || "Waiting for first sync"],
     ["School accounts", String(settings.schoolAccounts.length)],
   ].forEach(([label, value]) => {
@@ -2860,7 +2866,21 @@ function persistAndRender() {
 
 function saveData() {
   saveDataLocally();
-  saveDataToSupabase();
+  scheduleCloudSave();
+}
+
+function scheduleCloudSave() {
+  if (cloudSaveTimer) {
+    window.clearTimeout(cloudSaveTimer);
+  }
+
+  cloudSaveTimer = window.setTimeout(async () => {
+    cloudSaveTimer = null;
+    await saveDataToSupabase();
+    if (state.activeTab === "settings") {
+      elements.settingsStatus.textContent = lastCloudSyncMessage;
+    }
+  }, AUTO_SAVE_DELAY_MS);
 }
 
 function saveDataLocally() {

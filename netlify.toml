@@ -1,0 +1,19 @@
+[build]
+  command = "node build-deploy.js"
+  publish = "deploy"
+
+[functions]
+  directory = "netlify/functions"
+
+[functions."weekly-schedule-reminders"]
+  schedule = "*/15 * * * *"
+
+[[headers]]
+  for = "/css/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

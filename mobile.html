@@ -11,10 +11,11 @@
       name="description"
       content="Daily Planner helps you track homework, class schedules, daily plans, and reminders in one calendar."
     />
-    <title>Daily Planner | Student Planner</title>
+    <title>Daily Planner Mobile | Student Planner</title>
     <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/mobile.css" />
   </head>
-  <body>
+  <body class="mobile-preview">
     <div class="background-layer"></div>
 
     <main class="auth-screen" id="auth-screen" aria-live="polite">
@@ -74,7 +75,7 @@
             <div class="brand-mark">D</div>
             <div>
               <p class="eyebrow">Student planner</p>
-              <h1>Daily Planner</h1>
+              <h1>Daily Planner Mobile</h1>
             </div>
           </div>
 
@@ -138,12 +139,12 @@
                 <article class="panel-card calendar-panel">
                   <div class="panel-header">
                     <div>
-                      <p class="panel-label">Calendar view</p>
+                      <p class="panel-label">Monthly view</p>
                       <h3 id="calendar-month-label">Month</h3>
                     </div>
                     <div class="nav-actions">
-                      <button class="icon-button" id="prev-month" type="button" aria-label="Previous calendar period">←</button>
-                      <button class="icon-button" id="next-month" type="button" aria-label="Next calendar period">→</button>
+                      <button class="icon-button" id="prev-month" type="button" aria-label="Previous month">←</button>
+                      <button class="icon-button" id="next-month" type="button" aria-label="Next month">→</button>
                     </div>
                   </div>
 
@@ -1102,7 +1103,6 @@
     </template>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config.js"></script>
-    <script src="js/device-redirect.js"></script>
     <script src="js/app.js"></script>
   </body>
 </html>

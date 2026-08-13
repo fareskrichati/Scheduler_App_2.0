@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Daily Planner Widget Preview</title>
+    <link rel="stylesheet" href="css/widget-preview.css" />
+  </head>
+  <body>
+    <main class="preview-shell">
+      <header class="preview-header">
+        <div>
+          <p class="eyebrow">Design preview</p>
+          <h1>Daily Planner widget</h1>
+          <p>Browser mockups of the current Scriptable design. No account or planner data is used.</p>
+        </div>
+        <div class="preview-controls">
+          <label>
+            Preview data
+            <select id="preview-data-source">
+              <option value="mine">My schedule</option>
+              <option value="preset">Preset example</option>
+            </select>
+          </label>
+          <label>
+            Widget view
+            <select id="preview-view">
+              <option value="today">Today's planner</option>
+              <option value="classes">Classes + homework</option>
+              <option value="homework">Homework</option>
+              <option value="events">Events</option>
+            </select>
+          </label>
+          <label class="offline-control">
+            <input id="preview-offline" type="checkbox" />
+            Show offline state
+          </label>
+        </div>
+      </header>
+
+      <section class="widget-gallery" aria-label="Widget size previews">
+        <article class="preview-group">
+          <div class="size-label"><strong>Small</strong><span>3 items</span></div>
+          <div class="scriptable-widget widget-small" data-limit="3"></div>
+        </article>
+        <article class="preview-group">
+          <div class="size-label"><strong>Medium</strong><span>5 items</span></div>
+          <div class="scriptable-widget widget-medium" data-limit="5"></div>
+        </article>
+        <article class="preview-group">
+          <div class="size-label"><strong>Large</strong><span>10 items</span></div>
+          <div class="scriptable-widget widget-large" data-limit="14"></div>
+        </article>
+      </section>
+
+      <p class="preview-note">Completion controls are visual in this preview. In Scriptable, tapping a completion circle or its row marks homework, exams, reminders, and events complete.</p>
+    </main>
+    <script src="js/widget-preview.js"></script>
+  </body>
+</html>

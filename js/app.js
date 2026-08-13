@@ -709,7 +709,7 @@ function setupClassScheduleImport() {
       <label class="field"><span>Schedule system</span><select id="academic-term-system"><option value="semester">Semester</option><option value="quarter">Quarter</option><option value="trimester">Trimester</option></select></label>
       <label class="field"><span>Term name</span><input id="academic-term-name" type="text" placeholder="Fall 2026" /></label>
     </div>
-    <div class="form-actions"><button class="ghost-button" id="find-school-calendar" type="button">Research and autofill official dates</button></div>
+    <div class="form-actions"><button class="ghost-button" id="find-school-calendar" type="button">Research and autofill official dates</button><button class="ghost-button" id="search-school-calendar-manually" type="button">Find calendar manually</button></div>
     <div id="academic-calendar-sources" class="academic-calendar-sources"></div>
     <p class="settings-note">The backend searches official school sources, fills the dates below, and leaves them editable for your review.</p>
     <div class="field-row">
@@ -736,6 +736,7 @@ function setupClassScheduleImport() {
   document.querySelector("#save-academic-calendar").addEventListener("click", saveAcademicCalendar);
   document.querySelector("#add-academic-break").addEventListener("click", () => addAcademicBreakRow());
   document.querySelector("#find-school-calendar").addEventListener("click", researchOfficialSchoolCalendar);
+  document.querySelector("#search-school-calendar-manually").addEventListener("click", searchOfficialSchoolCalendarManually);
   document.querySelector("#detect-schedule-classes").addEventListener("click", detectScheduleClasses);
   document.querySelector("#save-detected-classes").addEventListener("click", saveDetectedClasses);
   syncAcademicCalendarInputs();
@@ -848,6 +849,25 @@ async function researchOfficialSchoolCalendar() {
     status.textContent = "Official dates found and autofilled. Review them, then save school dates.";
   } catch (error) { status.textContent = error.message || "School-calendar research failed."; }
   finally { button.disabled = false; }
+}
+
+function searchOfficialSchoolCalendarManually() {
+  const school = document.querySelector("#academic-school-name").value.trim();
+  const academicYear = document.querySelector("#academic-year").value.trim();
+  const term = document.querySelector("#academic-term-name").value.trim();
+  const status = document.querySelector("#schedule-import-status");
+  if (!school || !academicYear) {
+    status.textContent = "Enter your school name and academic year first.";
+    return;
+  }
+  const query = [school, academicYear, term, "official academic calendar term dates breaks"].filter(Boolean).join(" ");
+  const searchWindow = window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, "_blank");
+  if (!searchWindow) {
+    status.textContent = "Your browser blocked the search tab. Allow pop-ups for this site and try again.";
+    return;
+  }
+  searchWindow.opener = null;
+  status.textContent = "Official-calendar search opened. Use the school's own website, then enter the term dates and named breaks below and click Save school dates.";
 }
 
 async function extractScheduleFiles() {

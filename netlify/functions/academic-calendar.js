@@ -1,4 +1,7 @@
 const OPENAI_URL = "https://api.openai.com/v1/responses";
+// This is the same public anon key used by the browser client. It is safe to ship publicly
+// and is required when validating an end-user access token with Supabase Auth.
+const SUPABASE_PUBLIC_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ndmFoc2xieGRza3poaXd4eG9kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0NTE2MzksImV4cCI6MjA5NDAyNzYzOX0.ovt30I4ZqPclxcXR5XJVrtBKUn_bVz17vrTJklxg3h8";
 
 exports.handler = async function handler(event) {
   const authConfig = getSupabaseAuthConfig();
@@ -6,7 +9,7 @@ exports.handler = async function handler(event) {
     const missing = [];
     if (!process.env.OPENAI_API_KEY) missing.push("OPENAI_API_KEY");
     if (!authConfig.url) missing.push("SUPABASE_URL");
-    if (!authConfig.apiKey) missing.push("SUPABASE_PUBLISHABLE_KEY or SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY");
+    if (!authConfig.apiKey) missing.push("SUPABASE_PUBLISHABLE_KEY or SUPABASE_ANON_KEY");
     return json(200, { configured: missing.length === 0, missing });
   }
   if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed." });
@@ -62,16 +65,16 @@ exports.handler = async function handler(event) {
 
 async function requirePlannerUser(authorization) {
   const { url, apiKey } = getSupabaseAuthConfig();
-  if (!url || !apiKey) throw Object.assign(new Error("Backend authentication is not configured. Add SUPABASE_URL and a Supabase publishable, anon, or service-role key in Netlify."), { statusCode: 503 });
+  if (!url || !apiKey) throw Object.assign(new Error("Backend authentication is not configured. Add SUPABASE_URL and a Supabase publishable or anon key in Netlify."), { statusCode: 503 });
   if (!authorization?.startsWith("Bearer ")) throw Object.assign(new Error("Sign in before researching a school calendar."), { statusCode: 401 });
   const response = await fetch(`${url.replace(/\/$/, "")}/auth/v1/user`, { headers: { apikey: apiKey, Authorization: authorization } });
-  if (!response.ok) throw Object.assign(new Error("Your sign-in session expired. Sign in again."), { statusCode: 401 });
+  if (!response.ok) throw Object.assign(new Error("Your sign-in could not be verified. Sign out, sign in again, and retry."), { statusCode: 401 });
 }
 
 function getSupabaseAuthConfig() {
   return {
     url: process.env.SUPABASE_URL || "",
-    apiKey: process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || ""
+    apiKey: process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || SUPABASE_PUBLIC_ANON_KEY
   };
 }
 

@@ -34,7 +34,7 @@ Configure these Netlify environment variables before deploying the backend looku
 
 - `OPENAI_API_KEY` — server-side OpenAI API key; never expose it in browser JavaScript.
 - `SUPABASE_URL` — the planner Supabase project URL.
-- `SUPABASE_ANON_KEY` — used by the backend to validate the signed-in user's token.
+- `SUPABASE_PUBLISHABLE_KEY` or `SUPABASE_ANON_KEY` — used by the backend to validate the signed-in user's token. If neither is set, the backend can use `SUPABASE_SERVICE_ROLE_KEY` server-side.
 - `OPENAI_CALENDAR_MODEL` — optional override; defaults to `gpt-5.4-mini`.
 
 Redeploy after saving the variables. The class importer will then search official school-controlled sources and autofill editable term dates, named breaks, confidence, and source links.

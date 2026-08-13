@@ -749,7 +749,7 @@ async function checkAcademicCalendarBackend() {
     const response = await fetch("/.netlify/functions/academic-calendar", { headers: { Accept: "application/json" } });
     if (response.status === 404) { status.textContent = "Automatic research backend was not deployed. Redeploy the site with Netlify Functions enabled."; return; }
     const result = await response.json();
-    if (!result.configured) status.textContent = "Automatic research needs OPENAI_API_KEY, SUPABASE_URL, and SUPABASE_ANON_KEY in Netlify environment variables.";
+    if (!result.configured) status.textContent = `Automatic research is missing these Netlify environment variables: ${(result.missing || []).join(", ") || "backend configuration"}.`;
   } catch (_) {
     status.textContent = "Automatic research is unavailable in this local/static preview. It works through the deployed Netlify backend.";
   }
@@ -830,11 +830,13 @@ async function researchOfficialSchoolCalendar() {
   if (!school || !academicYear) { status.textContent = "Enter your school name and academic year first."; return; }
   button.disabled = true; status.textContent = "Researching official school sources…";
   try {
+    if (window.location.protocol === "file:") throw new Error("Research needs the Netlify backend. Open the deployed Netlify site, or run the project with Netlify Dev instead of opening the HTML file directly.");
     const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
     if (!session?.access_token) throw new Error("Sign in before researching a school calendar.");
     const response = await fetch("/.netlify/functions/academic-calendar", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ schoolName: school, academicYear, termSystem: document.querySelector("#academic-term-system").value, termName: term }) });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error || "School-calendar research failed.");
+    if (response.status === 404) throw new Error("The academic-calendar Netlify Function was not deployed. Trigger a new Netlify deploy from the latest code.");
+    if (!response.ok) throw new Error(result.error || `School-calendar research failed (${response.status}).`);
     document.querySelector("#academic-school-name").value = result.schoolName || school;
     document.querySelector("#academic-year").value = result.academicYear || academicYear;
     document.querySelector("#academic-term-system").value = result.termSystem;

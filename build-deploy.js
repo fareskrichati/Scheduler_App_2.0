@@ -10,6 +10,7 @@ const redirectJs = readSource(["js/device-redirect.js", "device-redirect.js"]);
 
 fs.mkdirSync(resolvePath("deploy"), { recursive: true });
 fs.mkdirSync(resolvePath("deploy/scriptable"), { recursive: true });
+fs.mkdirSync(resolvePath("deploy/netlify/functions"), { recursive: true });
 
 buildPage({
   source: "index.html",
@@ -25,7 +26,15 @@ buildPage({
   includeRedirect: false,
 });
 
-fs.writeFileSync(resolvePath("deploy/netlify.toml"), '[build]\n  publish = "."\n');
+fs.copyFileSync(resolvePath("widget-preview.html"), resolvePath("deploy/widget-preview.html"));
+fs.mkdirSync(resolvePath("deploy/css"), { recursive: true });
+fs.mkdirSync(resolvePath("deploy/js"), { recursive: true });
+fs.copyFileSync(resolvePath("css/widget-preview.css"), resolvePath("deploy/css/widget-preview.css"));
+fs.copyFileSync(resolvePath("js/widget-preview.js"), resolvePath("deploy/js/widget-preview.js"));
+
+fs.writeFileSync(resolvePath("deploy/netlify.toml"), '[build]\n  publish = "."\n\n[functions]\n  directory = "netlify/functions"\n\n[functions."weekly-schedule-reminders"]\n  schedule = "*/15 * * * *"\n');
+fs.copyFileSync(resolvePath("netlify/functions/academic-calendar.js"), resolvePath("deploy/netlify/functions/academic-calendar.js"));
+fs.copyFileSync(resolvePath("netlify/functions/weekly-schedule-reminders.js"), resolvePath("deploy/netlify/functions/weekly-schedule-reminders.js"));
 fs.copyFileSync(
   findSource(["scriptable/DailyPlannerWidget.js", "DailyPlannerWidget.js"]),
   resolvePath("deploy/scriptable/DailyPlannerWidget.js"),

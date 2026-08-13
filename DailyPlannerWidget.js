@@ -12,6 +12,11 @@ const APP_URL_KEY = "daily-planner-scriptable-app-url-v1";
 const CACHE_FILE = "daily-planner-widget-cache.json";
 
 async function main() {
+  if (args.queryParameters && args.queryParameters.action === "complete") {
+    await completeWidgetItem(args.queryParameters.collection, args.queryParameters.id);
+    return;
+  }
+
   if (args.queryParameters && args.queryParameters.action === "open-app") {
     try {
       await openFullPlanner();
@@ -228,7 +233,7 @@ function readSession() {
 
 function buildPlannerWidget(data, view, cached, preferences = getWidgetPreferences(data)) {
   const widget = new ListWidget();
-  widget.setPadding(14, 14, 12, 14);
+  widget.setPadding(10, 11, 9, 11);
   const gradient = new LinearGradient();
   gradient.colors = [new Color("EAF4FB"), new Color("F8F4EC")];
   gradient.locations = [0, 1];
@@ -237,17 +242,17 @@ function buildPlannerWidget(data, view, cached, preferences = getWidgetPreferenc
   const header = widget.addStack();
   header.centerAlignContent();
   const title = header.addText(viewTitle(view));
-  title.font = Font.boldSystemFont(14);
+  title.font = Font.boldSystemFont(12);
   title.textColor = new Color("285B86");
   header.addSpacer();
   const date = header.addText(shortDate(new Date()));
-  date.font = Font.mediumSystemFont(11);
+  date.font = Font.mediumSystemFont(9);
   date.textColor = new Color("667085");
 
   const items = getWidgetItems(data, view, preferences);
-  const familyLimit = config.widgetFamily === "small" ? 3 : config.widgetFamily === "large" ? 10 : 5;
-  const limit = Math.min(preferences.itemLimit, familyLimit);
-  widget.addSpacer(8);
+  const familyLimit = config.widgetFamily === "small" ? 3 : config.widgetFamily === "large" ? 14 : 5;
+  const limit = config.widgetFamily === "large" ? Math.min(Math.max(preferences.itemLimit, 12), familyLimit) : Math.min(preferences.itemLimit, familyLimit);
+  widget.addSpacer(5);
 
   if (!items.length) {
     const empty = widget.addText("Nothing coming up.");
@@ -255,7 +260,7 @@ function buildPlannerWidget(data, view, cached, preferences = getWidgetPreferenc
     empty.textColor = new Color("667085");
   } else {
     items.slice(0, limit).forEach((item, index) => {
-      if (index) widget.addSpacer(7);
+      if (index) widget.addSpacer(4);
       addItemRow(widget, item);
     });
   }
@@ -270,18 +275,27 @@ function buildPlannerWidget(data, view, cached, preferences = getWidgetPreferenc
 function addItemRow(widget, item) {
   const row = widget.addStack();
   row.centerAlignContent();
-  row.spacing = 7;
-  const dot = row.addText("|");
-  dot.font = Font.boldSystemFont(16);
-  dot.textColor = new Color(item.color.replace("#", "") || "7EAED6");
+  row.spacing = 6;
+  if (item.nested) row.addSpacer(14);
+  if (item.completable) {
+    row.url = `${URLScheme.forRunningScript()}?action=complete&collection=${encodeURIComponent(item.collection)}&id=${encodeURIComponent(item.id)}`;
+    const check = row.addText("○");
+    check.font = Font.semiboldSystemFont(14);
+    check.textColor = new Color(item.color.replace("#", "") || "7EAED6");
+    check.url = row.url;
+  } else {
+    const dot = row.addText("│");
+    dot.font = Font.boldSystemFont(13);
+    dot.textColor = new Color(item.color.replace("#", "") || "7EAED6");
+  }
   const text = row.addStack();
   text.layoutVertically();
   const name = text.addText(item.title);
-  name.font = Font.semiboldSystemFont(12);
+  name.font = Font.semiboldSystemFont(10);
   name.textColor = new Color("161616");
   name.lineLimit = 1;
   const meta = text.addText(item.meta);
-  meta.font = Font.mediumSystemFont(9);
+  meta.font = Font.mediumSystemFont(8);
   meta.textColor = new Color("667085");
   meta.lineLimit = 1;
 }
@@ -303,28 +317,75 @@ function getWidgetItems(data, view, preferences = getWidgetPreferences(data)) {
     if (view === "today" && item.date !== today) return;
     if (item.type === "class" && !preferences.classes) return;
     if (item.type === "event" && !preferences.events) return;
-    items.push({ title: item.title, date: item.date, time: item.start || "", color: item.color || "#3F76C5", meta: `${dateLabel(item.date, today)} ${formatTime(item.start)}${item.location ? ` - ${item.location}` : ""}`.trim() });
+    if (item.status === "done") return;
+    items.push({ title: item.title, date: item.date, time: item.start || "", color: item.color || "#3F76C5", meta: `${dateLabel(item.date, today)} ${formatTime(item.start)}${item.location ? ` - ${item.location}` : ""}`.trim(), id: item.id, collection: "schedule", completable: item.type === "event", courseKey: widgetCourseKey(item.title), sortKey: `${item.date} ${item.start || ""}|0` });
   });
+
+  if (view === "classes" && preferences.homework) {
+    const classItems = items.filter((item) => item.collection === "schedule").sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+    homework.forEach((item) => {
+      if (item.status === "done" || item.date < today || item.date > lastDate) return;
+      const homeworkKey = widgetCourseKey(item.course || "");
+      const courseName = (item.course || "").trim().toLowerCase();
+      if (!courseName) return;
+      const parent = classItems.find((classItem) => classItem.courseKey === homeworkKey || classItem.title.toLowerCase().includes(courseName) || courseName.includes(classItem.title.toLowerCase()));
+      if (!parent) return;
+      items.push({ title: item.title, date: parent.date, time: parent.time, color: parent.color, meta: `Due ${dateLabel(item.date, today)}${item.time ? ` - ${formatTime(item.time)}` : ""}`, id: item.id, collection: "homework", completable: true, nested: true, sortKey: `${parent.sortKey}|1|${item.date} ${item.time || "23:59"}` });
+    });
+  }
 
   if (view === "today" || view === "homework") {
     homework.forEach((item) => {
       if (!preferences.homework || item.status === "done" || item.date < today || item.date > lastDate || (view === "today" && item.date !== today)) return;
-      items.push({ title: item.title, date: item.date, time: item.time || "23:59", color: item.color || "#7EAED6", meta: `${dateLabel(item.date, today)} ${item.course || "Homework"}${item.time ? ` - ${formatTime(item.time)}` : ""}`.trim() });
+      items.push({ title: item.title, date: item.date, time: item.time || "23:59", color: item.color || "#7EAED6", meta: `${dateLabel(item.date, today)} ${item.course || "Homework"}${item.time ? ` - ${formatTime(item.time)}` : ""}`.trim(), id: item.id, collection: "homework", completable: true });
     });
   }
 
   if (view === "today" || view === "events") {
     exams.forEach((item) => {
       if (!preferences.exams || item.status === "done" || item.date < today || item.date > lastDate || (view === "today" && item.date !== today)) return;
-      items.push({ title: item.title, date: item.date, time: item.time || "23:58", color: item.color || "#6D9FD0", meta: `${dateLabel(item.date, today)} ${item.course || "Exam"}`.trim() });
+      items.push({ title: item.title, date: item.date, time: item.time || "23:58", color: item.color || "#6D9FD0", meta: `${dateLabel(item.date, today)} ${item.course || "Exam"}`.trim(), id: item.id, collection: "exams", completable: true });
     });
     reminders.forEach((item) => {
       if (!preferences.reminders || item.status === "done" || item.date < today || item.date > lastDate || (view === "today" && item.date !== today)) return;
-      items.push({ title: item.title, date: item.date, time: item.time || "23:57", color: item.color || "#9ABBD6", meta: `${dateLabel(item.date, today)} Reminder${item.time ? ` - ${formatTime(item.time)}` : ""}` });
+      items.push({ title: item.title, date: item.date, time: item.time || "23:57", color: item.color || "#9ABBD6", meta: `${dateLabel(item.date, today)} Reminder${item.time ? ` - ${formatTime(item.time)}` : ""}`, id: item.id, collection: "reminders", completable: true });
     });
   }
 
-  return items.sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+  return items.sort((a, b) => (a.sortKey || `${a.date} ${a.time}`).localeCompare(b.sortKey || `${b.date} ${b.time}`));
+}
+
+function widgetCourseKey(value) {
+  const match = String(value || "").match(/([A-Z]{2,}(?:\s+[A-Z])?\s*\d+[A-Z]?)/i);
+  return (match ? match[1] : String(value || "")).replace(/[^a-z0-9]/gi, "").toLowerCase();
+}
+
+async function completeWidgetItem(collection, id) {
+  const allowed = ["schedule", "homework", "exams", "reminders"];
+  if (!allowed.includes(collection) || !id) throw new Error("Invalid planner item.");
+  const result = await loadPlannerData();
+  const items = Array.isArray(result.data[collection]) ? result.data[collection] : [];
+  const item = items.find((entry) => entry.id === id);
+  if (!item || (collection === "schedule" && item.type !== "event")) return;
+  item.status = "done";
+  item.completedAt = new Date().toISOString();
+  await savePlannerData(result.data);
+  saveCache(result.data);
+  const notice = new Notification();
+  notice.title = "Completed";
+  notice.body = item.title;
+  await notice.schedule();
+  Script.complete();
+}
+
+async function savePlannerData(data) {
+  const session = readSession();
+  const request = new Request(`${CONFIG.supabaseUrl}/rest/v1/planner_profiles?user_id=eq.${encodeURIComponent(session.user.id)}`);
+  request.method = "PATCH";
+  request.headers = { apikey: CONFIG.anonKey, Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json", Prefer: "return=minimal" };
+  request.body = JSON.stringify({ data, updated_at: new Date().toISOString() });
+  await request.load();
+  if (request.response.statusCode >= 400) throw new Error("Could not mark that item complete.");
 }
 
 function buildMessageWidget(titleText, message) {
@@ -350,7 +411,7 @@ function getWidgetPreferences(data) {
     startScreen: normalizeStartScreen(saved.startScreen),
     plannerUrl: typeof saved.plannerUrl === "string" ? saved.plannerUrl.trim().replace(/\/$/, "") : "",
     daysAhead: [1, 3, 7, 14].includes(Number(saved.daysAhead)) ? Number(saved.daysAhead) : 7,
-    itemLimit: [3, 5, 8, 10].includes(Number(saved.itemLimit)) ? Number(saved.itemLimit) : 5,
+    itemLimit: [3, 5, 8, 10, 12, 14].includes(Number(saved.itemLimit)) ? Number(saved.itemLimit) : 5,
     classes: typeof saved.classes === "boolean" ? saved.classes : true,
     homework: typeof saved.homework === "boolean" ? saved.homework : true,
     events: typeof saved.events === "boolean" ? saved.events : true,
@@ -360,7 +421,7 @@ function getWidgetPreferences(data) {
 }
 
 function normalizeStartScreen(value) {
-  const screens = ["calendar", "day-scheduler", "classes", "events", "homework", "exams", "reminders", "settings"];
+  const screens = ["calendar", "classes", "events", "homework", "exams", "reminders", "settings"];
   return screens.includes(value) ? value : "calendar";
 }
 

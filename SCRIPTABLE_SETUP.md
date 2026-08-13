@@ -27,3 +27,25 @@ When no widget parameter is supplied, the widget uses the default view selected 
 ## Privacy
 
 The script signs into Supabase under the existing row-level security rules. The Supabase session is stored in iPhone Keychain. The password is used only during sign-in and is not saved by the script.
+
+## Automatic school-calendar lookup
+
+Configure these Netlify environment variables before deploying the backend lookup:
+
+- `OPENAI_API_KEY` — server-side OpenAI API key; never expose it in browser JavaScript.
+- `SUPABASE_URL` — the planner Supabase project URL.
+- `SUPABASE_ANON_KEY` — used by the backend to validate the signed-in user's token.
+- `OPENAI_CALENDAR_MODEL` — optional override; defaults to `gpt-5.4-mini`.
+
+Redeploy after saving the variables. The class importer will then search official school-controlled sources and autofill editable term dates, named breaks, confidence, and source links.
+
+## Weekly schedule reminders
+
+Run the latest `supabase-schema.sql`, then configure these Netlify variables:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `PLANNER_PUBLIC_URL`
+- `RESEND_API_KEY` and `REMINDER_EMAIL_FROM` for email
+- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER` for text messages
+
+`REMINDER_EMAIL_FROM` must use a domain verified with Resend. Text delivery must comply with Twilio messaging registration and consent requirements. The scheduled function checks every 15 minutes and sends once at the weekday, local time, timezone, and delivery method selected in Settings.

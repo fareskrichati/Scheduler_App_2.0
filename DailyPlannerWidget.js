@@ -27,11 +27,7 @@ async function main() {
   }
 
   if (config.runsInApp) {
-    try {
-      await openFullPlanner();
-    } catch (error) {
-      await showSetupMenu(error);
-    }
+    await showSetupMenu();
     return;
   }
 
@@ -61,55 +57,52 @@ async function main() {
 
 async function showSetupMenu(error = null) {
   const menu = new Alert();
+  const actions = [];
+  const hasSession = Keychain.contains(SESSION_KEY);
   menu.title = "Daily Planner Widget";
   menu.message = error
     ? String(error.message || error)
-    : Keychain.contains(SESSION_KEY)
+    : hasSession
     ? "Your planner account is connected."
     : "Connect the same account used in Daily Planner.";
-  menu.addAction("Open full planner");
-  menu.addAction(Keychain.contains(SESSION_KEY) ? "Reconnect account" : "Connect account");
+
+  if (hasSession) {
+    menu.addAction("Open full planner");
+    actions.push(openFullPlanner);
+  }
+  menu.addAction(hasSession ? "Reconnect account" : "Connect account");
+  actions.push(signInInteractively);
   menu.addAction("Set planner website URL");
-  menu.addAction("Preview widget");
-  if (Keychain.contains(SESSION_KEY)) menu.addDestructiveAction("Sign out");
+  actions.push(configureAppUrl);
+  if (hasSession) {
+    menu.addAction("Preview widget");
+    actions.push(previewWidget);
+    menu.addDestructiveAction("Sign out");
+    actions.push(signOut);
+  }
   menu.addCancelAction("Cancel");
   const choice = await menu.presentAlert();
+  if (choice >= 0 && actions[choice]) await actions[choice]();
+}
 
-  if (choice === 0) {
-    await openFullPlanner();
-    return;
+async function previewWidget() {
+  try {
+    const result = await loadPlannerData();
+    saveCache(result.data);
+    const preferences = getWidgetPreferences(result.data);
+    await buildPlannerWidget(result.data, preferences.defaultView, false, preferences).presentMedium();
+  } catch (error) {
+    await showError(error);
   }
+}
 
-  if (choice === 1) {
-    await signInInteractively();
-    return;
-  }
-
-  if (choice === 2) {
-    await configureAppUrl();
-    return;
-  }
-
-  if (choice === 3) {
-    try {
-      const result = await loadPlannerData();
-      saveCache(result.data);
-      const preferences = getWidgetPreferences(result.data);
-      await buildPlannerWidget(result.data, preferences.defaultView, false, preferences).presentMedium();
-    } catch (error) {
-      await showError(error);
-    }
-    return;
-  }
-
-  if (choice === 4 && Keychain.contains(SESSION_KEY)) {
-    Keychain.remove(SESSION_KEY);
-    const alert = new Alert();
-    alert.title = "Signed out";
-    alert.message = "The widget session was removed from iPhone Keychain.";
-    alert.addAction("OK");
-    await alert.presentAlert();
-  }
+async function signOut() {
+  if (Keychain.contains(SESSION_KEY)) Keychain.remove(SESSION_KEY);
+  const alert = new Alert();
+  alert.title = "Signed out";
+  alert.message = "The widget session was removed from iPhone Keychain.";
+  alert.addAction("OK");
+  await alert.presentAlert();
 }
 
 async function configureAppUrl() {
@@ -186,7 +179,15 @@ async function loadPlannerData() {
   if (!session) throw new Error("Open this script in Scriptable to connect your account.");
 
   if (!session.access_token || Date.now() >= session.expiresAt - 60000) {
-    session = await requestSession("refresh_token", { refresh_token: session.refresh_token });
+    try {
+      session = await requestSession("refresh_token", { refresh_token: session.refresh_token });
+    } catch (error) {
+      if (error.statusCode === 400 || error.statusCode === 401) {
+        Keychain.remove(SESSION_KEY);
+        throw new Error("Your saved sign-in expired. Tap Connect account to sign in again.");
+      }
+      throw error;
+    }
     saveSession(session);
   }
 
@@ -213,7 +214,11 @@ async function requestSession(grantType, body) {
   };
   request.body = JSON.stringify(body);
   const response = await request.loadJSON();
-  if (request.response.statusCode >= 400) throw new Error(response.error_description || response.msg || "Sign in failed.");
+  if (request.response.statusCode >= 400) {
+    const error = new Error(response.error_description || response.msg || "Sign in failed.");
+    error.statusCode = request.response.statusCode;
+    throw error;
+  }
   return response;
 }
 

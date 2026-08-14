@@ -19,6 +19,7 @@ let syncInProgress = false;
 let schoolImportItems = [];
 let detectedScheduleClasses = [];
 let detectedHomeworkItems = [];
+let detectedEventItems = [];
 let pendingFirstLogin = null;
 let lastCloudSyncMessage = "";
 let supabaseSetupMessage = "";
@@ -240,6 +241,7 @@ async function initialize() {
   bindEvents();
   setupClassScheduleImport();
   setupHomeworkPhotoImport();
+  setupEventPhotoImport();
   setupWidgetSettingsPreview();
   setupWeeklyScheduleReminderSettings();
   setupDesktopAddAccordions();
@@ -387,6 +389,7 @@ function bindEvents() {
   elements.homeworkDate.addEventListener("change", () => syncRepeatSelectionWithDate("homework"));
   elements.homeworkMatchColor.addEventListener("change", () => toggleMatchOptions("homework"));
   elements.homeworkRepeatForever.addEventListener("change", () => toggleRepeatOptions("homework"));
+  elements.homeworkClass.addEventListener("change", () => applySelectedClassColor("homework"));
 
   elements.examForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -395,6 +398,7 @@ function bindEvents() {
 
   elements.examReset.addEventListener("click", resetExamForm);
   elements.examMatchColor.addEventListener("change", () => toggleMatchOptions("exam"));
+  elements.examCourse.addEventListener("change", () => applySelectedClassColor("exam"));
 
   elements.reminderForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -414,9 +418,9 @@ function bindEvents() {
   elements.reminderMatchColor.addEventListener("change", () => toggleMatchOptions("reminder"));
   elements.reminderRepeatForever.addEventListener("change", () => toggleRepeatOptions("reminder"));
 
-  elements.settingsForm.addEventListener("submit", (event) => {
+  elements.settingsForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    saveSettings();
+    await saveSettings();
   });
 
   elements.settingsReset.addEventListener("click", resetSettingsForm);
@@ -613,6 +617,34 @@ function getImportableClasses() {
   return Array.from(map.values());
 }
 
+function renderClassCourseOptions() {
+  const classes = getImportableClasses();
+  [elements.homeworkClass, elements.examCourse].forEach((select) => {
+    const current = select.value;
+    select.innerHTML = '<option value="">Choose a class</option>';
+    classes.forEach((course) => {
+      const option = document.createElement("option");
+      option.value = course.title;
+      option.textContent = course.title;
+      select.appendChild(option);
+    });
+    if (classes.some((course) => course.title === current)) select.value = current;
+  });
+}
+
+function applySelectedClassColor(kind) {
+  const select = kind === "homework" ? elements.homeworkClass : elements.examCourse;
+  const colorInput = kind === "homework" ? elements.homeworkColor : elements.examColor;
+  const course = getImportableClasses().find((item) => item.title === select.value);
+  if (!course) return;
+  colorInput.value = course.color;
+  setMatchSelection(kind, "");
+}
+
+function colorForSelectedClass(courseTitle, fallback) {
+  return getImportableClasses().find((item) => item.title === courseTitle)?.color || fallback;
+}
+
 function parseCanvasHomeworkText(text) {
   const lines = text.split(/\n+/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
   const classes = getImportableClasses();
@@ -681,6 +713,103 @@ function saveDetectedHomework() {
   const count = detectedHomeworkItems.length; detectedHomeworkItems = [];
   document.querySelector("#homework-photo-review").hidden = true; persistAndRender();
   status.textContent = `${count} homework item${count === 1 ? "" : "s"} added with matching class colors.`;
+}
+
+function setupEventPhotoImport() {
+  const eventPanel = elements.eventForm?.closest(".panel-card");
+  if (!eventPanel || document.querySelector("#event-photo-importer")) return;
+  const importer = document.createElement("section");
+  importer.id = "event-photo-importer";
+  importer.className = "homework-photo-importer";
+  importer.dataset.desktopAccordionLabel = "Import events from screenshots";
+  importer.innerHTML = `
+    <div class="subsection-header"><div><p class="panel-label">Event screenshots</p><h3>Import an event schedule</h3></div></div>
+    <p class="settings-note">Upload screenshots of a sports, club, work, or other event schedule. The photo reader finds event names, dates, times, and locations. Review every event before saving.</p>
+    <label class="field"><span>Schedule screenshots</span><input id="event-photo-files" type="file" accept="image/*" multiple /></label>
+    <button class="primary-button" id="read-event-photos" type="button">Read event schedule</button>
+    <p class="settings-note" id="event-photo-status" role="status"></p>
+    <div id="event-photo-review" hidden><div class="subsection-header"><div><p class="panel-label">Review</p><h3>Events found</h3></div></div><div id="detected-event-list" class="detected-class-list"></div><button class="primary-button" id="save-detected-events" type="button">Add reviewed events</button></div>`;
+  eventPanel.insertBefore(importer, elements.eventForm);
+  document.querySelector("#read-event-photos").addEventListener("click", readEventPhotos);
+  document.querySelector("#save-detected-events").addEventListener("click", saveDetectedEvents);
+  setupMobileSectionPopup(importer, eventPanel, "Import event schedule");
+}
+
+async function readEventPhotos() {
+  const files = Array.from(document.querySelector("#event-photo-files").files || []);
+  const status = document.querySelector("#event-photo-status");
+  const button = document.querySelector("#read-event-photos");
+  if (!files.length) { status.textContent = "Choose at least one schedule screenshot."; return; }
+  if (files.length > 4) { status.textContent = "Choose up to 4 screenshots at a time."; return; }
+  button.disabled = true;
+  status.textContent = "Reading event names, dates, times, and locations…";
+  try {
+    if (window.location.protocol === "file:") throw new Error("Photo import needs the deployed Netlify site or Netlify Dev.");
+    const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
+    if (!session?.access_token) throw new Error("Sign in before importing an event schedule.");
+    const images = [];
+    for (const file of files) images.push(await resizeImageForImport(file));
+    const response = await fetch("/.netlify/functions/event-photo-import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ images, currentDate: todayString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (response.status === 404) throw new Error("The event-photo-import function is not deployed yet. Redeploy the latest project first.");
+    if (!response.ok) throw new Error(result.error || `Event schedule import failed (${response.status}).`);
+    detectedEventItems = Array.isArray(result.events) ? result.events.map((item, index) => ({ ...item, color: classColorForIndex(index), notes: item.notes || "Imported from an event schedule screenshot." })) : [];
+    if (!detectedEventItems.length) throw new Error("No dated events were found. Try a clearer screenshot that includes the schedule heading and dates.");
+    renderDetectedEvents();
+    document.querySelector("#event-photo-review").hidden = false;
+    status.textContent = `Found ${detectedEventItems.length} event${detectedEventItems.length === 1 ? "" : "s"}. Review them before adding.`;
+  } catch (error) {
+    status.textContent = error.message || "The event screenshots could not be read.";
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function resizeImageForImport(file) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    image.onload = () => {
+      const scale = Math.min(1, 1400 / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(objectUrl);
+      resolve(canvas.toDataURL("image/jpeg", 0.78));
+    };
+    image.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error(`Could not read ${file.name}.`)); };
+    image.src = objectUrl;
+  });
+}
+
+function renderDetectedEvents() {
+  const list = document.querySelector("#detected-event-list");
+  list.innerHTML = "";
+  detectedEventItems.forEach((item, index) => {
+    const card = document.createElement("article");
+    card.className = "detected-class-card";
+    card.innerHTML = `<label class="field"><span>Event</span><input data-event-field="title" value="${escapeHtml(item.title || "")}" /></label><div class="field-row"><label class="field"><span>Date</span><input data-event-field="date" type="date" value="${item.date || ""}" /></label><label class="field"><span>Location</span><input data-event-field="location" value="${escapeHtml(item.location || "")}" /></label></div><div class="field-row"><label class="field"><span>Start</span><input data-event-field="start" type="time" value="${item.start || ""}" /></label><label class="field"><span>End</span><input data-event-field="end" type="time" value="${item.end || ""}" /></label><label class="field color-field"><span>Color</span><input data-event-field="color" type="color" value="${item.color}" /></label></div><label class="field"><span>Notes</span><textarea data-event-field="notes" rows="2">${escapeHtml(item.notes || "")}</textarea></label><button class="small-button" type="button" data-remove-event="${index}">Remove</button>`;
+    card.querySelectorAll("[data-event-field]").forEach((input) => input.addEventListener("input", () => { detectedEventItems[index][input.dataset.eventField] = input.value; }));
+    card.querySelector("[data-remove-event]").addEventListener("click", () => { detectedEventItems.splice(index, 1); renderDetectedEvents(); });
+    list.appendChild(card);
+  });
+}
+
+function saveDetectedEvents() {
+  const invalid = detectedEventItems.find((item) => !item.title?.trim() || !item.date || !item.start || !item.end || item.end <= item.start);
+  const status = document.querySelector("#event-photo-status");
+  if (invalid) { status.textContent = "Each event needs a name, date, and an end time after its start time."; return; }
+  detectedEventItems.forEach((item) => state.data.schedule.push({ id: crypto.randomUUID(), type: "event", title: item.title.trim(), date: item.date, start: item.start, end: item.end, location: (item.location || "").trim(), color: normalizeColor(item.color, "#7eaed6"), status: "pending", notes: (item.notes || "").trim() }));
+  const count = detectedEventItems.length;
+  detectedEventItems = [];
+  document.querySelector("#event-photo-review").hidden = true;
+  persistAndRender();
+  status.textContent = `${count} event${count === 1 ? "" : "s"} added to your schedule.`;
 }
 
 function setupMobileSectionPopup(section, panel, label) {
@@ -2381,7 +2510,7 @@ function saveHomework() {
       elements.homeworkId.value,
       elements.homeworkStatus.value,
     ),
-    color: normalizeColor(elements.homeworkColor.value, "#7eaed6"),
+    color: colorForSelectedClass(elements.homeworkClass.value, normalizeColor(elements.homeworkColor.value, "#7eaed6")),
     repeatMode: elements.homeworkRepeatMode.value,
     matchSourceKey: getMatchSourceValue("homework"),
     notes: elements.homeworkNotes.value.trim(),
@@ -2433,7 +2562,7 @@ function saveExam() {
     course: elements.examCourse.value.trim(),
     date: elements.examDate.value,
     time: elements.examTime.value,
-    color: normalizeColor(elements.examColor.value, "#7eaed6"),
+    color: colorForSelectedClass(elements.examCourse.value, normalizeColor(elements.examColor.value, "#7eaed6")),
     status,
     completedAt: getExistingCompletedAt(state.data.exams, elements.examId.value, status),
     matchSourceKey: getMatchSourceValue("exam"),
@@ -2844,6 +2973,7 @@ function prefillForms() {
 }
 
 function renderColorMatchOptions() {
+  renderClassCourseOptions();
   const sources = getColorSourceItems();
 
   COLOR_MATCH_PREFIXES.forEach((prefix) => {
@@ -2935,7 +3065,7 @@ function resetReminderForm() {
   toggleRepeatOptions("reminder");
 }
 
-function saveSettings() {
+async function saveSettings() {
   const notificationPreference =
     elements.notificationPreference.find((input) => input.checked)?.value || "email";
   const notificationFrequency =
@@ -2990,10 +3120,20 @@ function saveSettings() {
   };
 
   syncAuthProfileFromSettings();
-  saveData();
+  saveDataLocally();
+  if (cloudSaveTimer) {
+    window.clearTimeout(cloudSaveTimer);
+    cloudSaveTimer = null;
+  }
+  elements.settingsStatus.textContent = "Saving widget settings...";
+  await saveDataToSupabase();
   requestBrowserNotificationPermission();
   scheduleNotificationCheck();
-  renderSettings("Settings saved.");
+  renderSettings(
+    authState.isAuthenticated && authState.userId
+      ? lastCloudSyncMessage || "Widget settings saved."
+      : "Settings saved on this device. Log in to sync them with Scriptable.",
+  );
 }
 
 function resetSettingsForm() {

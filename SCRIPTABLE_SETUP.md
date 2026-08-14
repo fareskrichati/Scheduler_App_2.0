@@ -7,7 +7,7 @@
 3. Open the script once inside Scriptable.
 4. Tap **Connect account** and use the same email and password as Daily Planner.
 5. In Daily Planner Settings, choose **Scriptable opens to** and save your widget settings. The deployed planner URL is filled automatically when Settings is saved from the live site.
-6. Run `DailyPlannerWidget` in Scriptable. After the initial connection, it opens the complete planner automatically at your chosen screen.
+6. Run `DailyPlannerWidget` in Scriptable to open its menu. From there you can open the complete planner or preview the widget with freshly synced settings.
 7. Long-press the iPhone Home Screen, tap **+**, choose **Scriptable**, and select a widget size.
 8. Edit the new widget and choose `DailyPlannerWidget` as its script.
 
@@ -24,6 +24,8 @@ Add several Scriptable widgets with different parameters to keep separate views 
 
 When no widget parameter is supplied, the widget uses the default view selected in Daily Planner Settings. The category toggles, upcoming range, and maximum item count also come from Daily Planner Settings. A widget parameter overrides only the default view.
 
+After changing widget settings, tap **Save settings** and wait for the cloud-sync confirmation. Scriptable fetches the new settings on its next widget refresh; iOS controls the exact refresh time. To see them immediately, run `DailyPlannerWidget` in Scriptable and choose **Preview widget**. If you want the app's default-view setting to control a Home Screen widget, leave that widget's **Parameter** field empty; values such as `today` or `classes` intentionally override it.
+
 ## Privacy
 
 The script signs into Supabase under the existing row-level security rules. The Supabase session is stored in iPhone Keychain. The password is used only during sign-in and is not saved by the script.
@@ -36,6 +38,7 @@ Configure these Netlify environment variables before deploying the backend looku
 - `SUPABASE_URL` — the planner Supabase project URL.
 - `SUPABASE_PUBLISHABLE_KEY` or `SUPABASE_ANON_KEY` — used by the backend to validate the signed-in user's token. If neither is set, the backend can use `SUPABASE_SERVICE_ROLE_KEY` server-side.
 - `OPENAI_CALENDAR_MODEL` — optional override; defaults to `gpt-5.4-mini`.
+- `OPENAI_EVENT_IMPORT_MODEL` — optional model override for event-schedule screenshot recognition; defaults to `gpt-5.4-mini`.
 
 Redeploy after saving the variables. The class importer will then search official school-controlled sources and autofill editable term dates, named breaks, confidence, and source links.
 

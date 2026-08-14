@@ -34,6 +34,7 @@ fs.copyFileSync(resolvePath("js/widget-preview.js"), resolvePath("deploy/js/widg
 
 fs.writeFileSync(resolvePath("deploy/netlify.toml"), '[build]\n  publish = "."\n\n[functions]\n  directory = "netlify/functions"\n\n[functions."weekly-schedule-reminders"]\n  schedule = "*/15 * * * *"\n');
 fs.copyFileSync(resolvePath("netlify/functions/academic-calendar.js"), resolvePath("deploy/netlify/functions/academic-calendar.js"));
+fs.copyFileSync(resolvePath("netlify/functions/event-photo-import.js"), resolvePath("deploy/netlify/functions/event-photo-import.js"));
 fs.copyFileSync(resolvePath("netlify/functions/weekly-schedule-reminders.js"), resolvePath("deploy/netlify/functions/weekly-schedule-reminders.js"));
 fs.copyFileSync(
   findSource(["scriptable/DailyPlannerWidget.js", "DailyPlannerWidget.js"]),

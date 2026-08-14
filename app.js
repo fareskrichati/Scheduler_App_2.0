@@ -19,6 +19,7 @@ let syncInProgress = false;
 let schoolImportItems = [];
 let detectedScheduleClasses = [];
 let detectedHomeworkItems = [];
+let detectedEventItems = [];
 let pendingFirstLogin = null;
 let lastCloudSyncMessage = "";
 let supabaseSetupMessage = "";
@@ -387,6 +388,7 @@ function bindEvents() {
   elements.homeworkDate.addEventListener("change", () => syncRepeatSelectionWithDate("homework"));
   elements.homeworkMatchColor.addEventListener("change", () => toggleMatchOptions("homework"));
   elements.homeworkRepeatForever.addEventListener("change", () => toggleRepeatOptions("homework"));
+  elements.homeworkClass.addEventListener("change", () => applySelectedClassColor("homework"));
 
   elements.examForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -395,6 +397,7 @@ function bindEvents() {
 
   elements.examReset.addEventListener("click", resetExamForm);
   elements.examMatchColor.addEventListener("change", () => toggleMatchOptions("exam"));
+  elements.examCourse.addEventListener("change", () => applySelectedClassColor("exam"));
 
   elements.reminderForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -414,9 +417,9 @@ function bindEvents() {
   elements.reminderMatchColor.addEventListener("change", () => toggleMatchOptions("reminder"));
   elements.reminderRepeatForever.addEventListener("change", () => toggleRepeatOptions("reminder"));
 
-  elements.settingsForm.addEventListener("submit", (event) => {
+  elements.settingsForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    saveSettings();
+    await saveSettings();
   });
 
   elements.settingsReset.addEventListener("click", resetSettingsForm);
@@ -611,6 +614,34 @@ function getImportableClasses() {
     if (!map.has(key)) map.set(key, { key, title: item.title, color: getStoredItemColor("schedule", item) });
   });
   return Array.from(map.values());
+}
+
+function renderClassCourseOptions() {
+  const classes = getImportableClasses();
+  [elements.homeworkClass, elements.examCourse].forEach((select) => {
+    const current = select.value;
+    select.innerHTML = '<option value="">Choose a class</option>';
+    classes.forEach((course) => {
+      const option = document.createElement("option");
+      option.value = course.title;
+      option.textContent = course.title;
+      select.appendChild(option);
+    });
+    if (classes.some((course) => course.title === current)) select.value = current;
+  });
+}
+
+function applySelectedClassColor(kind) {
+  const select = kind === "homework" ? elements.homeworkClass : elements.examCourse;
+  const colorInput = kind === "homework" ? elements.homeworkColor : elements.examColor;
+  const course = getImportableClasses().find((item) => item.title === select.value);
+  if (!course) return;
+  colorInput.value = course.color;
+  setMatchSelection(kind, "");
+}
+
+function colorForSelectedClass(courseTitle, fallback) {
+  return getImportableClasses().find((item) => item.title === courseTitle)?.color || fallback;
 }
 
 function parseCanvasHomeworkText(text) {
@@ -2361,7 +2392,7 @@ function saveHomework() {
       elements.homeworkId.value,
       elements.homeworkStatus.value,
     ),
-    color: normalizeColor(elements.homeworkColor.value, "#7eaed6"),
+    color: colorForSelectedClass(elements.homeworkClass.value, normalizeColor(elements.homeworkColor.value, "#7eaed6")),
     repeatMode: elements.homeworkRepeatMode.value,
     matchSourceKey: getMatchSourceValue("homework"),
     notes: elements.homeworkNotes.value.trim(),
@@ -2413,7 +2444,7 @@ function saveExam() {
     course: elements.examCourse.value.trim(),
     date: elements.examDate.value,
     time: elements.examTime.value,
-    color: normalizeColor(elements.examColor.value, "#7eaed6"),
+    color: colorForSelectedClass(elements.examCourse.value, normalizeColor(elements.examColor.value, "#7eaed6")),
     status,
     completedAt: getExistingCompletedAt(state.data.exams, elements.examId.value, status),
     matchSourceKey: getMatchSourceValue("exam"),
@@ -2824,6 +2855,7 @@ function prefillForms() {
 }
 
 function renderColorMatchOptions() {
+  renderClassCourseOptions();
   const sources = getColorSourceItems();
 
   COLOR_MATCH_PREFIXES.forEach((prefix) => {
@@ -2915,7 +2947,7 @@ function resetReminderForm() {
   toggleRepeatOptions("reminder");
 }
 
-function saveSettings() {
+async function saveSettings() {
   const notificationPreference =
     elements.notificationPreference.find((input) => input.checked)?.value || "email";
   const notificationFrequency =
@@ -2970,10 +3002,20 @@ function saveSettings() {
   };
 
   syncAuthProfileFromSettings();
-  saveData();
+  saveDataLocally();
+  if (cloudSaveTimer) {
+    window.clearTimeout(cloudSaveTimer);
+    cloudSaveTimer = null;
+  }
+  elements.settingsStatus.textContent = "Saving widget settings...";
+  await saveDataToSupabase();
   requestBrowserNotificationPermission();
   scheduleNotificationCheck();
-  renderSettings("Settings saved.");
+  renderSettings(
+    authState.isAuthenticated && authState.userId
+      ? lastCloudSyncMessage || "Widget settings saved."
+      : "Settings saved on this device. Log in to sync them with Scriptable.",
+  );
 }
 
 function resetSettingsForm() {

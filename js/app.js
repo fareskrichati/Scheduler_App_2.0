@@ -9,7 +9,7 @@ const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_DELAY_MS = 1000;
 const FOREVER_REPEAT_YEARS = 5;
 const SUPABASE_TABLE = "planner_profiles";
-const PLANNER_TABS = ["calendar", "classes", "events", "homework", "exams", "reminders", "settings"];
+const PLANNER_TABS = ["calendar", "todo", "classes", "events", "homework", "exams", "reminders", "settings"];
 
 if (new URLSearchParams(window.location.search).get("scriptable") === "1") {
   document.documentElement.classList.add("scriptable-webview");
@@ -85,6 +85,8 @@ const elements = {
   calendarGrid: document.querySelector("#calendar-grid"),
   selectedDateTitle: document.querySelector("#selected-date-title"),
   calendarDaySummary: document.querySelector("#calendar-day-summary"),
+  todoList: document.querySelector("#todo-list"),
+  todoCount: document.querySelector("#todo-count"),
   prevMonth: document.querySelector("#prev-month"),
   nextMonth: document.querySelector("#next-month"),
   calendarViewButtons: Array.from(document.querySelectorAll("[data-calendar-view]")),
@@ -100,6 +102,11 @@ const elements = {
   classForm: document.querySelector("#class-form"),
   classId: document.querySelector("#class-id"),
   classTitle: document.querySelector("#class-title"),
+  classOnline: document.querySelector("#class-online"),
+  onlineClassHint: document.querySelector("#online-class-hint"),
+  classDateLocationRow: document.querySelector("#class-date-location-row"),
+  classTimeRow: document.querySelector("#class-time-row"),
+  classRepeatBox: document.querySelector("#class-repeat-box"),
   classDate: document.querySelector("#class-date"),
   classLocation: document.querySelector("#class-location"),
   classStart: document.querySelector("#class-start"),
@@ -263,6 +270,7 @@ async function initialize() {
   toggleRepeatOptions("event");
   toggleRepeatOptions("homework");
   toggleRepeatOptions("reminder");
+  toggleOnlineClassFields();
   COLOR_MATCH_PREFIXES.forEach((prefix) => {
     toggleMatchOptions(prefix);
   });
@@ -358,6 +366,7 @@ function bindEvents() {
   });
 
   elements.classReset.addEventListener("click", resetClassForm);
+  elements.classOnline.addEventListener("change", toggleOnlineClassFields);
   elements.classRepeat.addEventListener("change", () => {
     toggleRepeatOptions("class");
     ensureRepeatSelection("class");
@@ -640,6 +649,10 @@ async function readHomeworkPhotos() {
 
 function getImportableClasses() {
   const map = new Map();
+  state.data.courses.forEach((item) => {
+    const key = importedCourseKey(item.title);
+    if (!map.has(key)) map.set(key, { key, title: item.title, color: normalizeColor(item.color, "#7eaed6"), online: true });
+  });
   state.data.schedule.filter((item) => item.type === "class").forEach((item) => {
     const key = importedCourseKey(item.title);
     if (!map.has(key)) map.set(key, { key, title: item.title, color: getStoredItemColor("schedule", item) });
@@ -1829,6 +1842,7 @@ function render() {
   renderTabs();
   renderHeaderStats();
   renderCalendar();
+  renderTodoList();
   renderClassList();
   renderEventList();
   renderHomeworkList();
@@ -1839,6 +1853,28 @@ function render() {
   renderSettings();
   renderSchoolImportItems();
   prefillForms();
+}
+
+function renderTodoList() {
+  const items = [
+    ...getNextVisibleOccurrences(state.data.homework, todayString()).map((item) => ({ ...item, kind: "homework", label: item.course || "Homework" })),
+    ...getNextVisibleOccurrences(state.data.reminders, todayString()).map((item) => ({ ...item, kind: "reminder", label: "Reminder" })),
+  ].filter((item) => !isExpiredCompletedItem(item)).sort(compareByDateTime);
+
+  elements.todoList.innerHTML = "";
+  elements.todoCount.textContent = `${items.filter((item) => item.status !== "done").length} left`;
+  if (!items.length) {
+    elements.todoList.innerHTML = '<div class="empty-state">Nothing upcoming. You’re all caught up.</div>';
+    return;
+  }
+  items.forEach((item) => {
+    const row = document.createElement("article");
+    row.className = `todo-item${item.status === "done" ? " is-complete" : ""}`;
+    applyItemColor(row, item.color);
+    row.innerHTML = `<button class="todo-check" type="button" aria-label="${item.status === "done" ? "Mark pending" : "Mark done"}">${item.status === "done" ? "✓" : ""}</button><div class="todo-copy"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.label)} · ${formatShortDate(item.date)}${item.time ? ` · ${formatTime(item.time)}` : ""}</span></div>`;
+    row.querySelector(".todo-check").addEventListener("click", () => item.kind === "homework" ? toggleHomeworkStatus(item.id) : toggleReminderStatus(item.id));
+    elements.todoList.appendChild(row);
+  });
 }
 
 function renderTabs() {
@@ -1866,7 +1902,7 @@ function renderWeekdays() {
 function renderHeaderStats() {
   const today = state.selectedDate;
   elements.homeworkCount.textContent = String(
-    state.data.homework.filter((item) => item.status !== "done").length,
+    getNextVisibleOccurrences(state.data.homework).filter((item) => item.status !== "done").length,
   );
   elements.examCount.textContent = String(state.data.exams.filter((item) => item.status !== "done" && item.date >= todayString()).length);
   elements.todayClassesCount.textContent = String(countGroupedItemsOnDate("class", today));
@@ -2221,7 +2257,7 @@ function buildDayDeleteButton(item) {
 }
 
 function renderHomeworkList() {
-  const sorted = [...state.data.homework]
+  const sorted = getNextVisibleOccurrences(state.data.homework)
     .sort(compareByDateTime)
     .map((item) => ({ ...item, effectiveColor: getStoredItemColor("homework", item) }));
   renderCollection({
@@ -2238,6 +2274,27 @@ function renderHomeworkList() {
       onToggleStatus: toggleHomeworkStatus,
     },
   });
+}
+
+function getNextVisibleOccurrences(collection, fromDate = "") {
+  const singles = [];
+  const series = new Map();
+
+  collection.forEach((item) => {
+    if (fromDate && item.date < fromDate) return;
+    if (!item.seriesId) {
+      singles.push(item);
+      return;
+    }
+    if (!series.has(item.seriesId)) series.set(item.seriesId, []);
+    series.get(item.seriesId).push(item);
+  });
+
+  const nextInEachSeries = Array.from(series.values())
+    .map((items) => [...items].sort(compareByDateTime).find((item) => item.status !== "done"))
+    .filter(Boolean);
+
+  return [...singles, ...nextInEachSeries];
 }
 
 function renderExamList() {
@@ -2263,14 +2320,17 @@ function renderExamList() {
 
 function renderClassList() {
   const sorted = groupScheduleEntries("class").filter((item) => !isScheduleGroupPast(item, "class"));
+  const online = state.data.courses.map((item) => ({ ...item, online: true, status: "pending" }));
   renderCollection({
     target: elements.classList,
-    items: sorted,
+    items: [...online, ...sorted],
     emptyMessage: "No classes added yet.",
     config: {
       category: "Class",
       meta: (item) =>
-        item.grouped
+        item.online
+          ? "Online · No scheduled meeting time"
+          : item.grouped
           ? `${item.repeatSummary} • ${formatShortDate(item.date)} - ${formatShortDate(item.lastDate)} • ${formatTime(item.start)} - ${formatTime(item.end)}${item.location ? ` • ${item.location}` : ""}`
           : `${formatShortDate(item.date)} • ${formatTime(item.start)} - ${formatTime(item.end)}${item.location ? ` • ${item.location}` : ""}`,
       notes: (item) => item.notes,
@@ -2498,9 +2558,21 @@ function saveClassItem() {
     notes: elements.classNotes.value.trim(),
   };
 
+  if (elements.classOnline.checked) {
+    if (!item.title) return;
+    state.data.schedule = state.data.schedule.filter((entry) => entry.id !== id && entry.seriesId !== editingSeriesId);
+    const course = { id, title: item.title, color: item.color, notes: item.notes, online: true };
+    upsertItem(state.data.courses, course);
+    persistAndRender();
+    resetClassForm();
+    return;
+  }
+
   if (!item.title || !item.date || !item.start || !item.end) {
     return;
   }
+
+  state.data.courses = state.data.courses.filter((course) => course.id !== id);
 
   if (item.end <= item.start) {
     window.alert("End time needs to be after the start time.");
@@ -2804,6 +2876,19 @@ function editExam(id) {
 }
 
 function editClassItem(id) {
+  const onlineCourse = state.data.courses.find((item) => item.id === id);
+  if (onlineCourse) {
+    setActiveTab("classes");
+    openMobileAddForm("classes");
+    resetClassForm();
+    elements.classId.value = onlineCourse.id;
+    elements.classTitle.value = onlineCourse.title;
+    elements.classColor.value = normalizeColor(onlineCourse.color, "#7eaed6");
+    elements.classNotes.value = onlineCourse.notes || "";
+    elements.classOnline.checked = true;
+    toggleOnlineClassFields();
+    return;
+  }
   const matches = state.data.schedule.filter(
     (entry) => entry.type === "class" && (entry.id === id || entry.seriesId === id),
   );
@@ -2816,6 +2901,8 @@ function editClassItem(id) {
 
   setActiveTab("classes");
   openMobileAddForm("classes");
+  elements.classOnline.checked = false;
+  toggleOnlineClassFields();
   elements.classForm.dataset.seriesId = item.seriesId || "";
   elements.classId.value = item.id;
   elements.classTitle.value = item.title;
@@ -2987,6 +3074,12 @@ function toggleReminderStatus(id) {
 }
 
 function deleteClassItem(id) {
+  if (state.data.courses.some((item) => item.id === id)) {
+    state.data.courses = state.data.courses.filter((item) => item.id !== id);
+    persistAndRender();
+    resetClassForm();
+    return;
+  }
   deleteScheduleEntryOrSeries(id, "class");
   persistAndRender();
   resetClassForm();
@@ -3115,6 +3208,7 @@ function renderColorMatchOptions() {
 
 function resetClassForm() {
   elements.classForm.reset();
+  toggleOnlineClassFields();
   delete elements.classForm.dataset.seriesId;
   elements.classId.value = "";
   elements.classDate.value = state.selectedDate;
@@ -3126,6 +3220,18 @@ function resetClassForm() {
   elements.classRepeatForever.checked = false;
   clearRepeatDays("class");
   toggleRepeatOptions("class");
+}
+
+function toggleOnlineClassFields() {
+  const online = elements.classOnline.checked;
+  elements.onlineClassHint.hidden = !online;
+  elements.classDateLocationRow.hidden = online;
+  elements.classTimeRow.hidden = online;
+  elements.classRepeatBox.hidden = online;
+  elements.classDate.required = !online;
+  elements.classStart.required = !online;
+  elements.classEnd.required = !online;
+  if (online) elements.classRepeat.checked = false;
 }
 
 function resetEventForm() {
@@ -3861,6 +3967,7 @@ function loadData() {
 
 function normalizePlannerData(data) {
   return {
+    courses: Array.isArray(data?.courses) ? data.courses : [],
     homework: Array.isArray(data?.homework) ? data.homework.filter((item) => !isLegacyDemoItem(item)) : [],
     exams: Array.isArray(data?.exams) ? data.exams.filter((item) => !isLegacyDemoItem(item)) : [],
     schedule: Array.isArray(data?.schedule) ? data.schedule.filter((item) => !isLegacyDemoItem(item)) : [],
@@ -3882,6 +3989,7 @@ function isLegacyDemoItem(item) {
 
 function seedData() {
   return {
+    courses: [],
     homework: [],
     exams: [],
     schedule: [],

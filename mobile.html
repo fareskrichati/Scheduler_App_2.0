@@ -113,6 +113,9 @@
             <button class="tab-button is-active" id="tab-calendar" data-tab="calendar" type="button" role="tab" aria-selected="true">
               <span aria-hidden="true">📅</span><span class="tab-label">Calendar</span>
             </button>
+            <button class="tab-button" id="tab-todo" data-tab="todo" type="button" role="tab" aria-selected="false">
+              <span aria-hidden="true">✓</span><span class="tab-label">To-Do</span>
+            </button>
             <button class="tab-button" id="tab-classes" data-tab="classes" type="button" role="tab" aria-selected="false">
               <span aria-hidden="true">🎓</span><span class="tab-label">Classes</span>
             </button>
@@ -172,6 +175,13 @@
               </div>
             </section>
 
+            <section class="tab-panel" id="panel-todo" data-panel="todo" role="tabpanel" aria-labelledby="tab-todo">
+              <article class="panel-card todo-panel">
+                <div class="panel-header"><div><p class="panel-label">Coming up</p><h3>Homework &amp; reminders</h3></div><span class="todo-count" id="todo-count">0 left</span></div>
+                <div class="todo-list" id="todo-list" aria-live="polite"></div>
+              </article>
+            </section>
+
             <section class="tab-panel" id="panel-classes" data-panel="classes" role="tabpanel" aria-labelledby="tab-classes">
               <div class="panel-grid split-layout">
                 <article class="panel-card">
@@ -190,7 +200,10 @@
                       <input id="class-title" type="text" maxlength="80" placeholder="Physics lecture" required />
                     </label>
 
-                    <div class="field-row">
+                    <label class="checkbox-row online-class-toggle"><input id="class-online" type="checkbox" /><span>Online class with no meeting time</span></label>
+                    <p class="settings-note" id="online-class-hint" hidden>Save the course name so Canvas homework can match it. A date and meeting time are not required.</p>
+
+                    <div class="field-row" id="class-date-location-row">
                       <label class="field">
                         <span>Date</span>
                         <input id="class-date" type="date" required />
@@ -201,7 +214,7 @@
                       </label>
                     </div>
 
-                    <div class="field-row">
+                    <div class="field-row" id="class-time-row">
                       <label class="field">
                         <span>Start time</span>
                         <input id="class-start" type="time" required />
@@ -233,7 +246,7 @@
                       </div>
                     </div>
 
-                    <div class="repeat-box">
+                    <div class="repeat-box" id="class-repeat-box">
                       <label class="checkbox-row">
                         <input id="class-repeat" type="checkbox" />
                         <span>Repeat</span>

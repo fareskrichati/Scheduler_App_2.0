@@ -182,6 +182,10 @@ body {
   grid-template-columns: 1fr;
 }
 
+.day-overview-panel {
+  display: none;
+}
+
 .panel-card {
   border-radius: 18px;
   padding: 14px;

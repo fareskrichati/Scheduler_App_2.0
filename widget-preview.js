@@ -1,5 +1,5 @@
 const STORAGE_KEY = "pulse-planner-v2";
-const titles = { all: "Everything upcoming", today: "Today's planner", classes: "Classes + homework", homework: "Homework", events: "Events" };
+const titles = { all: "Everything upcoming", today: "Today's planner", classes: "Classes + homework", homework: "Homework", reminders: "Reminders", tasks: "Homework & reminders", exams: "Exams & quizzes", events: "Events" };
 const viewSelect = document.querySelector("#preview-view");
 const dataSourceSelect = document.querySelector("#preview-data-source");
 const offline = document.querySelector("#preview-offline");
@@ -35,18 +35,17 @@ function getPreviewItems(view) {
   const data = previewData(), today = todayIso(), end = offsetDate(today, 7), items = [];
   const schedule = Array.isArray(data.schedule) ? data.schedule : [], homework = Array.isArray(data.homework) ? data.homework : [];
   schedule.filter((item) => item.date >= today && item.date <= end && item.status !== "done").forEach((item) => {
-    if (view === "classes" && item.type !== "class") return; if (view === "homework") return; if (view === "events" && item.type !== "event") return; if (view === "today" && item.date !== today) return;
+    if (view === "classes" && item.type !== "class") return; if (["homework", "reminders", "tasks", "exams"].includes(view)) return; if (view === "events" && item.type !== "event") return; if (view === "today" && item.date !== today) return;
     items.push({ symbol: item.type === "event" ? "○" : "│", title: item.title, meta: `${dateLabel(item.date, today)} ${formatTime(item.start)}${item.location ? ` · ${item.location}` : ""}`, color: item.color || "#7eaed6", key: courseKey(item.title), sort: `${item.date} ${item.start || ""}|0` });
   });
   if (view === "classes") {
     const parents = items.filter((item) => item.symbol === "│").sort((a, b) => a.sort.localeCompare(b.sort));
     homework.filter((item) => item.status !== "done" && item.date >= today && item.date <= end).forEach((item) => { const parent = parents.find((candidate) => candidate.key === courseKey(item.course)); if (parent) items.push({ symbol: "○", title: item.title, meta: `Due ${dateLabel(item.date, today)}${item.time ? ` · ${formatTime(item.time)}` : ""}`, color: parent.color, nested: true, sort: `${parent.sort}|1|${item.date}` }); });
-  } else if (view === "today" || view === "homework") {
+  } else if (["all", "today", "homework", "tasks"].includes(view)) {
     homework.filter((item) => item.status !== "done" && item.date >= today && item.date <= end && (view !== "today" || item.date === today)).forEach((item) => items.push({ symbol: "○", title: item.title, meta: `${dateLabel(item.date, today)} ${item.course || "Homework"}${item.time ? ` · ${formatTime(item.time)}` : ""}`, color: item.color || "#7eaed6", sort: `${item.date} ${item.time || "23:59"}` }));
   }
-  if (view === "events" || view === "today") {
-    [...(data.exams || []), ...(data.reminders || [])].filter((item) => item.status !== "done" && item.date >= today && item.date <= end && (view !== "today" || item.date === today)).forEach((item) => items.push({ symbol: "○", title: item.title, meta: `${dateLabel(item.date, today)}${item.time ? ` · ${formatTime(item.time)}` : ""}`, color: item.color || "#9abbd6", sort: `${item.date} ${item.time || "23:59"}` }));
-  }
+  if (["all", "events", "today", "exams"].includes(view)) (data.exams || []).filter((item) => item.status !== "done" && item.date >= today && item.date <= end && (view !== "today" || item.date === today)).forEach((item) => items.push({ symbol: "○", title: item.title, meta: `${dateLabel(item.date, today)}${item.time ? ` · ${formatTime(item.time)}` : ""}`, color: item.color || "#6d9fd0", sort: `${item.date} ${item.time || "23:58"}` }));
+  if (["all", "events", "today", "reminders", "tasks"].includes(view)) (data.reminders || []).filter((item) => item.status !== "done" && item.date >= today && item.date <= end && (view !== "today" || item.date === today)).forEach((item) => items.push({ symbol: "○", title: item.title, meta: `${dateLabel(item.date, today)}${item.time ? ` · ${formatTime(item.time)}` : ""}`, color: item.color || "#9abbd6", sort: `${item.date} ${item.time || "23:57"}` }));
   return items.sort((a, b) => a.sort.localeCompare(b.sort));
 }
 

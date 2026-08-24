@@ -18,9 +18,13 @@ Set **Parameter** while editing the widget:
 - `today` shows today's combined schedule.
 - `classes` shows upcoming classes.
 - `homework` shows upcoming incomplete homework.
+- `reminders` shows upcoming incomplete reminders.
+- `tasks` combines upcoming homework and reminders.
+- `exams` shows upcoming exams and quizzes.
 - `events` shows events, exams, and reminders.
+- `all` shows every enabled upcoming category.
 
-Add several Scriptable widgets with different parameters to keep separate views on the Home Screen. The widget refreshes every 15 minutes and uses its last cached data when offline.
+Add several Scriptable widgets with different parameters to keep separate views on the Home Screen. For example, add one widget with `homework`, another with `reminders`, and a third with `all`. They can use different widget sizes and all share the same securely stored login. The widget refreshes every 15 minutes and uses its last cached data when offline.
 
 When no widget parameter is supplied, the widget uses the default view selected in Daily Planner Settings. The category toggles, upcoming range, and maximum item count also come from Daily Planner Settings. A widget parameter overrides only the default view.
 

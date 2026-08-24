@@ -43,6 +43,15 @@ body {
   padding: 10px 10px 28px;
 }
 
+.scriptable-webview .app-shell,
+.scriptable-webview .auth-screen {
+  padding-top: calc(68px + env(safe-area-inset-top, 0px));
+}
+
+.scriptable-webview .app-shell {
+  min-height: 100dvh;
+}
+
 .auth-screen {
   padding: 14px;
   place-items: start center;

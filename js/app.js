@@ -11,6 +11,10 @@ const FOREVER_REPEAT_YEARS = 5;
 const SUPABASE_TABLE = "planner_profiles";
 const PLANNER_TABS = ["calendar", "classes", "events", "homework", "exams", "reminders", "settings"];
 
+if (new URLSearchParams(window.location.search).get("scriptable") === "1") {
+  document.documentElement.classList.add("scriptable-webview");
+}
+
 let completionSweepTimer = null;
 let notificationTimer = null;
 let autoSyncTimer = null;
@@ -3984,7 +3988,7 @@ function normalizeAcademicCalendar(calendar) {
 function normalizeWidgetPreferences(preferences) {
   const defaults = getDefaultSettings().widgetPreferences;
   return {
-    defaultView: ["all", "today", "classes", "homework", "events"].includes(preferences?.defaultView)
+    defaultView: ["all", "today", "classes", "homework", "reminders", "tasks", "exams", "events"].includes(preferences?.defaultView)
       ? preferences.defaultView
       : defaults.defaultView,
     startScreen: PLANNER_TABS.includes(preferences?.startScreen)

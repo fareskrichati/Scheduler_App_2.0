@@ -1,5 +1,5 @@
 // Daily Planner widget for Scriptable on iPhone.
-// Widget parameter: today, classes, homework, or events.
+// Widget parameter: all, today, classes, homework, reminders, exams, events, or tasks.
 
 const CONFIG = {
   supabaseUrl: "https://mgvahslbxdskzhiwxxod.supabase.co",
@@ -137,7 +137,7 @@ async function openFullPlanner() {
     throw new Error("Open the script and set your planner website URL first.");
   }
   const separator = url.includes("?") ? "&" : "?";
-  const plannerUrl = `${url}${separator}tab=${encodeURIComponent(preferences.startScreen)}`;
+  const plannerUrl = `${url}${separator}tab=${encodeURIComponent(preferences.startScreen)}&scriptable=1`;
   await WebView.loadURL(plannerUrl, null, true);
 }
 
@@ -317,7 +317,7 @@ function getWidgetItems(data, view, preferences = getWidgetPreferences(data)) {
   schedule.forEach((item) => {
     if (item.date < today || item.date > lastDate) return;
     if (view === "classes" && item.type !== "class") return;
-    if (view === "homework") return;
+    if (["homework", "reminders", "exams", "tasks"].includes(view)) return;
     if (view === "events" && item.type !== "event") return;
     if (view === "today" && item.date !== today) return;
     if (item.type === "class" && !preferences.classes) return;
@@ -339,23 +339,24 @@ function getWidgetItems(data, view, preferences = getWidgetPreferences(data)) {
     });
   }
 
-  if (view === "all" || view === "today" || view === "homework") {
+  if (["all", "today", "homework", "tasks"].includes(view)) {
     homework.forEach((item) => {
-      if (!preferences.homework || item.status === "done" || item.date < today || (view !== "homework" && item.date > lastDate) || (view === "today" && item.date !== today)) return;
+      if (!preferences.homework || item.status === "done" || item.date < today || (!["homework", "tasks"].includes(view) && item.date > lastDate) || (view === "today" && item.date !== today)) return;
       items.push({ title: item.title, date: item.date, time: item.time || "23:59", color: item.color || "#7EAED6", meta: `${dateLabel(item.date, today)} ${item.course || "Homework"}${item.time ? ` - ${formatTime(item.time)}` : ""}`.trim(), id: item.id, collection: "homework", completable: true });
     });
   }
 
-  if (view === "all" || view === "today" || view === "events") {
+  if (["all", "today", "events", "exams"].includes(view)) {
     exams.forEach((item) => {
       if (!preferences.exams || item.status === "done" || item.date < today || item.date > lastDate || (view === "today" && item.date !== today)) return;
       items.push({ title: item.title, date: item.date, time: item.time || "23:58", color: item.color || "#6D9FD0", meta: `${dateLabel(item.date, today)} ${item.course || "Exam"}`.trim(), id: item.id, collection: "exams", completable: true });
     });
-    reminders.forEach((item) => {
-      if (!preferences.reminders || item.status === "done" || item.date < today || item.date > lastDate || (view === "today" && item.date !== today)) return;
-      items.push({ title: item.title, date: item.date, time: item.time || "23:57", color: item.color || "#9ABBD6", meta: `${dateLabel(item.date, today)} Reminder${item.time ? ` - ${formatTime(item.time)}` : ""}`, id: item.id, collection: "reminders", completable: true });
-    });
   }
+
+  if (["all", "today", "events", "reminders", "tasks"].includes(view)) reminders.forEach((item) => {
+    if (!preferences.reminders || item.status === "done" || item.date < today || (["reminders", "tasks"].includes(view) ? false : item.date > lastDate) || (view === "today" && item.date !== today)) return;
+    items.push({ title: item.title, date: item.date, time: item.time || "23:57", color: item.color || "#9ABBD6", meta: `${dateLabel(item.date, today)} Reminder${item.time ? ` - ${formatTime(item.time)}` : ""}`, id: item.id, collection: "reminders", completable: true });
+  });
 
   return items.sort((a, b) => (a.sortKey || `${a.date} ${a.time}`).localeCompare(b.sortKey || `${b.date} ${b.time}`));
 }
@@ -432,11 +433,11 @@ function normalizeStartScreen(value) {
 
 function normalizeView(value, fallback = "today") {
   const view = String(value || "").trim().toLowerCase();
-  return ["all", "today", "classes", "homework", "events"].includes(view) ? view : fallback;
+  return ["all", "today", "classes", "homework", "reminders", "exams", "events", "tasks"].includes(view) ? view : fallback;
 }
 
 function viewTitle(view) {
-  return { all: "Everything upcoming", today: "Today's planner", classes: "Classes", homework: "Homework", events: "Events" }[view];
+  return { all: "Everything upcoming", today: "Today's planner", classes: "Classes", homework: "Homework", reminders: "Reminders", exams: "Exams & quizzes", events: "Events", tasks: "Homework & reminders" }[view];
 }
 
 function isoDate(date) {

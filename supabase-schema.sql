@@ -40,6 +40,11 @@ revoke all on table public.planner_profiles from anon;
 grant select, insert, update, delete on table public.planner_profiles to authenticated;
 grant select, insert, update, delete on table public.planner_profiles to service_role;
 
+do $$ begin
+  alter publication supabase_realtime add table public.planner_profiles;
+exception when duplicate_object then null;
+end $$;
+
 create table if not exists public.planner_reminder_delivery (
   user_id uuid not null references auth.users(id) on delete cascade,
   reminder_type text not null,

@@ -307,7 +307,7 @@ function addItemRow(widget, item) {
 
 function getWidgetItems(data, view, preferences = getWidgetPreferences(data)) {
   const today = isoDate(new Date());
-  const lastDate = offsetIsoDate(today, preferences.daysAhead - 1);
+  const lastDate = preferences.daysAhead === "all" ? "9999-12-31" : offsetIsoDate(today, preferences.daysAhead - 1);
   const schedule = Array.isArray(data.schedule) ? data.schedule : [];
   const homework = Array.isArray(data.homework) ? data.homework : [];
   const exams = Array.isArray(data.exams) ? data.exams : [];
@@ -339,14 +339,14 @@ function getWidgetItems(data, view, preferences = getWidgetPreferences(data)) {
     });
   }
 
-  if (view === "today" || view === "homework") {
+  if (view === "all" || view === "today" || view === "homework") {
     homework.forEach((item) => {
-      if (!preferences.homework || item.status === "done" || item.date < today || item.date > lastDate || (view === "today" && item.date !== today)) return;
+      if (!preferences.homework || item.status === "done" || item.date < today || (view !== "homework" && item.date > lastDate) || (view === "today" && item.date !== today)) return;
       items.push({ title: item.title, date: item.date, time: item.time || "23:59", color: item.color || "#7EAED6", meta: `${dateLabel(item.date, today)} ${item.course || "Homework"}${item.time ? ` - ${formatTime(item.time)}` : ""}`.trim(), id: item.id, collection: "homework", completable: true });
     });
   }
 
-  if (view === "today" || view === "events") {
+  if (view === "all" || view === "today" || view === "events") {
     exams.forEach((item) => {
       if (!preferences.exams || item.status === "done" || item.date < today || item.date > lastDate || (view === "today" && item.date !== today)) return;
       items.push({ title: item.title, date: item.date, time: item.time || "23:58", color: item.color || "#6D9FD0", meta: `${dateLabel(item.date, today)} ${item.course || "Exam"}`.trim(), id: item.id, collection: "exams", completable: true });
@@ -412,10 +412,10 @@ function getWidgetPreferences(data) {
     ? data.settings.widgetPreferences
     : {};
   return {
-    defaultView: normalizeView(saved.defaultView, "today"),
+    defaultView: normalizeView(saved.defaultView, "all"),
     startScreen: normalizeStartScreen(saved.startScreen),
     plannerUrl: typeof saved.plannerUrl === "string" ? saved.plannerUrl.trim().replace(/\/$/, "") : "",
-    daysAhead: [1, 3, 7, 14].includes(Number(saved.daysAhead)) ? Number(saved.daysAhead) : 7,
+    daysAhead: saved.daysAhead === "all" || [1, 3, 7, 14].includes(Number(saved.daysAhead)) ? (saved.daysAhead === "all" ? "all" : Number(saved.daysAhead)) : "all",
     itemLimit: [3, 5, 8, 10, 12, 14].includes(Number(saved.itemLimit)) ? Number(saved.itemLimit) : 5,
     classes: typeof saved.classes === "boolean" ? saved.classes : true,
     homework: typeof saved.homework === "boolean" ? saved.homework : true,
@@ -432,11 +432,11 @@ function normalizeStartScreen(value) {
 
 function normalizeView(value, fallback = "today") {
   const view = String(value || "").trim().toLowerCase();
-  return ["today", "classes", "homework", "events"].includes(view) ? view : fallback;
+  return ["all", "today", "classes", "homework", "events"].includes(view) ? view : fallback;
 }
 
 function viewTitle(view) {
-  return { today: "Today's planner", classes: "Classes", homework: "Homework", events: "Events" }[view];
+  return { all: "Everything upcoming", today: "Today's planner", classes: "Classes", homework: "Homework", events: "Events" }[view];
 }
 
 function isoDate(date) {

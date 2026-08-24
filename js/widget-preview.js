@@ -1,5 +1,5 @@
 const STORAGE_KEY = "pulse-planner-v2";
-const titles = { today: "Today's planner", classes: "Classes + homework", homework: "Homework", events: "Events" };
+const titles = { all: "Everything upcoming", today: "Today's planner", classes: "Classes + homework", homework: "Homework", events: "Events" };
 const viewSelect = document.querySelector("#preview-view");
 const dataSourceSelect = document.querySelector("#preview-data-source");
 const offline = document.querySelector("#preview-offline");

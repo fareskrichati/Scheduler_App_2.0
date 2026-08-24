@@ -15,10 +15,13 @@ let completionSweepTimer = null;
 let notificationTimer = null;
 let autoSyncTimer = null;
 let cloudSaveTimer = null;
+let realtimeChannel = null;
+let lastLocalSaveAt = 0;
 let syncInProgress = false;
 let schoolImportItems = [];
 let detectedScheduleClasses = [];
 let detectedHomeworkItems = [];
+let detectedExamItems = [];
 let detectedEventItems = [];
 let pendingFirstLogin = null;
 let lastCloudSyncMessage = "";
@@ -32,7 +35,8 @@ const state = {
   activeTab: getInitialTab(),
   selectedDate: todayString(),
   visibleMonth: startOfMonth(todayString()),
-  calendarView: "month",
+  calendarView: "week",
+  calendarFilter: "all",
   data: loadData(),
 };
 
@@ -80,6 +84,7 @@ const elements = {
   prevMonth: document.querySelector("#prev-month"),
   nextMonth: document.querySelector("#next-month"),
   calendarViewButtons: Array.from(document.querySelectorAll("[data-calendar-view]")),
+  calendarFilter: document.querySelector("#calendar-filter"),
   daySchedulerTitle: document.querySelector("#day-scheduler-title"),
   daySchedulerSummary: document.querySelector("#day-scheduler-summary"),
   classList: document.querySelector("#class-list"),
@@ -241,9 +246,11 @@ async function initialize() {
   bindEvents();
   setupClassScheduleImport();
   setupHomeworkPhotoImport();
+  setupExamPhotoImport();
   setupEventPhotoImport();
   setupWidgetSettingsPreview();
   setupWeeklyScheduleReminderSettings();
+  setupSettingsAccordions();
   setupDesktopAddAccordions();
   setupMobileAddForms();
   await restoreSupabaseSession();
@@ -334,6 +341,11 @@ function bindEvents() {
       if (state.calendarView === "month") state.visibleMonth = startOfMonth(state.selectedDate);
       renderCalendar();
     });
+  });
+  elements.calendarFilter?.addEventListener("change", () => {
+    state.calendarFilter = elements.calendarFilter.value;
+    renderCalendar();
+    renderSelectedDayViews();
   });
 
   elements.classForm.addEventListener("submit", (event) => {
@@ -537,6 +549,20 @@ function toggleWeeklyReminderOptions() {
   document.querySelectorAll(".weekly-reminder-options input, .weekly-reminder-options select").forEach((input) => { input.disabled = !enabled; });
 }
 
+function setupSettingsAccordions() {
+  document.querySelectorAll("#panel-settings .subsection").forEach((section, index) => {
+    if (section.closest("details.settings-accordion")) return;
+    const heading = section.querySelector(".subsection-header .panel-label, .subsection-header h3")?.textContent?.trim() || `Settings group ${index + 1}`;
+    const details = document.createElement("details");
+    details.className = "settings-accordion";
+    if (index === 0) details.open = true;
+    const summary = document.createElement("summary");
+    summary.textContent = heading;
+    section.parentElement.insertBefore(details, section);
+    details.append(summary, section);
+  });
+}
+
 function setupDesktopAddAccordions() {
   if (document.body.classList.contains("mobile-preview") || window.matchMedia("(max-width: 760px)").matches) return;
   const labels = { "class-form": "Add a class", "event-form": "Add an event", "homework-form": "Add homework", "exam-form": "Add an exam", "reminder-form": "Add a reminder" };
@@ -735,6 +761,59 @@ function setupEventPhotoImport() {
   setupMobileSectionPopup(importer, eventPanel, "Import event schedule");
 }
 
+function setupExamPhotoImport() {
+  const examPanel = elements.examForm?.closest(".panel-card");
+  if (!examPanel || document.querySelector("#exam-photo-importer")) return;
+  const importer = document.createElement("section");
+  importer.id = "exam-photo-importer";
+  importer.className = "homework-photo-importer";
+  importer.dataset.desktopAccordionLabel = "Import exams and quizzes from Canvas screenshots";
+  importer.innerHTML = `<div class="subsection-header"><div><p class="panel-label">Canvas screenshots</p><h3>Import exams &amp; quizzes</h3></div></div><p class="settings-note">Choose Canvas screenshots that show the exam or quiz name, class, and date. Review every result before saving.</p><label class="field"><span>Canvas screenshots</span><input id="exam-photo-files" type="file" accept="image/*" multiple /></label><button class="primary-button" id="read-exam-photos" type="button">Read screenshots</button><p class="settings-note" id="exam-photo-status" role="status"></p><div id="exam-photo-review" hidden><div id="detected-exam-list" class="detected-class-list"></div><button class="primary-button" id="save-detected-exams" type="button">Add reviewed exams</button></div>`;
+  examPanel.insertBefore(importer, elements.examForm);
+  document.querySelector("#read-exam-photos").addEventListener("click", readExamPhotos);
+  document.querySelector("#save-detected-exams").addEventListener("click", saveDetectedExams);
+  setupMobileSectionPopup(importer, examPanel, "Import Canvas exams");
+}
+
+async function readExamPhotos() {
+  const files = Array.from(document.querySelector("#exam-photo-files").files || []);
+  const status = document.querySelector("#exam-photo-status");
+  if (!files.length) { status.textContent = "Choose at least one Canvas screenshot."; return; }
+  const button = document.querySelector("#read-exam-photos"); button.disabled = true; status.textContent = "Reading screenshots…";
+  try {
+    await loadExternalScript("https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js");
+    const found = [];
+    for (const file of files) {
+      const result = await window.Tesseract.recognize(file, "eng");
+      found.push(...parseCanvasHomeworkText(result.data.text).filter((item) => /exam|quiz|test|midterm|final/i.test(item.title)));
+    }
+    detectedExamItems = dedupeDetectedHomework(found);
+    if (!detectedExamItems.length) throw new Error("No dated exams or quizzes were found. Include the title and due date in the screenshot.");
+    renderDetectedExams(); document.querySelector("#exam-photo-review").hidden = false;
+    status.textContent = `Found ${detectedExamItems.length} exam or quiz item${detectedExamItems.length === 1 ? "" : "s"}.`;
+  } catch (error) { status.textContent = error.message || "The screenshots could not be read."; }
+  finally { button.disabled = false; }
+}
+
+function renderDetectedExams() {
+  const list = document.querySelector("#detected-exam-list");
+  const classes = getImportableClasses(); list.innerHTML = "";
+  detectedExamItems.forEach((item, index) => {
+    const card = document.createElement("article"); card.className = "detected-class-card";
+    card.innerHTML = `<label class="field"><span>Exam or quiz</span><input data-exam-field="title" value="${escapeHtml(item.title)}"></label><div class="field-row"><label class="field"><span>Class</span><select data-exam-field="course"><option value="">Choose a class</option>${classes.map((course) => `<option value="${escapeHtml(course.title)}"${course.title === item.course ? " selected" : ""}>${escapeHtml(course.title)}</option>`).join("")}</select></label><label class="field"><span>Date</span><input data-exam-field="date" type="date" value="${item.date}"></label><label class="field"><span>Time</span><input data-exam-field="time" type="time" value="${item.time}"></label></div><button class="small-button" type="button">Remove</button>`;
+    card.querySelectorAll("[data-exam-field]").forEach((input) => input.addEventListener("input", () => { detectedExamItems[index][input.dataset.examField] = input.value; }));
+    card.querySelector("button").addEventListener("click", () => { detectedExamItems.splice(index, 1); renderDetectedExams(); });
+    list.appendChild(card);
+  });
+}
+
+function saveDetectedExams() {
+  const status = document.querySelector("#exam-photo-status");
+  if (detectedExamItems.some((item) => !item.title.trim() || !item.course || !item.date)) { status.textContent = "Each item needs a title, class, and date."; return; }
+  detectedExamItems.forEach((item) => state.data.exams.push({ id: crypto.randomUUID(), title: item.title.trim(), course: item.course, date: item.date, time: item.time, status: "pending", color: colorForSelectedClass(item.course, "#6d9fd0"), notes: "Imported from a Canvas screenshot." }));
+  const count = detectedExamItems.length; detectedExamItems = []; document.querySelector("#exam-photo-review").hidden = true; persistAndRender(); status.textContent = `${count} exam or quiz item${count === 1 ? "" : "s"} added.`;
+}
+
 async function readEventPhotos() {
   const files = Array.from(document.querySelector("#event-photo-files").files || []);
   const status = document.querySelector("#event-photo-status");
@@ -745,13 +824,13 @@ async function readEventPhotos() {
   status.textContent = "Reading event names, dates, times, and locations…";
   try {
     if (window.location.protocol === "file:") throw new Error("Photo import needs the deployed Netlify site or Netlify Dev.");
-    const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
-    if (!session?.access_token) throw new Error("Sign in before importing an event schedule.");
+    const accessToken = await getValidAccessToken();
+    if (!accessToken) throw new Error("Sign in before importing an event schedule.");
     const images = [];
     for (const file of files) images.push(await resizeImageForImport(file));
     const response = await fetch("/.netlify/functions/event-photo-import", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({ images, currentDate: todayString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" }),
     });
     const result = await response.json().catch(() => ({}));
@@ -961,9 +1040,9 @@ async function researchOfficialSchoolCalendar() {
   button.disabled = true; status.textContent = "Researching official school sources…";
   try {
     if (window.location.protocol === "file:") throw new Error("Research needs the Netlify backend. Open the deployed Netlify site, or run the project with Netlify Dev instead of opening the HTML file directly.");
-    const session = supabaseClient ? (await supabaseClient.auth.getSession()).data.session : null;
-    if (!session?.access_token) throw new Error("Sign in before researching a school calendar.");
-    const response = await fetch("/.netlify/functions/academic-calendar", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ schoolName: school, academicYear, termSystem: document.querySelector("#academic-term-system").value, termName: term }) });
+    const accessToken = await getValidAccessToken();
+    if (!accessToken) throw new Error("Sign in before researching a school calendar.");
+    const response = await fetch("/.netlify/functions/academic-calendar", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ schoolName: school, academicYear, termSystem: document.querySelector("#academic-term-system").value, termName: term }) });
     const result = await response.json().catch(() => ({}));
     if (response.status === 404) throw new Error("The academic-calendar Netlify Function was not deployed. Trigger a new Netlify deploy from the latest code.");
     if (!response.ok) throw new Error(result.error || `School-calendar research failed (${response.status}).`);
@@ -1417,6 +1496,17 @@ async function restoreSupabaseSession() {
   await applySupabaseUser(data.session.user);
 }
 
+async function getValidAccessToken() {
+  if (!supabaseClient) return "";
+  let { data } = await supabaseClient.auth.getSession();
+  const expiresSoon = !data.session?.expires_at || data.session.expires_at * 1000 < Date.now() + 60000;
+  if (expiresSoon) {
+    const refreshed = await supabaseClient.auth.refreshSession();
+    data = refreshed.data;
+  }
+  return data.session?.access_token || "";
+}
+
 async function loginWithSupabase(email, password) {
   elements.loginSubmit.disabled = true;
   elements.loginStatus.textContent = "Logging in...";
@@ -1503,6 +1593,22 @@ async function applySupabaseUser(user) {
   syncSettingsFromAuthProfile();
   saveDataLocally();
   lastCloudSyncMessage = `Cloud sync active for ${authState.profile.email}.`;
+  subscribeToPlannerChanges();
+}
+
+function subscribeToPlannerChanges() {
+  if (!supabaseClient || !authState.userId) return;
+  if (realtimeChannel) supabaseClient.removeChannel(realtimeChannel);
+  realtimeChannel = supabaseClient
+    .channel(`planner-${authState.userId}`)
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: SUPABASE_TABLE, filter: `user_id=eq.${authState.userId}` }, (payload) => {
+      if (cloudSaveTimer || Date.now() - lastLocalSaveAt < 1500 || !payload.new?.data) return;
+      state.data = normalizePlannerData(payload.new.data);
+      saveDataLocally();
+      lastCloudSyncMessage = "Updated instantly from another device.";
+      render();
+    })
+    .subscribe();
 }
 
 async function loadDataFromSupabase(userId) {
@@ -1540,6 +1646,7 @@ async function saveDataToSupabase() {
     return;
   }
 
+  lastLocalSaveAt = Date.now();
   const { error } = await supabaseClient.from(SUPABASE_TABLE).upsert({
     user_id: authState.userId,
     profile: {
@@ -1580,15 +1687,14 @@ async function syncNow() {
   }
 
   syncInProgress = true;
+  const hadPendingLocalChanges = Boolean(cloudSaveTimer);
   if (cloudSaveTimer) {
     window.clearTimeout(cloudSaveTimer);
     cloudSaveTimer = null;
   }
   setSyncButtonsDisabled(true);
   elements.settingsStatus.textContent = "Syncing...";
-  await saveDataToSupabase();
-
-  const savedMessage = lastCloudSyncMessage;
+  if (hadPendingLocalChanges) await saveDataToSupabase();
   const cloudData = await loadDataFromSupabase(authState.userId);
   if (cloudData) {
     state.data = cloudData;
@@ -1599,7 +1705,7 @@ async function syncNow() {
   setSyncButtonsDisabled(false);
   syncInProgress = false;
   render();
-  renderSettings(savedMessage || lastCloudSyncMessage || "Sync complete.");
+  renderSettings(lastCloudSyncMessage || "Cloud changes loaded.");
 }
 
 function setSyncButtonsDisabled(isDisabled) {
@@ -1758,7 +1864,7 @@ function renderHeaderStats() {
   elements.homeworkCount.textContent = String(
     state.data.homework.filter((item) => item.status !== "done").length,
   );
-  elements.examCount.textContent = String(state.data.exams.length);
+  elements.examCount.textContent = String(state.data.exams.filter((item) => item.status !== "done" && item.date >= todayString()).length);
   elements.todayClassesCount.textContent = String(countGroupedItemsOnDate("class", today));
   elements.reminderCount.textContent = String(
     groupReminderEntries().filter((item) => item.status !== "done").length,
@@ -1799,7 +1905,7 @@ function renderCalendar() {
     const current = new Date(firstDay);
     current.setDate(firstDay.getDate() + index);
     const dateString = isoDate(current);
-    const items = getItemsForDate(dateString);
+    const items = filterCalendarItems(getItemsForDate(dateString));
     const button = document.createElement("button");
     const isSelected = dateString === state.selectedDate;
     const isToday = dateString === todayString();
@@ -1881,9 +1987,14 @@ function renderSelectedDayViews() {
   elements.selectedDateTitle.textContent = formattedDate;
   if (elements.daySchedulerTitle) elements.daySchedulerTitle.textContent = formattedDate;
 
-  const items = getItemsForDate(state.selectedDate);
+  const items = filterCalendarItems(getItemsForDate(state.selectedDate));
   renderDaySummary(elements.calendarDaySummary, items);
   if (elements.daySchedulerSummary) renderDaySummary(elements.daySchedulerSummary, items);
+}
+
+function filterCalendarItems(items) {
+  const filter = state.calendarFilter || "all";
+  return filter === "all" ? items : items.filter((item) => item.kind === filter);
 }
 
 function renderDaySummary(target, items) {
@@ -2974,7 +3085,9 @@ function prefillForms() {
 
 function renderColorMatchOptions() {
   renderClassCourseOptions();
-  const sources = getColorSourceItems();
+  const sources = getColorSourceItems().filter((source, index, all) =>
+    all.findIndex((candidate) => candidate.label.trim().toLowerCase() === source.label.trim().toLowerCase()) === index,
+  );
 
   COLOR_MATCH_PREFIXES.forEach((prefix) => {
     const select = getElementByPrefix(prefix, "MatchSource");
@@ -3080,7 +3193,7 @@ async function saveSettings() {
       defaultView: elements.widgetDefaultView.value,
       startScreen: elements.scriptableStartScreen.value,
       plannerUrl: elements.widgetPlannerUrl.value.trim(),
-      daysAhead: Number(elements.widgetDaysAhead.value),
+      daysAhead: elements.widgetDaysAhead.value === "all" ? "all" : Number(elements.widgetDaysAhead.value),
       itemLimit: Number(elements.widgetItemLimit.value),
       classes: elements.widgetShowClasses.checked,
       homework: elements.widgetShowHomework.checked,
@@ -3744,90 +3857,31 @@ function loadData() {
 
 function normalizePlannerData(data) {
   return {
-    homework: Array.isArray(data?.homework) ? data.homework : [],
-    exams: Array.isArray(data?.exams) ? data.exams : [],
-    schedule: Array.isArray(data?.schedule) ? data.schedule : [],
-    reminders: Array.isArray(data?.reminders) ? data.reminders : [],
+    homework: Array.isArray(data?.homework) ? data.homework.filter((item) => !isLegacyDemoItem(item)) : [],
+    exams: Array.isArray(data?.exams) ? data.exams.filter((item) => !isLegacyDemoItem(item)) : [],
+    schedule: Array.isArray(data?.schedule) ? data.schedule.filter((item) => !isLegacyDemoItem(item)) : [],
+    reminders: Array.isArray(data?.reminders) ? data.reminders.filter((item) => !isLegacyDemoItem(item)) : [],
     settings: normalizeSettings(data?.settings),
   };
 }
 
-function seedData() {
-  const today = todayString();
-  const tomorrow = offsetDate(today, 1);
-  const nextDay = offsetDate(today, 2);
+function isLegacyDemoItem(item) {
+  return [
+    "Finish questions 1 through 12.",
+    "Upload the final PDF before class.",
+    "Bring calculator and formula sheet.",
+    "Bring lab notebook.",
+    "Discuss slides and final edits.",
+    "Ask about next semester registration.",
+  ].includes(item?.notes);
+}
 
+function seedData() {
   return {
-    homework: [
-      {
-        id: crypto.randomUUID(),
-        title: "Calculus problem set",
-        course: "Math 150",
-        date: today,
-        time: "23:00",
-        status: "pending",
-        color: "#7eaed6",
-        notes: "Finish questions 1 through 12.",
-      },
-      {
-        id: crypto.randomUUID(),
-        title: "Physics lab write-up",
-        course: "Physics 202",
-        date: tomorrow,
-        time: "17:00",
-        status: "pending",
-        color: "#5c8fd8",
-        notes: "Upload the final PDF before class.",
-      },
-    ],
-    exams: [
-      {
-        id: crypto.randomUUID(),
-        title: "Physics midterm",
-        course: "Physics 202",
-        date: nextDay,
-        time: "13:00",
-        color: "#6d9fd0",
-        status: "pending",
-        notes: "Bring calculator and formula sheet.",
-      },
-    ],
-    schedule: [
-      {
-        id: crypto.randomUUID(),
-        title: "Physics lecture",
-        date: today,
-        type: "class",
-        start: "09:30",
-        end: "10:45",
-        location: "Room 204",
-        color: "#3f76c5",
-        status: "pending",
-        notes: "Bring lab notebook.",
-      },
-      {
-        id: crypto.randomUUID(),
-        title: "Group project meeting",
-        date: today,
-        type: "event",
-        start: "14:00",
-        end: "15:00",
-        location: "Library",
-        color: "#8eb4de",
-        status: "pending",
-        notes: "Discuss slides and final edits.",
-      },
-    ],
-    reminders: [
-      {
-        id: crypto.randomUUID(),
-        title: "Call advisor",
-        date: nextDay,
-        time: "11:30",
-        color: "#9abbd6",
-        notes: "Ask about next semester registration.",
-      },
-    ],
+    homework: [],
+    exams: [],
+    schedule: [],
+    reminders: [],
     settings: getDefaultSettings(),
   };
 }
@@ -3878,7 +3932,7 @@ function getDefaultSettings() {
       defaultView: "today",
       startScreen: "calendar",
       plannerUrl: "",
-      daysAhead: 7,
+      daysAhead: "all",
       itemLimit: 5,
       classes: true,
       homework: true,
@@ -3930,7 +3984,7 @@ function normalizeAcademicCalendar(calendar) {
 function normalizeWidgetPreferences(preferences) {
   const defaults = getDefaultSettings().widgetPreferences;
   return {
-    defaultView: ["today", "classes", "homework", "events"].includes(preferences?.defaultView)
+    defaultView: ["all", "today", "classes", "homework", "events"].includes(preferences?.defaultView)
       ? preferences.defaultView
       : defaults.defaultView,
     startScreen: PLANNER_TABS.includes(preferences?.startScreen)
@@ -3939,8 +3993,8 @@ function normalizeWidgetPreferences(preferences) {
     plannerUrl: typeof preferences?.plannerUrl === "string"
       ? preferences.plannerUrl.trim().replace(/\/$/, "")
       : defaults.plannerUrl,
-    daysAhead: [1, 3, 7, 14].includes(Number(preferences?.daysAhead))
-      ? Number(preferences.daysAhead)
+    daysAhead: preferences?.daysAhead === "all" || [1, 3, 7, 14].includes(Number(preferences?.daysAhead))
+      ? (preferences.daysAhead === "all" ? "all" : Number(preferences.daysAhead))
       : defaults.daysAhead,
     itemLimit: [3, 5, 8, 10, 12, 14].includes(Number(preferences?.itemLimit))
       ? Number(preferences.itemLimit)
@@ -4210,7 +4264,7 @@ function getItemsForDate(date) {
     .map((item) => ({
       sourceId: item.id,
       sourceType: item.type,
-      kind: "class",
+      kind: item.type === "event" ? "event" : "class",
       label: item.type === "class" ? "Class" : "Scheduled event",
       title: item.title,
       meta: `${formatTime(item.start)} - ${formatTime(item.end)}${item.location ? ` • ${item.location}` : ""}${item.type === "event" && item.status === "done" ? " • Done" : ""}`,

@@ -340,11 +340,45 @@ body.is-authenticated .auth-screen {
 }
 
 .tab-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   padding: 12px 18px;
   background: rgba(255, 255, 255, 0.75);
   color: var(--muted);
   font-weight: 700;
   white-space: nowrap;
+}
+
+.tab-icon { font-size: 1.05rem; line-height: 1; }
+
+body:not(.mobile-preview) .calendar-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+body:not(.mobile-preview) .day-overview-panel {
+  display: none;
+}
+
+body:not(.mobile-preview) .calendar-grid[data-view="week"] {
+  grid-template-columns: repeat(7, minmax(120px, 1fr));
+  gap: 14px;
+  overflow-x: auto;
+  padding: 4px 2px 12px;
+}
+
+body:not(.mobile-preview) .calendar-grid[data-view="week"] .calendar-day {
+  min-height: 300px;
+  padding: 16px;
+}
+
+body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-day {
+  min-height: 420px;
+  padding: 24px;
+}
+
+body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-markers {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
 .tab-button.is-active {

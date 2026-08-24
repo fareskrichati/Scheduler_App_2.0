@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#7eaed6" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -111,25 +111,25 @@
         <section class="tab-shell">
           <div class="tab-row" role="tablist" aria-label="Planner sections">
             <button class="tab-button is-active" id="tab-calendar" data-tab="calendar" type="button" role="tab" aria-selected="true">
-              Calendar
+              <span aria-hidden="true">📅</span><span class="tab-label">Calendar</span>
             </button>
             <button class="tab-button" id="tab-classes" data-tab="classes" type="button" role="tab" aria-selected="false">
-              Class
+              <span aria-hidden="true">🎓</span><span class="tab-label">Classes</span>
             </button>
             <button class="tab-button" id="tab-events" data-tab="events" type="button" role="tab" aria-selected="false">
-              Other Events
+              <span aria-hidden="true">🎟️</span><span class="tab-label">Events</span>
             </button>
             <button class="tab-button" id="tab-homework" data-tab="homework" type="button" role="tab" aria-selected="false">
-              Homework
+              <span aria-hidden="true">📚</span><span class="tab-label">Homework</span>
             </button>
             <button class="tab-button" id="tab-exams" data-tab="exams" type="button" role="tab" aria-selected="false">
-              Exams
+              <span aria-hidden="true">📝</span><span class="tab-label">Exams</span>
             </button>
             <button class="tab-button" id="tab-reminders" data-tab="reminders" type="button" role="tab" aria-selected="false">
-              Other Reminders
+              <span aria-hidden="true">🔔</span><span class="tab-label">Reminders</span>
             </button>
             <button class="tab-button" id="tab-settings" data-tab="settings" type="button" role="tab" aria-selected="false">
-              Settings
+              <span aria-hidden="true">⚙️</span><span class="tab-label">Settings</span>
             </button>
           </div>
 
@@ -149,10 +149,11 @@
                   </div>
 
                   <div class="calendar-view-switch" role="group" aria-label="Calendar view">
-                    <button class="view-switch-button is-active" type="button" data-calendar-view="month">Month</button>
-                    <button class="view-switch-button" type="button" data-calendar-view="week">Week</button>
+                    <button class="view-switch-button" type="button" data-calendar-view="month">Month</button>
+                    <button class="view-switch-button is-active" type="button" data-calendar-view="week">Week</button>
                     <button class="view-switch-button" type="button" data-calendar-view="day">Day</button>
                   </div>
+                  <label class="calendar-filter field"><span>Show</span><select id="calendar-filter"><option value="all">Everything</option><option value="class">Classes</option><option value="homework">Homework</option><option value="event">Other events</option><option value="exam">Exams &amp; quizzes</option><option value="reminder">Reminders</option></select></label>
 
                   <div class="calendar-weekdays" id="calendar-weekdays"></div>
                   <div class="calendar-grid" id="calendar-grid" aria-live="polite"></div>
@@ -867,6 +868,7 @@
                         <label class="field">
                           <span>Default widget view</span>
                           <select id="widget-default-view">
+                            <option value="all">Everything upcoming</option>
                             <option value="today">Today's planner</option>
                             <option value="classes">Classes</option>
                             <option value="homework">Homework</option>
@@ -892,6 +894,7 @@
                             <option value="3">Next 3 days</option>
                             <option value="7">Next 7 days</option>
                             <option value="14">Next 14 days</option>
+                            <option value="all">All upcoming</option>
                           </select>
                         </label>
                         <label class="field">

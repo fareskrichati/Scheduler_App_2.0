@@ -146,6 +146,7 @@
                       <h3 id="calendar-month-label">Month</h3>
                     </div>
                     <div class="nav-actions">
+                      <button class="small-button calendar-today-button" id="calendar-today" type="button">Today</button>
                       <button class="icon-button" id="prev-month" type="button" aria-label="Previous month">←</button>
                       <button class="icon-button" id="next-month" type="button" aria-label="Next month">→</button>
                     </div>
@@ -177,7 +178,7 @@
 
             <section class="tab-panel" id="panel-todo" data-panel="todo" role="tabpanel" aria-labelledby="tab-todo">
               <article class="panel-card todo-panel">
-                <div class="panel-header"><div><p class="panel-label">Coming up</p><h3>Homework &amp; reminders</h3></div><span class="todo-count" id="todo-count">0 left</span></div>
+                <div class="panel-header"><div><p class="panel-label">Coming up</p><h3>Homework, exams &amp; reminders</h3></div><span class="todo-count" id="todo-count">0 left</span></div>
                 <div class="todo-list" id="todo-list" aria-live="polite"></div>
               </article>
             </section>
@@ -886,7 +887,7 @@
                             <option value="classes">Classes</option>
                             <option value="homework">Homework</option>
                             <option value="reminders">Reminders</option>
-                            <option value="tasks">Homework &amp; reminders</option>
+                            <option value="tasks">To-Do list</option>
                             <option value="exams">Exams &amp; quizzes</option>
                             <option value="events">Events</option>
                           </select>
@@ -895,6 +896,7 @@
                           <span>Scriptable opens to</span>
                           <select id="scriptable-start-screen">
                             <option value="calendar">Calendar</option>
+                            <option value="todo">To-Do</option>
                             <option value="classes">Classes</option>
                             <option value="events">Other Events</option>
                             <option value="homework">Homework</option>
@@ -966,6 +968,13 @@
                       <div class="subsection-header">
                         <p class="panel-label">School accounts</p>
                       </div>
+
+                      <label class="field">
+                        <span>Canvas calendar feed</span>
+                        <input id="settings-canvas-feed" type="password" maxlength="500" placeholder="Paste your private Canvas .ics feed link" autocomplete="off" />
+                      </label>
+                      <button class="primary-button" id="sync-canvas-feed" type="button">Sync Canvas calendar</button>
+                      <p class="settings-note" id="canvas-feed-status" role="status">Imports dated assignments and exams without an API token. Keep this link private.</p>
 
                       <input id="settings-school-account-id" type="hidden" />
 

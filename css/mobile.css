@@ -49,7 +49,7 @@ body:has(.mobile-form-dialog[open]) {
 
 .scriptable-webview .app-shell,
 .scriptable-webview .auth-screen {
-  padding-top: calc(68px + env(safe-area-inset-top, 0px));
+  padding-top: calc(28px + env(safe-area-inset-top, 0px));
 }
 
 .scriptable-webview .app-shell {
@@ -346,6 +346,11 @@ body:has(.mobile-form-dialog[open]) {
 
 .calendar-panel .nav-actions {
   margin-left: auto;
+}
+
+.calendar-today-button {
+  min-height: 40px;
+  padding-inline: 12px;
 }
 
 .calendar-weekdays {

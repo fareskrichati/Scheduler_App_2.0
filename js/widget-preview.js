@@ -1,5 +1,5 @@
 const STORAGE_KEY = "pulse-planner-v2";
-const titles = { all: "Everything upcoming", today: "Today's planner", classes: "Classes + homework", homework: "Homework", reminders: "Reminders", tasks: "Homework & reminders", exams: "Exams & quizzes", events: "Events" };
+const titles = { all: "Everything upcoming", today: "Today's planner", classes: "Classes + homework", homework: "Homework", reminders: "Reminders", tasks: "To-Do list", exams: "Exams & quizzes", events: "Events" };
 const viewSelect = document.querySelector("#preview-view");
 const dataSourceSelect = document.querySelector("#preview-data-source");
 const offline = document.querySelector("#preview-offline");
@@ -44,7 +44,7 @@ function getPreviewItems(view) {
   } else if (["all", "today", "homework", "tasks"].includes(view)) {
     homework.filter((item) => item.status !== "done" && item.date >= today && item.date <= end && (view !== "today" || item.date === today)).forEach((item) => items.push({ symbol: "○", title: item.title, meta: `${dateLabel(item.date, today)} ${item.course || "Homework"}${item.time ? ` · ${formatTime(item.time)}` : ""}`, color: item.color || "#7eaed6", sort: `${item.date} ${item.time || "23:59"}` }));
   }
-  if (["all", "events", "today", "exams"].includes(view)) (data.exams || []).filter((item) => item.status !== "done" && item.date >= today && item.date <= end && (view !== "today" || item.date === today)).forEach((item) => items.push({ symbol: "○", title: item.title, meta: `${dateLabel(item.date, today)}${item.time ? ` · ${formatTime(item.time)}` : ""}`, color: item.color || "#6d9fd0", sort: `${item.date} ${item.time || "23:58"}` }));
+  if (["all", "events", "today", "exams", "tasks"].includes(view)) (data.exams || []).filter((item) => item.status !== "done" && item.date >= today && item.date <= end && (view !== "today" || item.date === today)).forEach((item) => items.push({ symbol: "○", title: item.title, meta: `${dateLabel(item.date, today)}${item.time ? ` · ${formatTime(item.time)}` : ""}`, color: item.color || "#6d9fd0", sort: `${item.date} ${item.time || "23:58"}` }));
   if (["all", "events", "today", "reminders", "tasks"].includes(view)) (data.reminders || []).filter((item) => item.status !== "done" && item.date >= today && item.date <= end && (view !== "today" || item.date === today)).forEach((item) => items.push({ symbol: "○", title: item.title, meta: `${dateLabel(item.date, today)}${item.time ? ` · ${formatTime(item.time)}` : ""}`, color: item.color || "#9abbd6", sort: `${item.date} ${item.time || "23:57"}` }));
   return items.sort((a, b) => a.sort.localeCompare(b.sort));
 }

@@ -19,7 +19,7 @@ Set **Parameter** while editing the widget:
 - `classes` shows upcoming classes.
 - `homework` shows upcoming incomplete homework.
 - `reminders` shows upcoming incomplete reminders.
-- `tasks` combines upcoming homework and reminders.
+- `tasks` shows the To-Do list with upcoming homework, exams, and reminders.
 - `exams` shows upcoming exams and quizzes.
 - `events` shows events, exams, and reminders.
 - `all` shows every enabled upcoming category.

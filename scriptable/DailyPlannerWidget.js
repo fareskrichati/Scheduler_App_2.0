@@ -309,9 +309,11 @@ function getWidgetItems(data, view, preferences = getWidgetPreferences(data)) {
   const today = isoDate(new Date());
   const lastDate = preferences.daysAhead === "all" ? "9999-12-31" : offsetIsoDate(today, preferences.daysAhead - 1);
   const schedule = Array.isArray(data.schedule) ? data.schedule : [];
-  const homework = Array.isArray(data.homework) ? data.homework : [];
+  const rawHomework = Array.isArray(data.homework) ? data.homework : [];
   const exams = Array.isArray(data.exams) ? data.exams : [];
-  const reminders = Array.isArray(data.reminders) ? data.reminders : [];
+  const rawReminders = Array.isArray(data.reminders) ? data.reminders : [];
+  const homework = view === "tasks" ? nextWidgetOccurrences(rawHomework, today) : rawHomework;
+  const reminders = view === "tasks" ? nextWidgetOccurrences(rawReminders, today) : rawReminders;
   const items = [];
 
   schedule.forEach((item) => {
@@ -341,12 +343,12 @@ function getWidgetItems(data, view, preferences = getWidgetPreferences(data)) {
 
   if (["all", "today", "homework", "tasks"].includes(view)) {
     homework.forEach((item) => {
-      if (!preferences.homework || item.status === "done" || item.date < today || (!["homework", "tasks"].includes(view) && item.date > lastDate) || (view === "today" && item.date !== today)) return;
+      if (!preferences.homework || item.status === "done" || item.date < today || item.date > lastDate || (view === "today" && item.date !== today)) return;
       items.push({ title: item.title, date: item.date, time: item.time || "23:59", color: item.color || "#7EAED6", meta: `${dateLabel(item.date, today)} ${item.course || "Homework"}${item.time ? ` - ${formatTime(item.time)}` : ""}`.trim(), id: item.id, collection: "homework", completable: true });
     });
   }
 
-  if (["all", "today", "events", "exams"].includes(view)) {
+  if (["all", "today", "events", "exams", "tasks"].includes(view)) {
     exams.forEach((item) => {
       if (!preferences.exams || item.status === "done" || item.date < today || item.date > lastDate || (view === "today" && item.date !== today)) return;
       items.push({ title: item.title, date: item.date, time: item.time || "23:58", color: item.color || "#6D9FD0", meta: `${dateLabel(item.date, today)} ${item.course || "Exam"}`.trim(), id: item.id, collection: "exams", completable: true });
@@ -354,11 +356,23 @@ function getWidgetItems(data, view, preferences = getWidgetPreferences(data)) {
   }
 
   if (["all", "today", "events", "reminders", "tasks"].includes(view)) reminders.forEach((item) => {
-    if (!preferences.reminders || item.status === "done" || item.date < today || (["reminders", "tasks"].includes(view) ? false : item.date > lastDate) || (view === "today" && item.date !== today)) return;
+    if (!preferences.reminders || item.status === "done" || item.date < today || item.date > lastDate || (view === "today" && item.date !== today)) return;
     items.push({ title: item.title, date: item.date, time: item.time || "23:57", color: item.color || "#9ABBD6", meta: `${dateLabel(item.date, today)} Reminder${item.time ? ` - ${formatTime(item.time)}` : ""}`, id: item.id, collection: "reminders", completable: true });
   });
 
   return items.sort((a, b) => (a.sortKey || `${a.date} ${a.time}`).localeCompare(b.sortKey || `${b.date} ${b.time}`));
+}
+
+function nextWidgetOccurrences(collection, today) {
+  const singles = [];
+  const series = new Map();
+  collection.forEach((item) => {
+    if (item.date < today || item.status === "done") return;
+    if (!item.seriesId) { singles.push(item); return; }
+    if (!series.has(item.seriesId)) series.set(item.seriesId, []);
+    series.get(item.seriesId).push(item);
+  });
+  return [...singles, ...Array.from(series.values()).map((items) => items.sort((a, b) => `${a.date} ${a.time || ""}`.localeCompare(`${b.date} ${b.time || ""}`))[0])];
 }
 
 function widgetCourseKey(value) {
@@ -374,7 +388,7 @@ async function completeWidgetItem(collection, id) {
   const item = items.find((entry) => entry.id === id);
   if (!item || (collection === "schedule" && item.type !== "event")) return;
   item.status = "done";
-  item.completedAt = new Date().toISOString();
+  item.completedAt = String(Date.now());
   await savePlannerData(result.data);
   saveCache(result.data);
   const notice = new Notification();
@@ -427,7 +441,7 @@ function getWidgetPreferences(data) {
 }
 
 function normalizeStartScreen(value) {
-  const screens = ["calendar", "classes", "events", "homework", "exams", "reminders", "settings"];
+  const screens = ["calendar", "todo", "classes", "events", "homework", "exams", "reminders", "settings"];
   return screens.includes(value) ? value : "calendar";
 }
 
@@ -437,7 +451,7 @@ function normalizeView(value, fallback = "today") {
 }
 
 function viewTitle(view) {
-  return { all: "Everything upcoming", today: "Today's planner", classes: "Classes", homework: "Homework", reminders: "Reminders", exams: "Exams & quizzes", events: "Events", tasks: "Homework & reminders" }[view];
+  return { all: "Everything upcoming", today: "Today's planner", classes: "Classes", homework: "Homework", reminders: "Reminders", exams: "Exams & quizzes", events: "Events", tasks: "To-Do list" }[view];
 }
 
 function isoDate(date) {

@@ -70,6 +70,7 @@ const elements = {
   statButtons: Array.from(document.querySelectorAll(".stat-button")),
   openSettings: document.querySelector("#open-settings"),
   jumpToday: document.querySelector("#jump-today"),
+  calendarToday: document.querySelector("#calendar-today"),
   quickAdd: document.querySelector("#quick-add"),
   quickAddDialog: document.querySelector("#quick-add-dialog"),
   quickAddType: document.querySelector("#quick-add-type"),
@@ -204,6 +205,9 @@ const elements = {
   settingsSchoolAccountId: document.querySelector("#settings-school-account-id"),
   settingsSchool: document.querySelector("#settings-school"),
   settingsCanvasUrl: document.querySelector("#settings-canvas-url"),
+  settingsCanvasFeed: document.querySelector("#settings-canvas-feed"),
+  syncCanvasFeed: document.querySelector("#sync-canvas-feed"),
+  canvasFeedStatus: document.querySelector("#canvas-feed-status"),
   settingsConnectCanvas: document.querySelector("#settings-connect-canvas"),
   settingsConnectClassroom: document.querySelector("#settings-connect-classroom"),
   settingsCanvasToken: document.querySelector("#settings-canvas-token"),
@@ -315,13 +319,15 @@ function bindEvents() {
     elements.tabShell?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
-  elements.jumpToday.addEventListener("click", () => {
+  const jumpToToday = () => {
     state.selectedDate = todayString();
     state.visibleMonth = startOfMonth(state.selectedDate);
     setActiveTab("calendar");
     render();
     elements.tabShell?.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
+  };
+  elements.jumpToday.addEventListener("click", jumpToToday);
+  elements.calendarToday.addEventListener("click", jumpToToday);
 
   elements.quickAdd.addEventListener("click", () => {
     elements.quickAddDialog.showModal();
@@ -456,6 +462,7 @@ function bindEvents() {
   elements.sendDaySchedulePdf.addEventListener("click", sendDaySchedulePdf);
   elements.syncNow.addEventListener("click", syncNow);
   elements.fetchSchoolItems.addEventListener("click", fetchSchoolItems);
+  elements.syncCanvasFeed.addEventListener("click", syncCanvasCalendarFeed);
   elements.clearSchoolImports.addEventListener("click", () => {
     schoolImportItems = [];
     renderSchoolImportItems("Import results cleared.");
@@ -1858,6 +1865,7 @@ function render() {
 function renderTodoList() {
   const items = [
     ...getNextVisibleOccurrences(state.data.homework, todayString()).map((item) => ({ ...item, kind: "homework", label: item.course || "Homework" })),
+    ...state.data.exams.filter((item) => item.date >= todayString()).map((item) => ({ ...item, kind: "exam", label: item.course || "Exam" })),
     ...getNextVisibleOccurrences(state.data.reminders, todayString()).map((item) => ({ ...item, kind: "reminder", label: "Reminder" })),
   ].filter((item) => !isExpiredCompletedItem(item)).sort(compareByDateTime);
 
@@ -1872,7 +1880,11 @@ function renderTodoList() {
     row.className = `todo-item${item.status === "done" ? " is-complete" : ""}`;
     applyItemColor(row, item.color);
     row.innerHTML = `<button class="todo-check" type="button" aria-label="${item.status === "done" ? "Mark pending" : "Mark done"}">${item.status === "done" ? "✓" : ""}</button><div class="todo-copy"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.label)} · ${formatShortDate(item.date)}${item.time ? ` · ${formatTime(item.time)}` : ""}</span></div>`;
-    row.querySelector(".todo-check").addEventListener("click", () => item.kind === "homework" ? toggleHomeworkStatus(item.id) : toggleReminderStatus(item.id));
+    row.querySelector(".todo-check").addEventListener("click", () => {
+      if (item.kind === "homework") toggleHomeworkStatus(item.id);
+      else if (item.kind === "exam") toggleExamStatus(item.id);
+      else toggleReminderStatus(item.id);
+    });
     elements.todoList.appendChild(row);
   });
 }
@@ -3340,6 +3352,7 @@ async function saveSettings() {
     schoolUsername: currentSettings.schoolUsername,
     connections: currentSettings.connections,
     schoolAccounts: currentSettings.schoolAccounts,
+    canvasFeedUrl: elements.settingsCanvasFeed.value.trim(),
   };
 
   syncAuthProfileFromSettings();
@@ -3381,6 +3394,7 @@ function renderSettings(statusMessage = "") {
   elements.widgetShowEvents.checked = settings.widgetPreferences.events;
   elements.widgetShowExams.checked = settings.widgetPreferences.exams;
   elements.widgetShowReminders.checked = settings.widgetPreferences.reminders;
+  elements.settingsCanvasFeed.value = settings.canvasFeedUrl;
   elements.settingsCurrentPassword.value = "";
   elements.settingsNewPassword.value = "";
   clearSchoolAccountForm();
@@ -3682,6 +3696,57 @@ function isNotificationDue(schedule) {
 
 function buildNotificationMessage(schedule) {
   return `Time to check ${formatList(getNotificationTopicLabels(schedule))}.`;
+}
+
+async function syncCanvasCalendarFeed() {
+  const feedUrl = elements.settingsCanvasFeed.value.trim();
+  if (!/^https:\/\/[^/]+\.instructure\.com\/feeds\/calendars\/[^/]+\.ics(?:\?.*)?$/i.test(feedUrl)) {
+    elements.canvasFeedStatus.textContent = "Paste a valid private Canvas calendar feed ending in .ics.";
+    return;
+  }
+  elements.syncCanvasFeed.disabled = true;
+  elements.canvasFeedStatus.textContent = "Syncing Canvas calendar…";
+  try {
+    const response = await fetch("/.netlify/functions/canvas-calendar-feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ feedUrl }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Canvas calendar sync failed.");
+    const items = parseCanvasCalendarFeed(result.ics || "");
+    let added = 0;
+    items.forEach((item) => {
+      const target = item.kind === "exam" ? state.data.exams : state.data.homework;
+      if (target.some((saved) => saved.canvasFeedUid === item.uid)) return;
+      target.push({ id: crypto.randomUUID(), title: item.title, course: item.course, date: item.date, time: item.time, status: "pending", color: colorForSelectedClass(item.course, item.kind === "exam" ? "#6d9fd0" : "#7eaed6"), notes: "Imported from Canvas calendar feed.", canvasFeedUid: item.uid });
+      added += 1;
+    });
+    state.data.settings.canvasFeedUrl = feedUrl;
+    persistAndRender();
+    elements.canvasFeedStatus.textContent = `${added} new Canvas item${added === 1 ? "" : "s"} imported${items.length > added ? `; ${items.length - added} already existed` : ""}.`;
+  } catch (error) {
+    elements.canvasFeedStatus.textContent = error.message || "Canvas calendar sync failed.";
+  } finally {
+    elements.syncCanvasFeed.disabled = false;
+  }
+}
+
+function parseCanvasCalendarFeed(ics) {
+  const unfolded = ics.replace(/\r?\n[ \t]/g, "");
+  return unfolded.split("BEGIN:VEVENT").slice(1).map((block) => {
+    const read = (name) => block.match(new RegExp(`(?:^|\\n)${name}(?:;[^:]*)?:(.*)`, "i"))?.[1]?.trim() || "";
+    const summary = read("SUMMARY").replace(/\\([,;\\])/g, "$1");
+    const uid = read("UID") || `${summary}|${read("DTSTART")}`;
+    const dateValue = read("DTSTART") || read("DUE");
+    const match = dateValue.match(/(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2}))?/);
+    if (!summary || !match) return null;
+    const courseMatch = summary.match(/^\[([^\]]+)\]\s*(.*)$/);
+    const title = (courseMatch?.[2] || summary).trim();
+    const course = (courseMatch?.[1] || "Canvas").trim();
+    const kind = /\b(exam|quiz|test|midterm|final)\b/i.test(title) ? "exam" : "homework";
+    return { uid, title, course, kind, date: `${match[1]}-${match[2]}-${match[3]}`, time: match[4] ? `${match[4]}:${match[5]}` : "" };
+  }).filter((item) => item && item.date >= todayString());
 }
 
 async function fetchSchoolItems() {
@@ -4032,6 +4097,7 @@ function normalizeSettings(settings) {
         : defaults.schoolUsername,
     connections: normalizeConnections(settings.connections),
     schoolAccounts: normalizeSchoolAccounts(settings),
+    canvasFeedUrl: typeof settings.canvasFeedUrl === "string" ? settings.canvasFeedUrl : defaults.canvasFeedUrl,
   };
 }
 
@@ -4077,6 +4143,7 @@ function getDefaultSettings() {
       googleClassroom: false,
     },
     schoolAccounts: [],
+    canvasFeedUrl: "",
   };
 }
 

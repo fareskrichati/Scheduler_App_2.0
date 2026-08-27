@@ -179,6 +179,10 @@
             <section class="tab-panel" id="panel-todo" data-panel="todo" role="tabpanel" aria-labelledby="tab-todo">
               <article class="panel-card todo-panel">
                 <div class="panel-header"><div><p class="panel-label">Coming up</p><h3>Homework, exams &amp; reminders</h3></div><span class="todo-count" id="todo-count">0 left</span></div>
+                <div class="todo-filters">
+                  <label class="field"><span>Show</span><select id="todo-type-filter"><option value="all">All items</option><option value="homework">Homework</option><option value="exam">Exams</option><option value="reminder">Reminders</option></select></label>
+                  <label class="field"><span>Class</span><select id="todo-class-filter"><option value="all">All classes</option></select></label>
+                </div>
                 <div class="todo-list" id="todo-list" aria-live="polite"></div>
               </article>
             </section>
@@ -485,6 +489,7 @@
                       <span>Color</span>
                       <input id="homework-color" type="color" value="#7eaed6" />
                     </label>
+                    <label class="checkbox-row"><input id="homework-priority" type="checkbox" /><span>Priority</span></label>
 
                     <div class="match-box">
                       <label class="checkbox-row">
@@ -606,6 +611,7 @@
                         <input id="exam-color" type="color" value="#7eaed6" />
                       </label>
                     </div>
+                    <label class="checkbox-row"><input id="exam-priority" type="checkbox" /><span>Priority</span></label>
 
                     <div class="match-box">
                       <label class="checkbox-row">
@@ -681,6 +687,7 @@
                       <span>Color</span>
                       <input id="reminder-color" type="color" value="#7eaed6" />
                     </label>
+                    <label class="checkbox-row"><input id="reminder-priority" type="checkbox" /><span>Priority</span></label>
 
                     <div class="match-box">
                       <label class="checkbox-row">

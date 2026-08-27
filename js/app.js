@@ -30,6 +30,8 @@ let detectedEventItems = [];
 let pendingFirstLogin = null;
 let lastCloudSyncMessage = "";
 let supabaseSetupMessage = "";
+let todoTypeFilter = "all";
+let todoClassFilter = "all";
 const supabaseClient = createSupabaseClient();
 clearLegacyLocalLogin();
 const savedAuthProfile = null;
@@ -88,6 +90,8 @@ const elements = {
   calendarDaySummary: document.querySelector("#calendar-day-summary"),
   todoList: document.querySelector("#todo-list"),
   todoCount: document.querySelector("#todo-count"),
+  todoTypeFilter: document.querySelector("#todo-type-filter"),
+  todoClassFilter: document.querySelector("#todo-class-filter"),
   prevMonth: document.querySelector("#prev-month"),
   nextMonth: document.querySelector("#next-month"),
   calendarViewButtons: Array.from(document.querySelectorAll("[data-calendar-view]")),
@@ -153,6 +157,7 @@ const elements = {
   homeworkTime: document.querySelector("#homework-time"),
   homeworkStatus: document.querySelector("#homework-status"),
   homeworkColor: document.querySelector("#homework-color"),
+  homeworkPriority: document.querySelector("#homework-priority"),
   homeworkMatchColor: document.querySelector("#homework-match-color"),
   homeworkMatchOptions: document.querySelector("#homework-match-options"),
   homeworkMatchSource: document.querySelector("#homework-match-source"),
@@ -172,6 +177,7 @@ const elements = {
   examDate: document.querySelector("#exam-date"),
   examTime: document.querySelector("#exam-time"),
   examColor: document.querySelector("#exam-color"),
+  examPriority: document.querySelector("#exam-priority"),
   examMatchColor: document.querySelector("#exam-match-color"),
   examMatchOptions: document.querySelector("#exam-match-options"),
   examMatchSource: document.querySelector("#exam-match-source"),
@@ -183,6 +189,7 @@ const elements = {
   reminderDate: document.querySelector("#reminder-date"),
   reminderTime: document.querySelector("#reminder-time"),
   reminderColor: document.querySelector("#reminder-color"),
+  reminderPriority: document.querySelector("#reminder-priority"),
   reminderMatchColor: document.querySelector("#reminder-match-color"),
   reminderMatchOptions: document.querySelector("#reminder-match-options"),
   reminderMatchSource: document.querySelector("#reminder-match-source"),
@@ -421,6 +428,8 @@ function bindEvents() {
   elements.homeworkMatchColor.addEventListener("change", () => toggleMatchOptions("homework"));
   elements.homeworkRepeatForever.addEventListener("change", () => toggleRepeatOptions("homework"));
   elements.homeworkClass.addEventListener("change", () => applySelectedClassColor("homework"));
+  elements.todoTypeFilter.addEventListener("change", () => { todoTypeFilter = elements.todoTypeFilter.value; renderTodoList(); });
+  elements.todoClassFilter.addEventListener("change", () => { todoClassFilter = elements.todoClassFilter.value; renderTodoList(); });
 
   elements.examForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -1319,6 +1328,23 @@ function loadExternalScript(src, isModule = false) {
 }
 
 function openMobileAddForm(tabId) {
+  const formIds = {
+    classes: "class-form",
+    events: "event-form",
+    homework: "homework-form",
+    exams: "exam-form",
+    reminders: "reminder-form",
+  };
+  const form = document.querySelector(`#${formIds[tabId] || ""}`);
+  const desktopDropdown = form?.closest("details.desktop-add-accordion");
+  if (desktopDropdown) {
+    desktopDropdown.open = true;
+    window.setTimeout(() => {
+      desktopDropdown.scrollIntoView({ behavior: "smooth", block: "start" });
+      getPrimaryFieldForTab(tabId)?.focus({ preventScroll: true });
+    }, 0);
+    return;
+  }
   setMobileAddFormState(tabId, true);
 }
 
@@ -1863,11 +1889,23 @@ function render() {
 }
 
 function renderTodoList() {
-  const items = [
+  const allItems = [
     ...getNextVisibleOccurrences(state.data.homework, todayString()).map((item) => ({ ...item, kind: "homework", label: item.course || "Homework" })),
     ...state.data.exams.filter((item) => item.date >= todayString()).map((item) => ({ ...item, kind: "exam", label: item.course || "Exam" })),
     ...getNextVisibleOccurrences(state.data.reminders, todayString()).map((item) => ({ ...item, kind: "reminder", label: "Reminder" })),
-  ].filter((item) => !isExpiredCompletedItem(item)).sort(compareByDateTime);
+  ].filter((item) => !isExpiredCompletedItem(item));
+
+  const courses = [...new Set(allItems.map((item) => item.course).filter(Boolean))].sort();
+  const selectedCourse = courses.includes(todoClassFilter) ? todoClassFilter : "all";
+  todoClassFilter = selectedCourse;
+  elements.todoClassFilter.innerHTML = '<option value="all">All classes</option>' + courses.map((course) => `<option value="${escapeHtml(course)}">${escapeHtml(course)}</option>`).join("");
+  elements.todoClassFilter.value = selectedCourse;
+  elements.todoTypeFilter.value = todoTypeFilter;
+
+  const items = allItems
+    .filter((item) => todoTypeFilter === "all" || item.kind === todoTypeFilter)
+    .filter((item) => selectedCourse === "all" || item.course === selectedCourse)
+    .sort(compareByDateTime);
 
   elements.todoList.innerHTML = "";
   elements.todoCount.textContent = `${items.filter((item) => item.status !== "done").length} left`;
@@ -1879,7 +1917,7 @@ function renderTodoList() {
     const row = document.createElement("article");
     row.className = `todo-item${item.status === "done" ? " is-complete" : ""}`;
     applyItemColor(row, item.color);
-    row.innerHTML = `<button class="todo-check" type="button" aria-label="${item.status === "done" ? "Mark pending" : "Mark done"}">${item.status === "done" ? "✓" : ""}</button><div class="todo-copy"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.label)} · ${formatShortDate(item.date)}${item.time ? ` · ${formatTime(item.time)}` : ""}</span></div>`;
+    row.innerHTML = `<button class="todo-check" type="button" aria-label="${item.status === "done" ? "Mark pending" : "Mark done"}">${item.status === "done" ? "✓" : ""}</button><div class="todo-copy"><div class="todo-title-line"><strong>${escapeHtml(item.title)}</strong>${item.priority ? '<span class="priority-label">Priority</span>' : ""}</div><span>${escapeHtml(item.label)} · ${formatShortDate(item.date)}${item.time ? ` · ${formatTime(item.time)}` : ""}</span></div>`;
     row.querySelector(".todo-check").addEventListener("click", () => {
       if (item.kind === "homework") toggleHomeworkStatus(item.id);
       else if (item.kind === "exam") toggleExamStatus(item.id);
@@ -2710,6 +2748,7 @@ function saveHomework() {
       elements.homeworkStatus.value,
     ),
     color: colorForSelectedClass(elements.homeworkClass.value, normalizeColor(elements.homeworkColor.value, "#7eaed6")),
+    priority: elements.homeworkPriority.checked,
     repeatMode: elements.homeworkRepeatMode.value,
     matchSourceKey: getMatchSourceValue("homework"),
     notes: elements.homeworkNotes.value.trim(),
@@ -2762,6 +2801,7 @@ function saveExam() {
     date: elements.examDate.value,
     time: elements.examTime.value,
     color: colorForSelectedClass(elements.examCourse.value, normalizeColor(elements.examColor.value, "#7eaed6")),
+    priority: elements.examPriority.checked,
     status,
     completedAt: getExistingCompletedAt(state.data.exams, elements.examId.value, status),
     matchSourceKey: getMatchSourceValue("exam"),
@@ -2789,6 +2829,7 @@ function saveReminder() {
     date: elements.reminderDate.value,
     time: elements.reminderTime.value,
     color: normalizeColor(elements.reminderColor.value, "#7eaed6"),
+    priority: elements.reminderPriority.checked,
     status,
     completedAt: getExistingCompletedAt(state.data.reminders, elements.reminderId.value, status),
     repeatMode: elements.reminderRepeatMode.value,
@@ -2855,6 +2896,7 @@ function editHomework(id) {
   elements.homeworkTime.value = item.time || "";
   elements.homeworkStatus.value = item.status;
   elements.homeworkColor.value = normalizeColor(item.color, "#7eaed6");
+  elements.homeworkPriority.checked = Boolean(item.priority);
   setMatchSelection("homework", item.matchSourceKey || "");
   elements.homeworkRepeat.checked = Boolean(item.seriesId);
   elements.homeworkRepeatMode.value = item.repeatMode || "weekly";
@@ -2883,6 +2925,7 @@ function editExam(id) {
   elements.examDate.value = item.date;
   elements.examTime.value = item.time || "";
   elements.examColor.value = normalizeColor(item.color, "#7eaed6");
+  elements.examPriority.checked = Boolean(item.priority);
   setMatchSelection("exam", item.matchSourceKey || "");
   elements.examNotes.value = item.notes || "";
 }
@@ -2991,6 +3034,7 @@ function editReminder(id) {
   elements.reminderDate.value = item.date;
   elements.reminderTime.value = item.time || "";
   elements.reminderColor.value = normalizeColor(item.color, "#7eaed6");
+  elements.reminderPriority.checked = Boolean(item.priority);
   setMatchSelection("reminder", item.matchSourceKey || "");
   elements.reminderRepeat.checked = Boolean(item.seriesId);
   elements.reminderRepeatMode.value = item.repeatMode || "weekly";

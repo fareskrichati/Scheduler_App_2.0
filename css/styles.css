@@ -450,6 +450,13 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-markers {
   gap: 0.55rem;
 }
 
+.todo-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin-bottom: 0.8rem;
+}
+
 .todo-item {
   display: flex;
   align-items: center;
@@ -476,8 +483,10 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-markers {
 }
 
 .todo-copy { min-width: 0; display: grid; gap: 0.12rem; }
+.todo-title-line { display: flex; align-items: center; gap: 0.45rem; min-width: 0; }
 .todo-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.92rem; }
 .todo-copy span { color: var(--muted); font-size: 0.74rem; }
+.todo-copy .priority-label { flex: 0 0 auto; padding: 2px 7px; border-radius: 999px; background: #c93434; color: #fff; font-size: 0.64rem; font-weight: 600; line-height: 1.35; }
 .todo-item.is-complete { opacity: 0.55; }
 .todo-item.is-complete .todo-check { background: var(--item-color, #7eaed6); }
 .todo-item.is-complete strong { text-decoration: line-through; }

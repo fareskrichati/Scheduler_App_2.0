@@ -559,6 +559,9 @@ body:has(.mobile-form-dialog[open]) {
 .calendar-grid[data-view="week"] .calendar-day-number,
 .calendar-grid[data-view="day"] .calendar-day-number { font-weight: 600; }
 .mobile-import-toggle { width: 100%; margin-bottom: 8px; }
+.todo-filters { grid-template-columns: 1fr 1fr; gap: 8px; }
+.todo-filters .field span { font-size: 0.7rem; }
+.todo-filters select { min-height: 40px; padding: 8px; font-size: 0.82rem; }
 .schedule-import-dialog .schedule-import-card { margin: 0; padding: 0; border: 0; background: transparent; }
 .academic-break-row { grid-template-columns: 1fr; }
 .schedule-import-primary-fields { grid-template-columns: 1fr; }

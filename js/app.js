@@ -390,6 +390,7 @@ function bindEvents() {
   });
   elements.classDate.addEventListener("change", () => syncRepeatSelectionWithDate("class"));
   elements.classMatchColor.addEventListener("change", () => toggleMatchOptions("class"));
+  elements.classMatchSource.addEventListener("change", () => updateMatchedColorPreview("class"));
   elements.classRepeatForever.addEventListener("change", () => toggleRepeatOptions("class"));
 
   elements.eventForm.addEventListener("submit", (event) => {
@@ -408,6 +409,7 @@ function bindEvents() {
   });
   elements.eventDate.addEventListener("change", () => syncRepeatSelectionWithDate("event"));
   elements.eventMatchColor.addEventListener("change", () => toggleMatchOptions("event"));
+  elements.eventMatchSource.addEventListener("change", () => updateMatchedColorPreview("event"));
   elements.eventRepeatForever.addEventListener("change", () => toggleRepeatOptions("event"));
 
   elements.homeworkForm.addEventListener("submit", (event) => {
@@ -426,6 +428,7 @@ function bindEvents() {
   });
   elements.homeworkDate.addEventListener("change", () => syncRepeatSelectionWithDate("homework"));
   elements.homeworkMatchColor.addEventListener("change", () => toggleMatchOptions("homework"));
+  elements.homeworkMatchSource.addEventListener("change", () => updateMatchedColorPreview("homework"));
   elements.homeworkRepeatForever.addEventListener("change", () => toggleRepeatOptions("homework"));
   elements.homeworkClass.addEventListener("change", () => applySelectedClassColor("homework"));
   elements.todoTypeFilter.addEventListener("change", () => { todoTypeFilter = elements.todoTypeFilter.value; renderTodoList(); });
@@ -438,6 +441,7 @@ function bindEvents() {
 
   elements.examReset.addEventListener("click", resetExamForm);
   elements.examMatchColor.addEventListener("change", () => toggleMatchOptions("exam"));
+  elements.examMatchSource.addEventListener("change", () => updateMatchedColorPreview("exam"));
   elements.examCourse.addEventListener("change", () => applySelectedClassColor("exam"));
 
   elements.reminderForm.addEventListener("submit", (event) => {
@@ -456,6 +460,7 @@ function bindEvents() {
   });
   elements.reminderDate.addEventListener("change", () => syncRepeatSelectionWithDate("reminder"));
   elements.reminderMatchColor.addEventListener("change", () => toggleMatchOptions("reminder"));
+  elements.reminderMatchSource.addEventListener("change", () => updateMatchedColorPreview("reminder"));
   elements.reminderRepeatForever.addEventListener("change", () => toggleRepeatOptions("reminder"));
 
   elements.settingsForm.addEventListener("submit", async (event) => {
@@ -1890,9 +1895,9 @@ function render() {
 
 function renderTodoList() {
   const allItems = [
-    ...getNextVisibleOccurrences(state.data.homework, todayString()).map((item) => ({ ...item, kind: "homework", label: item.course || "Homework" })),
-    ...state.data.exams.filter((item) => item.date >= todayString()).map((item) => ({ ...item, kind: "exam", label: item.course || "Exam" })),
-    ...getNextVisibleOccurrences(state.data.reminders, todayString()).map((item) => ({ ...item, kind: "reminder", label: "Reminder" })),
+    ...getNextVisibleOccurrences(state.data.homework, todayString()).map((item) => ({ ...item, color: getStoredItemColor("homework", item), kind: "homework", label: item.course || "Homework" })),
+    ...state.data.exams.filter((item) => item.date >= todayString()).map((item) => ({ ...item, color: getStoredItemColor("exams", item), kind: "exam", label: item.course || "Exam" })),
+    ...getNextVisibleOccurrences(state.data.reminders, todayString()).map((item) => ({ ...item, color: getStoredItemColor("reminders", item), kind: "reminder", label: "Reminder" })),
   ].filter((item) => !isExpiredCompletedItem(item));
 
   const courses = [...new Set(allItems.map((item) => item.course).filter(Boolean))].sort();
@@ -4809,7 +4814,16 @@ function toggleMatchOptions(prefix) {
 
   options.classList.toggle("is-disabled", !enabled);
   select.disabled = !enabled;
+  select.required = enabled;
   colorInput.disabled = enabled;
+  if (enabled) updateMatchedColorPreview(prefix);
+}
+
+function updateMatchedColorPreview(prefix) {
+  const select = getElementByPrefix(prefix, "MatchSource");
+  const colorInput = getElementByPrefix(prefix, "Color");
+  const target = findSourceItem(select.value);
+  if (target) colorInput.value = getStoredItemColor(target.collectionName, target.item);
 }
 
 function setMatchSelection(prefix, sourceKey) {

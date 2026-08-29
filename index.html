@@ -68,9 +68,11 @@
       <header class="topbar">
         <div class="topbar-main">
           <div class="brand-block">
-            <button class="settings-button" id="open-settings" type="button" aria-label="Open settings" title="Settings">
-              <span aria-hidden="true">⚙</span>
-            </button>
+            <div class="topbar-shortcuts">
+              <button class="canvas-shortcut-button" id="open-canvas" type="button" title="Open Canvas">Open Canvas</button>
+              <button class="mobile-quick-add-button" id="mobile-quick-add" type="button" aria-label="Quick add" title="Quick add"><span aria-hidden="true">➕</span></button>
+              <button class="settings-button" id="open-settings" type="button" aria-label="Open settings" title="Settings"><span aria-hidden="true">⚙</span></button>
+            </div>
             <div class="brand-mark">D</div>
             <div>
               <p class="eyebrow">Student planner</p>
@@ -961,6 +963,15 @@
                     </div>
 
                     <div class="subsection">
+                      <div class="subsection-header"><p class="panel-label">Canvas shortcut</p></div>
+                      <p class="settings-note">Save your school and Canvas home page for the Open Canvas button in the top bar.</p>
+                      <div class="field-row">
+                        <label class="field"><span>School name</span><input id="settings-canvas-shortcut-school" type="text" maxlength="120" placeholder="San Diego State University" /></label>
+                        <label class="field"><span>Canvas link</span><input id="settings-canvas-shortcut-url" type="url" maxlength="300" placeholder="https://sdsu.instructure.com" autocomplete="url" /></label>
+                      </div>
+                    </div>
+
+                    <div class="subsection">
                       <div class="subsection-header">
                         <p class="panel-label">Login password</p>
                       </div>
@@ -988,8 +999,8 @@
                         <span>Canvas calendar feed</span>
                         <input id="settings-canvas-feed" type="password" maxlength="500" placeholder="Paste your private Canvas .ics feed link" autocomplete="off" />
                       </label>
-                      <button class="primary-button" id="sync-canvas-feed" type="button">Sync Canvas calendar</button>
-                      <p class="settings-note" id="canvas-feed-status" role="status">Imports dated assignments and exams without an API token. Keep this link private.</p>
+                      <button class="primary-button" id="sync-canvas-feed" type="button">Check Canvas calendar</button>
+                      <p class="settings-note" id="canvas-feed-status" role="status">Finds dated assignments and exams for you to review before adding. Keep this link private.</p>
 
                       <input id="settings-school-account-id" type="hidden" />
 

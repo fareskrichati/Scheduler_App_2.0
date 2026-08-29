@@ -35,6 +35,7 @@ fs.copyFileSync(resolvePath("js/widget-preview.js"), resolvePath("deploy/js/widg
 fs.writeFileSync(resolvePath("deploy/netlify.toml"), '[build]\n  publish = "."\n\n[functions]\n  directory = "netlify/functions"\n\n[functions."weekly-schedule-reminders"]\n  schedule = "*/15 * * * *"\n');
 fs.copyFileSync(resolvePath("netlify/functions/academic-calendar.js"), resolvePath("deploy/netlify/functions/academic-calendar.js"));
 fs.copyFileSync(resolvePath("netlify/functions/event-photo-import.js"), resolvePath("deploy/netlify/functions/event-photo-import.js"));
+fs.copyFileSync(resolvePath("netlify/functions/homework-photo-import.js"), resolvePath("deploy/netlify/functions/homework-photo-import.js"));
 fs.copyFileSync(resolvePath("netlify/functions/canvas-calendar-feed.js"), resolvePath("deploy/netlify/functions/canvas-calendar-feed.js"));
 fs.copyFileSync(resolvePath("netlify/functions/weekly-schedule-reminders.js"), resolvePath("deploy/netlify/functions/weekly-schedule-reminders.js"));
 fs.copyFileSync(
@@ -42,6 +43,7 @@ fs.copyFileSync(
   resolvePath("deploy/scriptable/DailyPlannerWidget.js"),
 );
 fs.copyFileSync(resolvePath("SCRIPTABLE_SETUP.md"), resolvePath("deploy/SCRIPTABLE_SETUP.md"));
+fs.copyFileSync(resolvePath("IMAGE_IMPORT_SETUP.md"), resolvePath("deploy/IMAGE_IMPORT_SETUP.md"));
 
 function resolvePath(relativePath) {
   return path.resolve(root, relativePath);

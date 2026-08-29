@@ -14,7 +14,11 @@ exports.handler = async function handler(event) {
     }
 
     const prompt = `Read these screenshots as one event schedule. Today is ${clean(input.currentDate, 10)} and the user's timezone is ${clean(input.timezone, 80) || "UTC"}.
-Extract each distinct scheduled event, game, match, practice, meeting, tournament, or activity. Use the schedule heading and surrounding context to create a useful title (for example, Rugby vs Opponent). Resolve dates to YYYY-MM-DD, including an inferred year when the screenshot omits it. Use 24-hour HH:MM times. If a start time is shown but no end time is shown, set end one hour after start. If no time is shown, use 09:00 to 10:00 and explain that in notes. Preserve home/away, opponent, venue, team level, and other useful details. Do not invent events that are not visible. Return events in chronological order.`;
+Extract each distinct event, game, match, practice, meeting, lift, training session, tournament, or activity. Use the schedule heading and surrounding context to create a useful title.
+
+For free-form weekly schedules, a weekday heading applies to every time line beneath it until the next weekday heading. Split multiple time ranges on one weekday into separate events. Treat text after @ as the location. If only a weekday is supplied, use its next occurrence on or after today and add "Repeats weekly on <weekday>" to notes. Do not collapse separate meetings, lifts, or training sessions into one event.
+
+For dated schedules, resolve dates to YYYY-MM-DD and infer the most logical current or upcoming year when omitted. Use 24-hour HH:MM times. If a start time is shown but no end is shown, set end one hour after start and explain that in notes. If no time is shown, use 09:00 to 10:00 and explain that in notes. Preserve home/away, opponent, venue, team level, and useful details. Ignore prose that is not an event. Do not invent events that are not visible. Return events in chronological order.`;
     const content = [{ type: "input_text", text: prompt }, ...images.map((image_url) => ({ type: "input_image", image_url, detail: "high" }))];
     const response = await fetch(OPENAI_URL, {
       method: "POST",

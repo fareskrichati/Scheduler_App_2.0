@@ -71,6 +71,8 @@ const elements = {
   tabPanels: Array.from(document.querySelectorAll(".tab-panel")),
   statButtons: Array.from(document.querySelectorAll(".stat-button")),
   openSettings: document.querySelector("#open-settings"),
+  openCanvas: document.querySelector("#open-canvas"),
+  mobileQuickAdd: document.querySelector("#mobile-quick-add"),
   jumpToday: document.querySelector("#jump-today"),
   calendarToday: document.querySelector("#calendar-today"),
   quickAdd: document.querySelector("#quick-add"),
@@ -213,6 +215,8 @@ const elements = {
   settingsSchool: document.querySelector("#settings-school"),
   settingsCanvasUrl: document.querySelector("#settings-canvas-url"),
   settingsCanvasFeed: document.querySelector("#settings-canvas-feed"),
+  settingsCanvasShortcutSchool: document.querySelector("#settings-canvas-shortcut-school"),
+  settingsCanvasShortcutUrl: document.querySelector("#settings-canvas-shortcut-url"),
   syncCanvasFeed: document.querySelector("#sync-canvas-feed"),
   canvasFeedStatus: document.querySelector("#canvas-feed-status"),
   settingsConnectCanvas: document.querySelector("#settings-connect-canvas"),
@@ -325,6 +329,7 @@ function bindEvents() {
     setActiveTab("settings");
     elements.tabShell?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
+  elements.openCanvas.addEventListener("click", openCanvasShortcut);
 
   const jumpToToday = () => {
     state.selectedDate = todayString();
@@ -339,6 +344,9 @@ function bindEvents() {
   elements.quickAdd.addEventListener("click", () => {
     elements.quickAddDialog.showModal();
   });
+  elements.mobileQuickAdd?.addEventListener("click", () => {
+    elements.quickAddDialog.showModal();
+  });
 
   elements.quickAddContinue.addEventListener("click", (event) => {
     event.preventDefault();
@@ -351,14 +359,13 @@ function bindEvents() {
   });
 
   elements.prevMonth.addEventListener("click", () => {
-    shiftCalendar(-1);
-    renderCalendar();
+    navigateCalendar(-1);
   });
 
   elements.nextMonth.addEventListener("click", () => {
-    shiftCalendar(1);
-    renderCalendar();
+    navigateCalendar(1);
   });
+  setupCalendarSwipe();
 
   elements.calendarViewButtons.forEach((button) => {
     button.addEventListener("click", () => {
@@ -631,14 +638,14 @@ function setupHomeworkPhotoImport() {
   importer.dataset.desktopAccordionLabel = "Import homework from Canvas screenshots";
   importer.innerHTML = `
     <div class="subsection-header"><div><p class="panel-label">Canvas screenshots</p><h3>Import homework from photos</h3></div><button class="small-button homework-photo-help" id="homework-photo-help" type="button">How to do it</button></div>
-    <p class="settings-note">Choose screenshots showing assignment names, course names, and due dates. Review all detected homework before saving.</p>
+    <p class="settings-note">Choose Canvas Grades, Assignments, Agenda, or To Do screenshots. Homework, discussions, quizzes, and exams can be detected together. Review every item before saving.</p>
     <label class="field"><span>Canvas screenshots</span><input id="homework-photo-files" type="file" accept="image/*" multiple /></label>
     <button class="primary-button" id="read-homework-photos" type="button">Read screenshots</button>
     <p class="settings-note" id="homework-photo-status" role="status"></p>
-    <div id="homework-photo-review" hidden><div class="subsection-header"><div><p class="panel-label">Review</p><h3>Homework found</h3></div></div><div id="detected-homework-list" class="detected-class-list"></div><button class="primary-button" id="save-detected-homework" type="button">Add reviewed homework</button></div>`;
+    <div id="homework-photo-review" hidden><div class="subsection-header"><div><p class="panel-label">Review</p><h3>Coursework found</h3></div></div><div id="detected-homework-list" class="detected-class-list"></div><button class="primary-button" id="save-detected-homework" type="button">Add reviewed coursework</button></div>`;
   homeworkPanel.insertBefore(importer, elements.homeworkForm);
   const helpDialog = document.createElement("dialog"); helpDialog.className = "quick-add-dialog homework-help-dialog";
-  helpDialog.innerHTML = `<div class="quick-add-card"><div class="panel-header"><div><p class="panel-label">Best results</p><h3>How to screenshot Canvas</h3></div><button class="icon-button" type="button" aria-label="Close">×</button></div><ol><li>Open Canvas Assignments or the To Do list.</li><li>Make sure the assignment name, class name, and due date are visible together.</li><li>Use clear, uncropped screenshots without menus covering the text.</li><li>Take multiple screenshots if the list is long.</li><li>Review every detected assignment before adding it.</li></ol></div>`;
+  helpDialog.innerHTML = `<div class="quick-add-card"><div class="panel-header"><div><p class="panel-label">Best results</p><h3>How to screenshot Canvas</h3></div><button class="icon-button" type="button" aria-label="Close">×</button></div><ol><li>Open Canvas Grades, Assignments, Agenda, or the To Do list.</li><li>Keep each date heading, course name, assignment title, and due time visible.</li><li>Use clear, uncropped screenshots without menus covering the rows.</li><li>Take multiple screenshots if the list is long (up to four at once).</li><li>Review each detected type, class, and date before adding it.</li></ol></div>`;
   document.body.appendChild(helpDialog);
   helpDialog.querySelector("button").addEventListener("click", () => helpDialog.close());
   document.querySelector("#homework-photo-help").addEventListener("click", () => helpDialog.showModal());
@@ -651,19 +658,31 @@ async function readHomeworkPhotos() {
   const files = Array.from(document.querySelector("#homework-photo-files").files || []);
   const status = document.querySelector("#homework-photo-status");
   if (!files.length) { status.textContent = "Choose at least one Canvas screenshot."; return; }
-  const button = document.querySelector("#read-homework-photos"); button.disabled = true; status.textContent = "Reading screenshots…";
+  if (files.length > 4) { status.textContent = "Choose up to 4 screenshots at a time."; return; }
+  const button = document.querySelector("#read-homework-photos"); button.disabled = true; status.textContent = "Reading Canvas rows and due dates…";
   try {
-    await loadExternalScript("https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js");
-    if (!window.Tesseract) throw new Error("The photo reader could not load. Check your connection.");
-    const found = [];
-    for (const file of files) {
-      const result = await window.Tesseract.recognize(file, "eng");
-      found.push(...parseCanvasHomeworkText(result.data.text));
-    }
+    if (window.location.protocol === "file:") throw new Error("Photo import needs the deployed Netlify site or Netlify Dev.");
+    const accessToken = await getValidAccessToken();
+    if (!accessToken) throw new Error("Sign in before importing Canvas screenshots.");
+    const images = [];
+    for (const file of files) images.push(await resizeImageForImport(file));
+    const classes = getImportableClasses();
+    const response = await fetch("/.netlify/functions/homework-photo-import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ images, currentDate: todayString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", knownCourses: classes.map((course) => course.title) }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (response.status === 404) throw new Error("The homework-photo-import function is not deployed yet. Redeploy the latest project first.");
+    if (!response.ok) throw new Error(result.error || `Canvas screenshot import failed (${response.status}).`);
+    const found = Array.isArray(result.items) ? result.items.map((item) => {
+      const match = findMatchingImportedClass(item.course || "", classes);
+      return { ...item, kind: item.kind === "exam" ? "exam" : "homework", course: match?.title || "", color: match?.color || "#7eaed6", notes: item.notes || "Imported from a Canvas screenshot." };
+    }) : [];
     detectedHomeworkItems = dedupeDetectedHomework(found);
-    if (!detectedHomeworkItems.length) throw new Error("No assignments with readable due dates were found. Try a clearer screenshot that shows the assignment, class, and due date together.");
+    if (!detectedHomeworkItems.length) throw new Error("No incomplete coursework with readable due dates was found. Keep the date heading, course, title, and due time visible.");
     renderDetectedHomework(); document.querySelector("#homework-photo-review").hidden = false;
-    status.textContent = `Found ${detectedHomeworkItems.length} assignment${detectedHomeworkItems.length === 1 ? "" : "s"}. Review the class and due date before adding.`;
+    status.textContent = `Found ${detectedHomeworkItems.length} coursework item${detectedHomeworkItems.length === 1 ? "" : "s"}. Review the type, class, and due date before adding.`;
   } catch (error) { status.textContent = error.message || "The screenshots could not be read."; }
   finally { button.disabled = false; }
 }
@@ -746,7 +765,15 @@ function importedCourseKey(value) {
 
 function findMatchingImportedClass(text, classes = getImportableClasses()) {
   const normalized = text.replace(/[^a-z0-9]/gi, "").toLowerCase();
-  return classes.find((item) => normalized.includes(item.key.replace(/[^a-z0-9]/gi, ""))) || classes.find((item) => normalized.includes(item.title.replace(/[^a-z0-9]/gi, "").toLowerCase()));
+  const canvasCode = importedCanvasCourseCode(text);
+  return classes.find((item) => canvasCode && importedCanvasCourseCode(item.title) === canvasCode)
+    || classes.find((item) => normalized.includes(item.key.replace(/[^a-z0-9]/gi, "")))
+    || classes.find((item) => normalized.includes(item.title.replace(/[^a-z0-9]/gi, "").toLowerCase()));
+}
+
+function importedCanvasCourseCode(value) {
+  const match = String(value || "").match(/\b([a-z]{2,})\s*[- ]?([a-z]?)\s*(\d{2,4})\b/i);
+  return match ? `${match[1]}${match[2]}${match[3]}`.toLowerCase() : "";
 }
 
 function dedupeDetectedHomework(items) {
@@ -759,7 +786,7 @@ function renderDetectedHomework() {
   const classes = getImportableClasses(); list.innerHTML = "";
   detectedHomeworkItems.forEach((item, index) => {
     const card = document.createElement("article"); card.className = "detected-class-card";
-    card.innerHTML = `<label class="field"><span>Assignment</span><input data-homework-field="title" value="${escapeHtml(item.title)}" /></label><div class="field-row"><label class="field"><span>Class</span><select data-homework-field="course"><option value="">Choose a class</option>${classes.map((course) => `<option value="${escapeHtml(course.title)}"${course.title === item.course ? " selected" : ""}>${escapeHtml(course.title)}</option>`).join("")}</select></label><label class="field color-field"><span>Matching color</span><input data-homework-field="color" type="color" value="${item.color}" /></label></div><div class="field-row"><label class="field"><span>Due date</span><input data-homework-field="date" type="date" value="${item.date}" /></label><label class="field"><span>Due time</span><input data-homework-field="time" type="time" value="${item.time}" /></label></div><button class="small-button" type="button" data-remove-homework="${index}">Remove</button>`;
+    card.innerHTML = `<div class="field-row"><label class="field"><span>Coursework</span><input data-homework-field="title" value="${escapeHtml(item.title)}" /></label><label class="field"><span>Type</span><select data-homework-field="kind"><option value="homework"${item.kind !== "exam" ? " selected" : ""}>Homework</option><option value="exam"${item.kind === "exam" ? " selected" : ""}>Exam or quiz</option></select></label></div><div class="field-row"><label class="field"><span>Class</span><select data-homework-field="course"><option value="">Choose a class</option>${classes.map((course) => `<option value="${escapeHtml(course.title)}"${course.title === item.course ? " selected" : ""}>${escapeHtml(course.title)}</option>`).join("")}</select></label><label class="field color-field"><span>Matching color</span><input data-homework-field="color" type="color" value="${item.color}" /></label></div><div class="field-row"><label class="field"><span>Due date</span><input data-homework-field="date" type="date" value="${item.date}" /></label><label class="field"><span>Due time</span><input data-homework-field="time" type="time" value="${item.time}" /></label></div><button class="small-button" type="button" data-remove-homework="${index}">Remove</button>`;
     card.querySelectorAll("[data-homework-field]").forEach((input) => input.addEventListener("input", () => {
       const field = input.dataset.homeworkField; detectedHomeworkItems[index][field] = input.value;
       if (field === "course") { const match = classes.find((course) => course.title === input.value); if (match) { detectedHomeworkItems[index].color = match.color; card.querySelector('[data-homework-field="color"]').value = match.color; } }
@@ -772,11 +799,14 @@ function renderDetectedHomework() {
 function saveDetectedHomework() {
   const invalid = detectedHomeworkItems.find((item) => !item.title.trim() || !item.course || !item.date);
   const status = document.querySelector("#homework-photo-status");
-  if (invalid) { status.textContent = "Each assignment needs a title, matching class, and due date."; return; }
-  detectedHomeworkItems.forEach((item) => state.data.homework.push({ id: crypto.randomUUID(), title: item.title.trim(), course: item.course, date: item.date, time: item.time, status: "pending", color: item.color, notes: item.notes }));
+  if (invalid) { status.textContent = "Each item needs a title, matching class, and due date."; return; }
+  detectedHomeworkItems.forEach((item) => {
+    const record = { id: crypto.randomUUID(), title: item.title.trim(), course: item.course, date: item.date, time: item.time, status: "pending", color: item.color, notes: item.notes, priority: false };
+    (item.kind === "exam" ? state.data.exams : state.data.homework).push(record);
+  });
   const count = detectedHomeworkItems.length; detectedHomeworkItems = [];
   document.querySelector("#homework-photo-review").hidden = true; persistAndRender();
-  status.textContent = `${count} homework item${count === 1 ? "" : "s"} added with matching class colors.`;
+  status.textContent = `${count} coursework item${count === 1 ? "" : "s"} added with matching class colors.`;
 }
 
 function setupEventPhotoImport() {
@@ -2007,6 +2037,8 @@ function renderCalendar() {
     const isOtherMonth = current.getMonth() !== monthDate.getMonth();
 
     button.type = "button";
+    button.dataset.calendarDate = dateString;
+    button.title = `${formatLongDate(dateString)} — tap for Day view, hold to add`;
     button.className = [
       "calendar-day",
       isSelected ? "is-selected" : "",
@@ -2031,9 +2063,7 @@ function renderCalendar() {
       const marker = document.createElement("div");
       marker.className = `calendar-marker marker-${item.kind}`;
       const monthTime = item.displayTime ? `<span class="calendar-marker-time">${escapeHtml(item.displayTime)}</span>` : "";
-      marker.innerHTML = view === "month"
-        ? `<span class="calendar-marker-title">${escapeHtml(item.title)}</span>${monthTime}`
-        : `<span class="calendar-marker-type">${escapeHtml(item.label)}</span><span class="calendar-marker-title">${escapeHtml(item.title)}</span>${item.meta ? `<span class="calendar-marker-meta">${escapeHtml(item.meta)}</span>` : ""}`;
+      marker.innerHTML = `<span class="calendar-marker-title">${escapeHtml(item.title)}</span>${monthTime}`;
       applyItemColor(marker, item.color);
       markers.appendChild(marker);
     });
@@ -2048,6 +2078,8 @@ function renderCalendar() {
     button.appendChild(markers);
     button.addEventListener("click", () => {
       state.selectedDate = dateString;
+      state.visibleMonth = startOfMonth(dateString);
+      state.calendarView = "day";
       renderHeaderStats();
       renderCalendar();
       renderSelectedDayViews();
@@ -2075,6 +2107,96 @@ function shiftCalendar(direction) {
   current.setDate(current.getDate() + direction * (view === "week" ? 7 : 1));
   state.selectedDate = isoDate(current);
   state.visibleMonth = startOfMonth(state.selectedDate);
+}
+
+function navigateCalendar(direction) {
+  shiftCalendar(direction);
+  renderHeaderStats();
+  renderCalendar();
+  renderSelectedDayViews();
+  prefillForms();
+}
+
+function setupCalendarSwipe() {
+  let startX = 0;
+  let startY = 0;
+  let startTime = 0;
+  let activePointer = null;
+  let suppressNextTap = false;
+  let holdTimer = null;
+  let holdDay = null;
+  let holdTriggered = false;
+
+  const cancelHold = () => {
+    if (holdTimer) window.clearTimeout(holdTimer);
+    holdTimer = null;
+    holdDay = null;
+  };
+
+  elements.calendarGrid.addEventListener("pointerdown", (event) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    activePointer = event.pointerId;
+    startX = event.clientX;
+    startY = event.clientY;
+    startTime = Date.now();
+    elements.calendarGrid.classList.add("is-dragging");
+    holdTriggered = false;
+    holdDay = event.target.closest("[data-calendar-date]");
+    if (holdDay) {
+      const heldDate = holdDay.dataset.calendarDate;
+      holdTimer = window.setTimeout(() => {
+        holdTriggered = true;
+        suppressNextTap = true;
+        state.selectedDate = heldDate;
+        state.visibleMonth = startOfMonth(heldDate);
+        renderHeaderStats();
+        renderSelectedDayViews();
+        prefillForms();
+        elements.quickAddDialog.showModal();
+        window.navigator.vibrate?.(20);
+        holdTimer = null;
+      }, 600);
+    }
+  });
+
+  elements.calendarGrid.addEventListener("pointermove", (event) => {
+    if (activePointer === null || event.pointerId !== activePointer) return;
+    if (Math.abs(event.clientX - startX) > 12 || Math.abs(event.clientY - startY) > 12) cancelHold();
+  });
+
+  const finishSwipe = (event) => {
+    if (activePointer === null || event.pointerId !== activePointer) return;
+    activePointer = null;
+    elements.calendarGrid.classList.remove("is-dragging");
+    cancelHold();
+    if (holdTriggered) {
+      renderCalendar();
+      window.setTimeout(() => { suppressNextTap = false; }, 250);
+      return;
+    }
+    const deltaX = event.clientX - startX;
+    const deltaY = event.clientY - startY;
+    const isSwipe = Math.abs(deltaX) >= 48 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2 && Date.now() - startTime < 1200;
+    if (!isSwipe) return;
+    suppressNextTap = true;
+    navigateCalendar(deltaX < 0 ? 1 : -1);
+    window.setTimeout(() => { suppressNextTap = false; }, 250);
+  };
+
+  elements.calendarGrid.addEventListener("pointerup", finishSwipe);
+  elements.calendarGrid.addEventListener("pointercancel", () => {
+    activePointer = null;
+    cancelHold();
+    elements.calendarGrid.classList.remove("is-dragging");
+  });
+  elements.calendarGrid.addEventListener("contextmenu", (event) => {
+    if (event.target.closest("[data-calendar-date]")) event.preventDefault();
+  });
+  elements.calendarGrid.addEventListener("click", (event) => {
+    if (!suppressNextTap) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
 }
 
 function renderSelectedDayViews() {
@@ -3355,6 +3477,13 @@ async function saveSettings() {
   const notificationFrequency =
     elements.notificationFrequency.find((input) => input.checked)?.value || "daily";
   const currentSettings = getSettings();
+  const canvasShortcutInput = elements.settingsCanvasShortcutUrl.value.trim();
+  const canvasShortcutUrl = normalizeCanvasShortcutUrl(canvasShortcutInput);
+  if (canvasShortcutInput && !canvasShortcutUrl) {
+    elements.settingsStatus.textContent = "Enter a complete secure Canvas link beginning with https://.";
+    elements.settingsCanvasShortcutUrl.focus();
+    return;
+  }
 
   state.data.settings = {
     name: elements.settingsName.value.trim(),
@@ -3402,6 +3531,10 @@ async function saveSettings() {
     connections: currentSettings.connections,
     schoolAccounts: currentSettings.schoolAccounts,
     canvasFeedUrl: elements.settingsCanvasFeed.value.trim(),
+    canvasShortcut: {
+      school: elements.settingsCanvasShortcutSchool.value.trim(),
+      url: canvasShortcutUrl,
+    },
   };
 
   syncAuthProfileFromSettings();
@@ -3444,6 +3577,9 @@ function renderSettings(statusMessage = "") {
   elements.widgetShowExams.checked = settings.widgetPreferences.exams;
   elements.widgetShowReminders.checked = settings.widgetPreferences.reminders;
   elements.settingsCanvasFeed.value = settings.canvasFeedUrl;
+  elements.settingsCanvasShortcutSchool.value = settings.canvasShortcut.school;
+  elements.settingsCanvasShortcutUrl.value = settings.canvasShortcut.url;
+  renderCanvasShortcut();
   elements.settingsCurrentPassword.value = "";
   elements.settingsNewPassword.value = "";
   clearSchoolAccountForm();
@@ -3754,7 +3890,7 @@ async function syncCanvasCalendarFeed() {
     return;
   }
   elements.syncCanvasFeed.disabled = true;
-  elements.canvasFeedStatus.textContent = "Syncing Canvas calendar…";
+  elements.canvasFeedStatus.textContent = "Checking Canvas calendar…";
   try {
     const response = await fetch("/.netlify/functions/canvas-calendar-feed", {
       method: "POST",
@@ -3764,16 +3900,26 @@ async function syncCanvasCalendarFeed() {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Canvas calendar sync failed.");
     const items = parseCanvasCalendarFeed(result.ics || "");
-    let added = 0;
-    items.forEach((item) => {
-      const target = item.kind === "exam" ? state.data.exams : state.data.homework;
-      if (target.some((saved) => saved.canvasFeedUid === item.uid)) return;
-      target.push({ id: crypto.randomUUID(), title: item.title, course: item.course, date: item.date, time: item.time, status: "pending", color: colorForSelectedClass(item.course, item.kind === "exam" ? "#6d9fd0" : "#7eaed6"), notes: "Imported from Canvas calendar feed.", canvasFeedUid: item.uid });
-      added += 1;
+    const classes = getImportableClasses();
+    const savedByUid = new Map();
+    state.data.homework.forEach((item) => { if (item.canvasFeedUid) savedByUid.set(item.canvasFeedUid, { record: item, kind: "homework" }); });
+    state.data.exams.forEach((item) => { if (item.canvasFeedUid) savedByUid.set(item.canvasFeedUid, { record: item, kind: "exam" }); });
+    const reviewItems = items.map((item) => {
+      const match = findMatchingImportedClass(item.course, classes);
+      const saved = savedByUid.get(item.uid);
+      const course = match?.title || saved?.record.course || "";
+      const changed = saved && (saved.record.title !== item.title || saved.record.course !== course || saved.record.date !== item.date || saved.record.time !== item.time || saved.kind !== item.kind);
+      return { ...item, id: `canvas-feed:${item.uid}`, source: "Canvas calendar", course, color: match?.color || saved?.record.color || (item.kind === "exam" ? "#6d9fd0" : "#7eaed6"), operation: saved ? (changed ? "update" : "current") : "add", missingTime: !item.time, notes: `${match ? `Matched Canvas course “${item.rawCourse}” to ${match.title}.` : `Canvas course: ${item.rawCourse}. Choose the correct class before adding.`}${!item.time ? " Canvas did not provide a due time; enter it below." : ""}` };
     });
+    schoolImportItems = [...schoolImportItems.filter((item) => item.source !== "Canvas calendar"), ...reviewItems];
     state.data.settings.canvasFeedUrl = feedUrl;
-    persistAndRender();
-    elements.canvasFeedStatus.textContent = `${added} new Canvas item${added === 1 ? "" : "s"} imported${items.length > added ? `; ${items.length - added} already existed` : ""}.`;
+    saveData();
+    const newCount = reviewItems.filter((item) => item.operation === "add").length;
+    const updateCount = reviewItems.filter((item) => item.operation === "update").length;
+    const missingCount = reviewItems.filter((item) => item.missingTime && item.operation !== "current").length;
+    const reviewMessage = `Canvas returned ${reviewItems.length} upcoming item${reviewItems.length === 1 ? "" : "s"}: ${newCount} new, ${updateCount} changed.${missingCount ? ` ${missingCount} need${missingCount === 1 ? "s" : ""} a due time from you.` : ""}`;
+    renderSchoolImportItems(reviewItems.length ? reviewMessage : "No upcoming Canvas items were found.");
+    elements.canvasFeedStatus.textContent = reviewItems.length ? "Canvas results are ready in the School import dropdowns below." : "No upcoming Canvas items were found.";
   } catch (error) {
     elements.canvasFeedStatus.textContent = error.message || "Canvas calendar sync failed.";
   } finally {
@@ -3785,16 +3931,21 @@ function parseCanvasCalendarFeed(ics) {
   const unfolded = ics.replace(/\r?\n[ \t]/g, "");
   return unfolded.split("BEGIN:VEVENT").slice(1).map((block) => {
     const read = (name) => block.match(new RegExp(`(?:^|\\n)${name}(?:;[^:]*)?:(.*)`, "i"))?.[1]?.trim() || "";
-    const summary = read("SUMMARY").replace(/\\([,;\\])/g, "$1");
+    const decode = (value) => value.replace(/\\n/gi, "\n").replace(/\\([,;\\])/g, "$1").trim();
+    const summary = decode(read("SUMMARY"));
+    const description = decode(read("DESCRIPTION"));
     const uid = read("UID") || `${summary}|${read("DTSTART")}`;
     const dateValue = read("DTSTART") || read("DUE");
     const match = dateValue.match(/(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2}))?/);
     if (!summary || !match) return null;
-    const courseMatch = summary.match(/^\[([^\]]+)\]\s*(.*)$/);
-    const title = (courseMatch?.[2] || summary).trim();
-    const course = (courseMatch?.[1] || "Canvas").trim();
+    const prefixCourse = summary.match(/^\[([^\]]+)\]\s*(.*)$/);
+    const suffixCourse = summary.match(/^(.*?)\s*\[([^\]]+)\]\s*$/);
+    const describedCourse = description.match(/(?:^|\n)\s*(?:course|context)\s*:\s*([^\n]+)/i);
+    const rawCourse = (prefixCourse?.[1] || suffixCourse?.[2] || describedCourse?.[1] || "Canvas").trim();
+    const title = (prefixCourse?.[2] || suffixCourse?.[1] || summary).replace(/^assignment\s*:\s*/i, "").trim();
+    const course = rawCourse;
     const kind = /\b(exam|quiz|test|midterm|final)\b/i.test(title) ? "exam" : "homework";
-    return { uid, title, course, kind, date: `${match[1]}-${match[2]}-${match[3]}`, time: match[4] ? `${match[4]}:${match[5]}` : "" };
+    return { uid, title, course, rawCourse, kind, date: `${match[1]}-${match[2]}-${match[3]}`, time: match[4] ? `${match[4]}:${match[5]}` : "" };
   }).filter((item) => item && item.date >= todayString());
 }
 
@@ -3973,23 +4124,41 @@ function renderSchoolImportItems(statusMessage = elements.schoolImportStatus.tex
     return;
   }
 
+  const importableClasses = getImportableClasses();
   schoolImportItems.forEach((item) => {
     const card = document.createElement("article");
     card.className = "item-card school-import-card";
-    card.innerHTML = `
+    const isCanvasFeed = item.source === "Canvas calendar";
+    const actionLabel = item.operation === "update" ? "Update planner item" : item.operation === "current" ? "Already current" : item.kind === "exam" ? "Add exam" : "Add homework";
+    const cardContent = `
       <div class="item-card-top">
         <div>
           <p class="item-category">${escapeHtml(item.source)}</p>
           <h4 class="item-title">${escapeHtml(item.title)}</h4>
         </div>
         <div class="item-actions">
-          <button class="small-button add-school-homework" type="button">Add homework</button>
+          <button class="small-button add-school-homework" type="button"${item.operation === "current" ? " disabled" : ""}>${actionLabel}</button>
           <button class="small-button add-school-reminder" type="button">Add reminder</button>
         </div>
       </div>
-      <p class="item-meta">${escapeHtml(item.course)} • ${formatShortDate(item.date)}${item.time ? ` at ${formatTime(item.time)}` : ""}</p>
+      <p class="item-meta">${escapeHtml(item.course || item.rawCourse || "Class not matched")} • ${formatShortDate(item.date)}${item.time ? ` at ${formatTime(item.time)}` : ""}</p>
+      ${isCanvasFeed ? `<div class="field-row"><label class="field"><span>Assignment name</span><input data-school-import-title value="${escapeHtml(item.title)}"></label><label class="field"><span>Save as</span><select data-school-import-kind><option value="homework"${item.kind !== "exam" ? " selected" : ""}>Homework</option><option value="exam"${item.kind === "exam" ? " selected" : ""}>Exam or quiz</option></select></label></div><div class="field-row"><label class="field"><span>Class</span><select data-school-import-course><option value="">Choose a class</option>${importableClasses.map((course) => `<option value="${escapeHtml(course.title)}"${course.title === item.course ? " selected" : ""}>${escapeHtml(course.title)}</option>`).join("")}</select></label><label class="field"><span>Due date</span><input data-school-import-date type="date" value="${item.date}"></label><label class="field"><span>Due time${item.missingTime ? " — Canvas did not include this" : ""}</span><input data-school-import-time type="time" value="${item.time || ""}"${item.missingTime ? " required" : ""}></label></div>` : ""}
       <p class="item-notes">${escapeHtml(item.url || item.notes)}</p>
     `;
+    card.innerHTML = isCanvasFeed ? `<details class="school-import-details"${item.operation !== "current" ? " open" : ""}><summary><span>${escapeHtml(item.title)}</span><small>${item.operation === "add" ? "New" : item.operation === "update" ? "Changed" : "Already current"}</small></summary><div class="school-import-details-body">${cardContent}</div></details>` : cardContent;
+
+    card.querySelector("[data-school-import-kind]")?.addEventListener("change", (event) => {
+      item.kind = event.target.value;
+      if (item.operation === "add") card.querySelector(".add-school-homework").textContent = item.kind === "exam" ? "Add exam" : "Add homework";
+    });
+    card.querySelector("[data-school-import-title]")?.addEventListener("input", (event) => { item.title = event.target.value; });
+    card.querySelector("[data-school-import-date]")?.addEventListener("input", (event) => { item.date = event.target.value; });
+    card.querySelector("[data-school-import-time]")?.addEventListener("input", (event) => { item.time = event.target.value; item.missingTime = !item.time; });
+    card.querySelector("[data-school-import-course]")?.addEventListener("change", (event) => {
+      item.course = event.target.value;
+      const match = importableClasses.find((course) => course.title === item.course);
+      if (match) item.color = match.color;
+    });
 
     card.querySelector(".add-school-homework").addEventListener("click", () => {
       addSchoolItemAsHomework(item);
@@ -4002,17 +4171,36 @@ function renderSchoolImportItems(statusMessage = elements.schoolImportStatus.tex
 }
 
 function addSchoolItemAsHomework(item) {
-  state.data.homework.push({
-    id: crypto.randomUUID(),
+  if (item.source === "Canvas calendar" && !item.course) {
+    renderSchoolImportItems(`Choose a class for ${item.title} before adding it.`);
+    return;
+  }
+  if (item.source === "Canvas calendar" && (!item.title.trim() || !item.date || !item.time)) {
+    renderSchoolImportItems(`Enter the assignment name, due date, and due time for ${item.title || "this Canvas item"}.`);
+    return;
+  }
+  const match = findMatchingImportedClass(item.course);
+  const course = match?.title || item.course;
+  const target = item.kind === "exam" ? state.data.exams : state.data.homework;
+  const existingHomeworkIndex = state.data.homework.findIndex((saved) => saved.canvasFeedUid === item.uid);
+  const existingExamIndex = state.data.exams.findIndex((saved) => saved.canvasFeedUid === item.uid);
+  const existing = existingHomeworkIndex >= 0 ? state.data.homework[existingHomeworkIndex] : existingExamIndex >= 0 ? state.data.exams[existingExamIndex] : null;
+  const record = {
+    id: existing?.id || crypto.randomUUID(),
     title: item.title,
-    course: item.course,
+    course,
     date: item.date,
     time: item.time,
-    status: "pending",
-    color: "#7eaed6",
-    notes: [item.notes, item.url].filter(Boolean).join(" "),
-  });
-  removeImportedSchoolItem(item.id, `${item.title} was added as homework.`);
+    status: existing?.status || "pending",
+    color: match?.color || item.color || (item.kind === "exam" ? "#6d9fd0" : "#7eaed6"),
+    priority: existing?.priority || false,
+    notes: existing?.notes || [item.notes, item.url].filter(Boolean).join(" "),
+    canvasFeedUid: item.uid || undefined,
+  };
+  if (existingHomeworkIndex >= 0) state.data.homework.splice(existingHomeworkIndex, 1);
+  if (existingExamIndex >= 0) state.data.exams.splice(existingExamIndex, 1);
+  target.push(record);
+  removeImportedSchoolItem(item.id, `${item.title} was ${existing ? "updated" : `added as ${item.kind === "exam" ? "an exam" : "homework"}`}.`);
 }
 
 function addSchoolItemAsReminder(item) {
@@ -4147,6 +4335,10 @@ function normalizeSettings(settings) {
     connections: normalizeConnections(settings.connections),
     schoolAccounts: normalizeSchoolAccounts(settings),
     canvasFeedUrl: typeof settings.canvasFeedUrl === "string" ? settings.canvasFeedUrl : defaults.canvasFeedUrl,
+    canvasShortcut: {
+      school: typeof settings.canvasShortcut?.school === "string" ? settings.canvasShortcut.school : defaults.canvasShortcut.school,
+      url: normalizeCanvasShortcutUrl(settings.canvasShortcut?.url) || defaults.canvasShortcut.url,
+    },
   };
 }
 
@@ -4186,6 +4378,7 @@ function getDefaultSettings() {
     },
     school: "",
     canvasUrl: "",
+    canvasShortcut: { school: "", url: "" },
     schoolUsername: "",
     connections: {
       canvas: false,
@@ -4339,6 +4532,39 @@ function normalizeUrl(value) {
   } catch (error) {
     return value;
   }
+}
+
+function normalizeCanvasShortcutUrl(value) {
+  if (!value || typeof value !== "string") return "";
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "https:") return "";
+    return `${url.origin}${url.pathname === "/" ? "" : url.pathname.replace(/\/$/, "")}`;
+  } catch (error) {
+    return "";
+  }
+}
+
+function renderCanvasShortcut() {
+  const shortcut = getSettings().canvasShortcut;
+  elements.openCanvas.title = shortcut.url ? `Open ${shortcut.school || "Canvas"}` : "Set up Canvas shortcut";
+  elements.openCanvas.classList.toggle("is-unconfigured", !shortcut.url);
+}
+
+function openCanvasShortcut() {
+  const shortcut = getSettings().canvasShortcut;
+  if (!shortcut.url) {
+    setActiveTab("settings");
+    const accordion = elements.settingsCanvasShortcutUrl.closest("details");
+    if (accordion) accordion.open = true;
+    elements.settingsCanvasShortcutUrl.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.setTimeout(() => elements.settingsCanvasShortcutSchool.focus(), 350);
+    elements.settingsStatus.textContent = "Add your school name and Canvas link, then save settings.";
+    return;
+  }
+  const canvasWindow = window.open(shortcut.url, "_blank");
+  if (canvasWindow) canvasWindow.opener = null;
+  else elements.settingsStatus.textContent = "Your browser blocked the Canvas tab. Allow pop-ups and try again.";
 }
 
 function formatNotificationPreference(preference) {

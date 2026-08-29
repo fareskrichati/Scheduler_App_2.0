@@ -93,7 +93,33 @@ body:has(.mobile-form-dialog[open]) {
 .brand-block {
   align-self: stretch;
   gap: 10px;
-  padding-right: 48px;
+  padding-right: 154px;
+}
+
+.topbar-shortcuts {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
+}
+
+.canvas-shortcut-button {
+  min-height: 30px;
+  padding: 0 7px;
+  border-radius: 12px;
+  font-size: 0.65rem;
+}
+
+.mobile-quick-add-button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(29, 35, 48, 0.08);
+  border-radius: 10px;
+  background: var(--accent);
+  font-size: 0.78rem;
 }
 
 .brand-mark {
@@ -108,9 +134,7 @@ body:has(.mobile-form-dialog[open]) {
 
 .brand-block .eyebrow { font-size: 0.62rem; }
 .settings-button {
-  position: absolute;
-  top: 12px;
-  right: 12px;
+  position: static;
   z-index: 1;
   display: grid;
   width: 36px;
@@ -324,6 +348,8 @@ body:has(.mobile-form-dialog[open]) {
 
 .calendar-weekdays,
 .calendar-grid {
+  touch-action: pan-y;
+  overscroll-behavior-x: contain;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 5px;
 }
@@ -471,11 +497,12 @@ body:has(.mobile-form-dialog[open]) {
 }
 
 .calendar-grid[data-view="month"] .calendar-day.is-selected {
-  box-shadow: inset 0 0 0 2px rgba(40, 91, 134, 0.26);
+  background: rgba(105, 168, 215, 0.045);
+  box-shadow: inset 0 0 0 1px rgba(40, 91, 134, 0.18);
 }
 
 .calendar-grid[data-view="month"] .calendar-day.is-today {
-  background: rgba(105, 168, 215, 0.1);
+  background: transparent;
 }
 
 .calendar-grid[data-view="month"] .calendar-day.is-today .calendar-day-number {
@@ -484,8 +511,9 @@ body:has(.mobile-form-dialog[open]) {
   height: 28px;
   place-items: center;
   border-radius: 50%;
-  background: var(--accent-deep);
-  color: #fff;
+  background: rgba(105, 168, 215, 0.16);
+  color: var(--accent-deep);
+  box-shadow: inset 0 0 0 1px rgba(40, 91, 134, 0.22);
 }
 
 .calendar-grid[data-view="month"] .calendar-day-number {
@@ -578,10 +606,32 @@ body:has(.mobile-form-dialog[open]) {
 
 .calendar-grid[data-view="day"] .calendar-marker,
 .calendar-grid[data-view="week"] .calendar-marker {
-  padding: 6px 7px;
-  font-size: 0.75rem;
+  display: block;
+  padding: 5px 4px;
+  border: 1px solid color-mix(in srgb, var(--item-color, var(--accent)) 28%, white);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--item-color, var(--accent)) 22%, white);
+  color: color-mix(in srgb, var(--item-color, var(--accent)) 68%, #161616);
+  font-size: 0.62rem;
+  line-height: 1.15;
+  text-align: left;
   white-space: normal;
 }
+
+.calendar-grid[data-view="week"] .calendar-day,
+.calendar-grid[data-view="day"] .calendar-day {
+  border-color: var(--line);
+  background: transparent;
+}
+
+.calendar-grid[data-view="week"] .calendar-day.is-today,
+.calendar-grid[data-view="day"] .calendar-day.is-today { background: transparent; }
+
+.calendar-grid[data-view="week"] .calendar-marker-title,
+.calendar-grid[data-view="day"] .calendar-marker-title { font-size: .67rem; font-weight: 600; }
+
+.calendar-grid[data-view="week"] .calendar-marker-time,
+.calendar-grid[data-view="day"] .calendar-marker-time { display: block; margin-top: 3px; font-size: .58rem; font-weight: 500; opacity: .78; }
 
 .field input,
 .field select,

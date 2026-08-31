@@ -754,7 +754,7 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-markers {
 .school-import-accordion[open] > summary::after { content: "−"; }
 .school-import-accordion > .school-import-card { margin: 0; padding: 12px; border: 0; border-top: 1px solid var(--line); border-radius: 0; }
 .school-import-list { gap: 7px; }
-.school-import-list .school-import-card { padding: 0; border-radius: 12px; overflow: hidden; }
+.school-import-list .school-import-card { padding: 0; border-left: 5px solid var(--school-import-color, #7eaed6); border-radius: 12px; overflow: hidden; }
 .school-import-details > summary { display: flex; justify-content: space-between; gap: 10px; padding: 10px 12px; cursor: pointer; list-style: none; }
 .school-import-details > summary::-webkit-details-marker { display: none; }
 .school-import-details > summary span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }

@@ -3902,24 +3902,34 @@ async function syncCanvasCalendarFeed() {
     const items = parseCanvasCalendarFeed(result.ics || "");
     const classes = getImportableClasses();
     const savedByUid = new Map();
+    const importedSourceIds = new Set([
+      ...state.data.homework.map((item) => item.schoolImportId),
+      ...state.data.exams.map((item) => item.schoolImportId),
+      ...state.data.reminders.map((item) => item.schoolImportId),
+    ].filter(Boolean));
     state.data.homework.forEach((item) => { if (item.canvasFeedUid) savedByUid.set(item.canvasFeedUid, { record: item, kind: "homework" }); });
     state.data.exams.forEach((item) => { if (item.canvasFeedUid) savedByUid.set(item.canvasFeedUid, { record: item, kind: "exam" }); });
     const reviewItems = items.map((item) => {
       const match = findMatchingImportedClass(item.course, classes);
       const saved = savedByUid.get(item.uid);
+      const importId = `canvas-feed:${item.uid}`;
+      const wasImported = importedSourceIds.has(importId);
       const course = match?.title || saved?.record.course || "";
       const changed = saved && (saved.record.title !== item.title || saved.record.course !== course || saved.record.date !== item.date || saved.record.time !== item.time || saved.kind !== item.kind);
-      return { ...item, id: `canvas-feed:${item.uid}`, source: "Canvas calendar", course, color: match?.color || saved?.record.color || (item.kind === "exam" ? "#6d9fd0" : "#7eaed6"), operation: saved ? (changed ? "update" : "current") : "add", missingTime: !item.time, notes: `${match ? `Matched Canvas course “${item.rawCourse}” to ${match.title}.` : `Canvas course: ${item.rawCourse}. Choose the correct class before adding.`}${!item.time ? " Canvas did not provide a due time; enter it below." : ""}` };
+      return { ...item, id: importId, source: "Canvas calendar", course, color: match?.color || saved?.record.color || (item.kind === "exam" ? "#6d9fd0" : "#7eaed6"), operation: saved ? (changed ? "update" : "current") : wasImported ? "current" : "add", missingTime: !item.time, notes: `${match ? `Matched Canvas course “${item.rawCourse}” to ${match.title}.` : `Canvas course: ${item.rawCourse}. Choose the correct class before adding.`}${!item.time ? " Canvas did not provide a due time; enter it below." : ""}` };
     });
-    schoolImportItems = [...schoolImportItems.filter((item) => item.source !== "Canvas calendar"), ...reviewItems];
+    const actionableItems = reviewItems.filter((item) => item.operation !== "current");
+    schoolImportItems = [...schoolImportItems.filter((item) => item.source !== "Canvas calendar"), ...actionableItems];
     state.data.settings.canvasFeedUrl = feedUrl;
     saveData();
     const newCount = reviewItems.filter((item) => item.operation === "add").length;
     const updateCount = reviewItems.filter((item) => item.operation === "update").length;
     const missingCount = reviewItems.filter((item) => item.missingTime && item.operation !== "current").length;
-    const reviewMessage = `Canvas returned ${reviewItems.length} upcoming item${reviewItems.length === 1 ? "" : "s"}: ${newCount} new, ${updateCount} changed.${missingCount ? ` ${missingCount} need${missingCount === 1 ? "s" : ""} a due time from you.` : ""}`;
-    renderSchoolImportItems(reviewItems.length ? reviewMessage : "No upcoming Canvas items were found.");
-    elements.canvasFeedStatus.textContent = reviewItems.length ? "Canvas results are ready in the School import dropdowns below." : "No upcoming Canvas items were found.";
+    const reviewMessage = actionableItems.length
+      ? `Canvas found ${newCount} new and ${updateCount} changed item${actionableItems.length === 1 ? "" : "s"}.${missingCount ? ` ${missingCount} need${missingCount === 1 ? "s" : ""} a due time from you.` : ""}`
+      : "Everything from Canvas has already been added.";
+    renderSchoolImportItems(reviewMessage);
+    elements.canvasFeedStatus.textContent = actionableItems.length ? "Canvas results are ready in the School import dropdowns below." : "Everything from Canvas has already been added.";
   } catch (error) {
     elements.canvasFeedStatus.textContent = error.message || "Canvas calendar sync failed.";
   } finally {
@@ -3972,7 +3982,10 @@ async function fetchSchoolItems() {
     }
 
     const results = await Promise.allSettled(requests);
-    const items = results.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
+    const classes = getImportableClasses();
+    const items = results
+      .flatMap((result) => (result.status === "fulfilled" ? result.value : []))
+      .map((item) => applyImportedClassMatch(item, classes));
     const errors = results
       .filter((result) => result.status === "rejected")
       .map((result) => result.reason?.message || "A school import failed.");
@@ -4135,6 +4148,12 @@ function mapGoogleCourseWork(item, course, account) {
   };
 }
 
+function applyImportedClassMatch(item, classes = getImportableClasses()) {
+  const match = findMatchingImportedClass(item.rawCourse || item.course || "", classes);
+  if (!match) return item;
+  return { ...item, course: match.title, color: match.color, matchedClass: true };
+}
+
 function renderSchoolImportItems(statusMessage = "") {
   const importableClasses = getImportableClasses();
   elements.schoolImportPanels.forEach((panel) => {
@@ -4155,8 +4174,10 @@ function renderSchoolImportItems(statusMessage = "") {
     }
 
     visibleItems.forEach((item) => {
+    Object.assign(item, applyImportedClassMatch(item, importableClasses));
     const card = document.createElement("article");
     card.className = "item-card school-import-card";
+    card.style.setProperty("--school-import-color", item.color || "#7eaed6");
     const actionLabel = item.operation === "update" ? "Update planner item" : item.operation === "current" ? "Already current" : item.kind === "exam" ? "Add exam" : "Add homework";
     const cardContent = `
       <div class="item-card-top">
@@ -4186,7 +4207,11 @@ function renderSchoolImportItems(statusMessage = "") {
     card.querySelector("[data-school-import-course]")?.addEventListener("change", (event) => {
       item.course = event.target.value;
       const match = importableClasses.find((course) => course.title === item.course);
-      if (match) item.color = match.color;
+      if (match) {
+        item.color = match.color;
+        item.matchedClass = true;
+        card.style.setProperty("--school-import-color", match.color);
+      }
     });
 
     card.querySelector(".add-school-homework").addEventListener("click", () => {
@@ -4226,6 +4251,7 @@ function addSchoolItemAsHomework(item) {
     priority: existing?.priority || false,
     notes: existing?.notes || [item.notes, item.url].filter(Boolean).join(" "),
     canvasFeedUid: item.uid || undefined,
+    schoolImportId: item.id,
   };
   if (existingHomeworkIndex >= 0) state.data.homework.splice(existingHomeworkIndex, 1);
   if (existingExamIndex >= 0) state.data.exams.splice(existingExamIndex, 1);
@@ -4242,6 +4268,7 @@ function addSchoolItemAsReminder(item) {
     color: "#9abbd6",
     status: "pending",
     notes: [item.course, item.notes, item.url].filter(Boolean).join(" "),
+    schoolImportId: item.id,
   });
   removeImportedSchoolItem(item.id, `${item.title} was added as a reminder.`);
 }
@@ -4698,6 +4725,11 @@ function dedupeSchoolItems(items) {
     ...state.data.reminders.map((item) => `${item.title}|${item.date}`),
   ]);
   const seen = new Set();
+  const importedSourceIds = new Set([
+    ...state.data.homework.map((item) => item.schoolImportId),
+    ...state.data.exams.map((item) => item.schoolImportId),
+    ...state.data.reminders.map((item) => item.schoolImportId),
+  ].filter(Boolean));
 
   return items.filter((item) => {
     if (!item.date || item.date < todayString()) return false;
@@ -4705,7 +4737,7 @@ function dedupeSchoolItems(items) {
     const homeworkKey = `${item.title}|${item.course}|${item.date}`;
     const reminderKey = `${item.title}|${item.date}`;
 
-    if (seen.has(importedKey) || existing.has(homeworkKey) || existing.has(reminderKey)) {
+    if (seen.has(importedKey) || importedSourceIds.has(item.id) || existing.has(homeworkKey) || existing.has(reminderKey)) {
       return false;
     }
 

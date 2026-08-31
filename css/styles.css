@@ -747,6 +747,21 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-markers {
 .school-import-details-body { padding-top: 14px; }
 .desktop-add-accordion > .entry-form { padding: 4px 16px 16px; }
 .schedule-import-accordion > .schedule-import-card { margin: 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: rgba(126,174,214,.05); }
+.school-import-accordion { margin: 0 0 16px; border: 1px solid var(--line); border-radius: 16px; background: rgba(126,174,214,.08); overflow: hidden; }
+.school-import-accordion > summary { position: relative; padding: 14px 44px 14px 16px; color: var(--accent-deep); cursor: pointer; font-weight: 700; list-style: none; }
+.school-import-accordion > summary::-webkit-details-marker { display: none; }
+.school-import-accordion > summary::after { content: "+"; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 1.25rem; }
+.school-import-accordion[open] > summary::after { content: "−"; }
+.school-import-accordion > .school-import-card { margin: 0; padding: 12px; border: 0; border-top: 1px solid var(--line); border-radius: 0; }
+.school-import-list { gap: 7px; }
+.school-import-list .school-import-card { padding: 0; border-radius: 12px; overflow: hidden; }
+.school-import-details > summary { display: flex; justify-content: space-between; gap: 10px; padding: 10px 12px; cursor: pointer; list-style: none; }
+.school-import-details > summary::-webkit-details-marker { display: none; }
+.school-import-details > summary span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+.school-import-details > summary small { flex: 0 0 auto; color: var(--muted); }
+.school-import-details-body { padding: 4px 12px 12px; border-top: 1px solid var(--line); }
+.school-import-details-body .field { margin-bottom: 10px; }
+.compact-empty-state { padding: 12px; }
 .panel-card.has-desktop-add-accordion > .panel-header:first-child { display: none; }
 .homework-photo-importer { padding: 16px; }
 .homework-photo-importer .subsection-header h3 { margin: 2px 0 0; font-family: "Avenir Next", "Segoe UI", sans-serif; font-size: 1.12rem; font-weight: 650; }

@@ -591,6 +591,10 @@ body:has(.mobile-form-dialog[open]) {
 .todo-filters .field span { font-size: 0.7rem; }
 .todo-filters select { min-height: 40px; padding: 8px; font-size: 0.82rem; }
 .schedule-import-dialog .schedule-import-card { margin: 0; padding: 0; border: 0; background: transparent; }
+.school-import-accordion { margin-bottom: 12px; }
+.school-import-accordion > summary { padding: 13px 42px 13px 14px; }
+.school-import-details > summary { padding: 9px 10px; }
+.school-import-details-body { padding: 4px 10px 10px; }
 .academic-break-row { grid-template-columns: 1fr; }
 .schedule-import-primary-fields { grid-template-columns: 1fr; }
 

@@ -258,10 +258,8 @@ const elements = {
   syncNow: document.querySelector("#sync-now"),
   passwordSummary: document.querySelector("#password-summary"),
   schoolAccountSummary: document.querySelector("#school-account-summary"),
-  fetchSchoolItems: document.querySelector("#fetch-school-items"),
-  clearSchoolImports: document.querySelector("#clear-school-imports"),
-  schoolImportStatus: document.querySelector("#school-import-status"),
-  schoolImportList: document.querySelector("#school-import-list"),
+  schoolImportPanels: Array.from(document.querySelectorAll("[data-school-import-panel]")),
+  clearSchoolImports: Array.from(document.querySelectorAll("[data-clear-school-imports]")),
 };
 
 initialize();
@@ -482,12 +480,14 @@ function bindEvents() {
   elements.settingsClearSchoolAccount.addEventListener("click", clearSchoolAccountForm);
   elements.sendDaySchedulePdf.addEventListener("click", sendDaySchedulePdf);
   elements.syncNow.addEventListener("click", syncNow);
-  elements.fetchSchoolItems.addEventListener("click", fetchSchoolItems);
   elements.syncCanvasFeed.addEventListener("click", syncCanvasCalendarFeed);
-  elements.clearSchoolImports.addEventListener("click", () => {
+  elements.schoolImportPanels.forEach((panel) => panel.addEventListener("toggle", () => {
+    if (panel.open) refreshSchoolImports();
+  }));
+  elements.clearSchoolImports.forEach((button) => button.addEventListener("click", () => {
     schoolImportItems = [];
     renderSchoolImportItems("Import results cleared.");
-  });
+  }));
 
   window.addEventListener("focus", () => {
     refreshCloudData();
@@ -3951,11 +3951,9 @@ function parseCanvasCalendarFeed(ics) {
 
 async function fetchSchoolItems() {
   saveSettings();
-  elements.fetchSchoolItems.disabled = true;
   renderSchoolImportItems("Checking connected school accounts...");
 
-  try {
-    const settings = getSettings();
+  const settings = getSettings();
     const requests = [];
 
     settings.schoolAccounts.forEach((account) => {
@@ -3979,7 +3977,10 @@ async function fetchSchoolItems() {
       .filter((result) => result.status === "rejected")
       .map((result) => result.reason?.message || "A school import failed.");
 
-    schoolImportItems = dedupeSchoolItems(items);
+    schoolImportItems = dedupeSchoolItems([
+      ...schoolImportItems.filter((item) => item.source === "Canvas calendar"),
+      ...items,
+    ]);
 
     if (schoolImportItems.length) {
       renderSchoolImportItems(
@@ -3989,9 +3990,27 @@ async function fetchSchoolItems() {
     }
 
     renderSchoolImportItems(errors[0] || "No upcoming school items were found.");
-  } finally {
-    elements.fetchSchoolItems.disabled = false;
-  }
+}
+
+let schoolImportRefreshPromise = null;
+
+function refreshSchoolImports() {
+  if (schoolImportRefreshPromise) return schoolImportRefreshPromise;
+  schoolImportRefreshPromise = (async () => {
+    const settings = getSettings();
+    const hasConnectedAccount = settings.schoolAccounts.some((account) => account.connections.canvas || account.connections.googleClassroom);
+    const feedUrl = elements.settingsCanvasFeed.value.trim() || settings.canvasFeedUrl;
+    if (!hasConnectedAccount && !feedUrl) {
+      renderSchoolImportItems("Connect a school account or add a Canvas calendar feed in Settings first.");
+      return;
+    }
+    if (hasConnectedAccount) await fetchSchoolItems();
+    if (feedUrl) {
+      elements.settingsCanvasFeed.value = feedUrl;
+      await syncCanvasCalendarFeed();
+    }
+  })().finally(() => { schoolImportRefreshPromise = null; });
+  return schoolImportRefreshPromise;
 }
 
 async function fetchCanvasItems(account) {
@@ -4076,16 +4095,18 @@ async function fetchGoogleClassroomItems(account) {
 
 function mapCanvasPlannerItem(item, account) {
   const plannable = item.plannable || {};
-  const dueAt = plannable.due_at || item.plannable_date || item.created_at;
+  const dueAt = plannable.due_at || item.plannable_date;
   const dateParts = parseSchoolDateTime(dueAt);
   if (!dateParts) {
     return null;
   }
 
+  const title = plannable.title || item.context_name || "Canvas item";
   return {
     id: `canvas:${item.plannable_type || "item"}:${item.plannable_id || plannable.id || dueAt}`,
     source: "Canvas",
-    title: plannable.title || item.context_name || "Canvas item",
+    title,
+    kind: /\b(exam|quiz|test|midterm|final)\b/i.test(title) ? "exam" : "homework",
     course: item.context_name || account.school || "Canvas",
     date: dateParts.date,
     time: dateParts.time,
@@ -4100,10 +4121,12 @@ function mapGoogleCourseWork(item, course, account) {
     return null;
   }
 
+  const title = item.title || "Classroom assignment";
   return {
     id: `classroom:${course.id}:${item.id}`,
     source: "Google Classroom",
-    title: item.title || "Classroom assignment",
+    title,
+    kind: /\b(exam|quiz|test|midterm|final)\b/i.test(title) ? "exam" : "homework",
     course: course.name || account.school || "Google Classroom",
     date: due.date,
     time: due.time,
@@ -4112,23 +4135,28 @@ function mapGoogleCourseWork(item, course, account) {
   };
 }
 
-function renderSchoolImportItems(statusMessage = elements.schoolImportStatus.textContent || "") {
-  elements.schoolImportStatus.textContent = statusMessage;
-  elements.schoolImportList.innerHTML = "";
-
-  if (!schoolImportItems.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-    empty.textContent = "No school items ready to add yet.";
-    elements.schoolImportList.appendChild(empty);
-    return;
-  }
-
+function renderSchoolImportItems(statusMessage = "") {
   const importableClasses = getImportableClasses();
-  schoolImportItems.forEach((item) => {
+  elements.schoolImportPanels.forEach((panel) => {
+    const panelKind = panel.dataset.schoolImportPanel;
+    const list = panel.querySelector("[data-school-import-list]");
+    const status = panel.querySelector("[data-school-import-status]");
+    if (statusMessage) status.textContent = statusMessage;
+    list.innerHTML = "";
+    const visibleItems = schoolImportItems
+      .filter((item) => item.date >= todayString() && (item.kind || "homework") === panelKind)
+      .sort(compareByDateTime);
+    if (!visibleItems.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty-state compact-empty-state";
+      empty.textContent = `No upcoming ${panelKind === "exam" ? "exams" : "homework"} found.`;
+      list.appendChild(empty);
+      return;
+    }
+
+    visibleItems.forEach((item) => {
     const card = document.createElement("article");
     card.className = "item-card school-import-card";
-    const isCanvasFeed = item.source === "Canvas calendar";
     const actionLabel = item.operation === "update" ? "Update planner item" : item.operation === "current" ? "Already current" : item.kind === "exam" ? "Add exam" : "Add homework";
     const cardContent = `
       <div class="item-card-top">
@@ -4142,14 +4170,15 @@ function renderSchoolImportItems(statusMessage = elements.schoolImportStatus.tex
         </div>
       </div>
       <p class="item-meta">${escapeHtml(item.course || item.rawCourse || "Class not matched")} • ${formatShortDate(item.date)}${item.time ? ` at ${formatTime(item.time)}` : ""}</p>
-      ${isCanvasFeed ? `<div class="field-row"><label class="field"><span>Assignment name</span><input data-school-import-title value="${escapeHtml(item.title)}"></label><label class="field"><span>Save as</span><select data-school-import-kind><option value="homework"${item.kind !== "exam" ? " selected" : ""}>Homework</option><option value="exam"${item.kind === "exam" ? " selected" : ""}>Exam or quiz</option></select></label></div><div class="field-row"><label class="field"><span>Class</span><select data-school-import-course><option value="">Choose a class</option>${importableClasses.map((course) => `<option value="${escapeHtml(course.title)}"${course.title === item.course ? " selected" : ""}>${escapeHtml(course.title)}</option>`).join("")}</select></label><label class="field"><span>Due date</span><input data-school-import-date type="date" value="${item.date}"></label><label class="field"><span>Due time${item.missingTime ? " — Canvas did not include this" : ""}</span><input data-school-import-time type="time" value="${item.time || ""}"${item.missingTime ? " required" : ""}></label></div>` : ""}
+      <div class="field-row"><label class="field"><span>Name</span><input data-school-import-title value="${escapeHtml(item.title)}"></label><label class="field"><span>Save as</span><select data-school-import-kind><option value="homework"${item.kind !== "exam" ? " selected" : ""}>Homework</option><option value="exam"${item.kind === "exam" ? " selected" : ""}>Exam or quiz</option></select></label></div><div class="field-row"><label class="field"><span>Class</span><select data-school-import-course><option value="">Choose a class</option>${importableClasses.map((course) => `<option value="${escapeHtml(course.title)}"${course.title === item.course ? " selected" : ""}>${escapeHtml(course.title)}</option>`).join("")}</select></label><label class="field"><span>Due date</span><input data-school-import-date type="date" value="${item.date}"></label><label class="field"><span>Due time${item.missingTime ? " — not provided" : ""}</span><input data-school-import-time type="time" value="${item.time || ""}"></label></div>
       <p class="item-notes">${escapeHtml(item.url || item.notes)}</p>
     `;
-    card.innerHTML = isCanvasFeed ? `<details class="school-import-details"${item.operation !== "current" ? " open" : ""}><summary><span>${escapeHtml(item.title)}</span><small>${item.operation === "add" ? "New" : item.operation === "update" ? "Changed" : "Already current"}</small></summary><div class="school-import-details-body">${cardContent}</div></details>` : cardContent;
+    const stateLabel = item.operation === "update" ? "Changed" : item.operation === "current" ? "Current" : "New";
+    card.innerHTML = `<details class="school-import-details"><summary><span>${escapeHtml(item.title)}</span><small>${formatShortDate(item.date)} · ${stateLabel}</small></summary><div class="school-import-details-body">${cardContent}</div></details>`;
 
     card.querySelector("[data-school-import-kind]")?.addEventListener("change", (event) => {
       item.kind = event.target.value;
-      if (item.operation === "add") card.querySelector(".add-school-homework").textContent = item.kind === "exam" ? "Add exam" : "Add homework";
+      renderSchoolImportItems(`${item.title} moved to the ${item.kind === "exam" ? "Exams" : "Homework"} import list.`);
     });
     card.querySelector("[data-school-import-title]")?.addEventListener("input", (event) => { item.title = event.target.value; });
     card.querySelector("[data-school-import-date]")?.addEventListener("input", (event) => { item.date = event.target.value; });
@@ -4166,7 +4195,8 @@ function renderSchoolImportItems(statusMessage = elements.schoolImportStatus.tex
     card.querySelector(".add-school-reminder").addEventListener("click", () => {
       addSchoolItemAsReminder(item);
     });
-    elements.schoolImportList.appendChild(card);
+    list.appendChild(card);
+    });
   });
 }
 
@@ -4664,11 +4694,13 @@ function parseGoogleDueDate(dueDate, dueTime) {
 function dedupeSchoolItems(items) {
   const existing = new Set([
     ...state.data.homework.map((item) => `${item.title}|${item.course}|${item.date}`),
+    ...state.data.exams.map((item) => `${item.title}|${item.course}|${item.date}`),
     ...state.data.reminders.map((item) => `${item.title}|${item.date}`),
   ]);
   const seen = new Set();
 
   return items.filter((item) => {
+    if (!item.date || item.date < todayString()) return false;
     const importedKey = `${item.source}|${item.id}`;
     const homeworkKey = `${item.title}|${item.course}|${item.date}`;
     const reminderKey = `${item.title}|${item.date}`;

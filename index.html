@@ -462,6 +462,17 @@
                     </div>
                   </div>
 
+                  <details class="school-import-accordion" data-school-import-panel="homework">
+                    <summary>Import homework from school</summary>
+                    <div class="school-import-card">
+                      <p class="settings-note" data-school-import-status role="status" aria-live="polite">Open this dropdown to check for new upcoming homework.</p>
+                      <div class="item-list school-import-list" data-school-import-list></div>
+                      <div class="form-actions import-actions">
+                        <button class="ghost-button" data-clear-school-imports type="button">Clear results</button>
+                      </div>
+                    </div>
+                  </details>
+
                   <form class="entry-form" id="homework-form">
                     <input type="hidden" id="homework-id" />
 
@@ -591,6 +602,17 @@
                       <h3>Tests, quizzes, and finals</h3>
                     </div>
                   </div>
+
+                  <details class="school-import-accordion" data-school-import-panel="exam">
+                    <summary>Import exams from school</summary>
+                    <div class="school-import-card">
+                      <p class="settings-note" data-school-import-status role="status" aria-live="polite">Open this dropdown to check for new upcoming exams.</p>
+                      <div class="item-list school-import-list" data-school-import-list></div>
+                      <div class="form-actions import-actions">
+                        <button class="ghost-button" data-clear-school-imports type="button">Clear results</button>
+                      </div>
+                    </div>
+                  </details>
 
                   <form class="entry-form" id="exam-form">
                     <input type="hidden" id="exam-id" />
@@ -1082,19 +1104,6 @@
                       <p class="panel-label">School accounts</p>
                     </div>
                     <div class="settings-summary school-account-list" id="school-account-summary"></div>
-                  </div>
-
-                  <div class="subsection">
-                    <div class="subsection-header">
-                      <p class="panel-label">School import</p>
-                    </div>
-
-                    <div class="form-actions import-actions">
-                      <button class="primary-button" id="fetch-school-items" type="button">Check school items</button>
-                      <button class="ghost-button" id="clear-school-imports" type="button">Clear results</button>
-                    </div>
-                    <p class="settings-note" id="school-import-status" role="status" aria-live="polite"></p>
-                    <div class="item-list school-import-list" id="school-import-list"></div>
                   </div>
 
                   <div class="subsection">

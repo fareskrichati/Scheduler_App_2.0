@@ -589,6 +589,12 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-markers {
   display: grid;
   align-content: start;
   gap: 10px;
+  cursor: pointer;
+}
+
+.calendar-day:focus-visible {
+  outline: 2px solid rgba(21, 93, 99, 0.45);
+  outline-offset: 2px;
 }
 
 .calendar-day.is-other-month {
@@ -624,6 +630,42 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-markers {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.calendar-marker-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.calendar-marker-check {
+  flex: 0 0 17px;
+  width: 17px;
+  height: 17px;
+  display: inline-grid;
+  padding: 0;
+  place-items: center;
+  border: 1.5px solid var(--item-color, currentColor);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--item-color, currentColor);
+  cursor: pointer;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.calendar-marker-check:hover,
+.calendar-marker-check:focus-visible {
+  background: color-mix(in srgb, var(--item-color, var(--accent)) 18%, white);
+  outline: 2px solid color-mix(in srgb, var(--item-color, var(--accent)) 35%, transparent);
+  outline-offset: 1px;
+}
+
+.calendar-marker.is-complete .calendar-marker-title {
+  opacity: 0.62;
+  text-decoration: line-through;
 }
 
 /* Open month layout shared by laptop and mobile calendar views. */
@@ -691,6 +733,7 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-markers {
 
 .calendar-grid[data-view="month"] .calendar-marker-title {
   display: block;
+  min-width: 0;
   overflow: hidden;
   font-size: 0.78rem;
   font-weight: 600;
@@ -888,6 +931,7 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-day-number {
 .calendar-grid[data-view="week"] .calendar-marker-title,
 .calendar-grid[data-view="day"] .calendar-marker-title {
   display: block;
+  min-width: 0;
   overflow: hidden;
   font-size: .78rem;
   font-weight: 600;

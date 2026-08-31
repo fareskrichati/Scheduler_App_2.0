@@ -2031,12 +2031,13 @@ function renderCalendar() {
     current.setDate(firstDay.getDate() + index);
     const dateString = isoDate(current);
     const items = filterCalendarItems(getItemsForDate(dateString));
-    const button = document.createElement("button");
+    const button = document.createElement("div");
     const isSelected = dateString === state.selectedDate;
     const isToday = dateString === todayString();
     const isOtherMonth = current.getMonth() !== monthDate.getMonth();
 
-    button.type = "button";
+    button.setAttribute("role", "button");
+    button.tabIndex = 0;
     button.dataset.calendarDate = dateString;
     button.title = `${formatLongDate(dateString)} — tap for Day view, hold to add`;
     button.className = [
@@ -2061,10 +2062,18 @@ function renderCalendar() {
     const markerLimit = isMobileCalendar && view === "month" ? 3 : isMobileCalendar ? items.length : view === "month" ? 3 : items.length;
     items.slice(0, markerLimit).forEach((item) => {
       const marker = document.createElement("div");
-      marker.className = `calendar-marker marker-${item.kind}`;
+      const canComplete = ["homework", "exam", "reminder"].includes(item.kind) || item.sourceType === "event";
+      marker.className = `calendar-marker marker-${item.kind}${item.status === "done" ? " is-complete" : ""}`;
       const monthTime = item.displayTime ? `<span class="calendar-marker-time">${escapeHtml(item.displayTime)}</span>` : "";
-      marker.innerHTML = `<span class="calendar-marker-title">${escapeHtml(item.title)}</span>${monthTime}`;
+      marker.innerHTML = `<span class="calendar-marker-row">${canComplete ? `<button class="calendar-marker-check" type="button" aria-label="${item.status === "done" ? "Mark pending" : "Mark done"}: ${escapeHtml(item.title)}">${item.status === "done" ? "✓" : ""}</button>` : ""}<span class="calendar-marker-title">${escapeHtml(item.title)}</span></span>${monthTime}`;
       applyItemColor(marker, item.color);
+      marker.querySelector(".calendar-marker-check")?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (item.kind === "homework") toggleHomeworkStatus(item.sourceId);
+        else if (item.kind === "exam") toggleExamStatus(item.sourceId);
+        else if (item.kind === "reminder") toggleReminderStatus(item.sourceId);
+        else if (item.sourceType === "event") toggleEventStatus(item.sourceId);
+      });
       markers.appendChild(marker);
     });
 
@@ -2084,6 +2093,11 @@ function renderCalendar() {
       renderCalendar();
       renderSelectedDayViews();
       prefillForms();
+    });
+    button.addEventListener("keydown", (event) => {
+      if (event.target !== button || !["Enter", " "].includes(event.key)) return;
+      event.preventDefault();
+      button.click();
     });
 
     elements.calendarGrid.appendChild(button);

@@ -5,9 +5,11 @@
   const wantsDesktop = params.get("view") === "desktop";
   const alreadyMobile = fileName.toLowerCase() === "mobile.html";
   const narrowScreen = window.matchMedia("(max-width: 760px)").matches;
-  const touchDevice = window.matchMedia("(pointer: coarse)").matches;
+  const tabletScreen = window.matchMedia("(max-width: 1366px)").matches;
+  const touchDevice = window.matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 1;
+  const phoneOrTablet = narrowScreen || (tabletScreen && touchDevice);
 
-  if (!alreadyMobile && !wantsDesktop && narrowScreen && touchDevice) {
+  if (!alreadyMobile && !wantsDesktop && phoneOrTablet && touchDevice) {
     const mobileUrl = new URL("mobile.html", window.location.href);
     mobileUrl.search = window.location.search;
     mobileUrl.hash = window.location.hash;

@@ -32,6 +32,8 @@ let lastCloudSyncMessage = "";
 let supabaseSetupMessage = "";
 let todoTypeFilter = "all";
 let todoClassFilter = "all";
+let homeworkClassFilter = "all";
+let examClassFilter = "all";
 const supabaseClient = createSupabaseClient();
 clearLegacyLocalLogin();
 const savedAuthProfile = null;
@@ -104,6 +106,8 @@ const elements = {
   eventList: document.querySelector("#event-list"),
   homeworkList: document.querySelector("#homework-list"),
   examList: document.querySelector("#exam-list"),
+  homeworkClassFilter: document.querySelector("#homework-class-filter"),
+  examClassFilter: document.querySelector("#exam-class-filter"),
   reminderList: document.querySelector("#reminder-list"),
   itemTemplate: document.querySelector("#item-card-template"),
   classForm: document.querySelector("#class-form"),
@@ -436,6 +440,10 @@ function bindEvents() {
   elements.homeworkMatchSource.addEventListener("change", () => updateMatchedColorPreview("homework"));
   elements.homeworkRepeatForever.addEventListener("change", () => toggleRepeatOptions("homework"));
   elements.homeworkClass.addEventListener("change", () => applySelectedClassColor("homework"));
+  elements.homeworkClassFilter.addEventListener("change", () => {
+    homeworkClassFilter = elements.homeworkClassFilter.value;
+    renderHomeworkList();
+  });
   elements.todoTypeFilter.addEventListener("change", () => { todoTypeFilter = elements.todoTypeFilter.value; renderTodoList(); });
   elements.todoClassFilter.addEventListener("change", () => { todoClassFilter = elements.todoClassFilter.value; renderTodoList(); });
 
@@ -448,6 +456,10 @@ function bindEvents() {
   elements.examMatchColor.addEventListener("change", () => toggleMatchOptions("exam"));
   elements.examMatchSource.addEventListener("change", () => updateMatchedColorPreview("exam"));
   elements.examCourse.addEventListener("change", () => applySelectedClassColor("exam"));
+  elements.examClassFilter.addEventListener("change", () => {
+    examClassFilter = elements.examClassFilter.value;
+    renderExamList();
+  });
 
   elements.reminderForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -2448,13 +2460,16 @@ function buildDayDeleteButton(item) {
 }
 
 function renderHomeworkList() {
-  const sorted = getNextVisibleOccurrences(state.data.homework)
+  const visible = getNextVisibleOccurrences(state.data.homework);
+  homeworkClassFilter = renderClassFilter(elements.homeworkClassFilter, visible, homeworkClassFilter);
+  const sorted = visible
+    .filter((item) => homeworkClassFilter === "all" || item.course === homeworkClassFilter)
     .sort(compareByDateTime)
     .map((item) => ({ ...item, effectiveColor: getStoredItemColor("homework", item) }));
   renderCollection({
     target: elements.homeworkList,
     items: sorted,
-    emptyMessage: "No homework added yet.",
+    emptyMessage: homeworkClassFilter === "all" ? "No homework added yet." : `No homework for ${homeworkClassFilter}.`,
     config: {
       category: "Homework",
       meta: (item) =>
@@ -2489,14 +2504,16 @@ function getNextVisibleOccurrences(collection, fromDate = "") {
 }
 
 function renderExamList() {
-  const sorted = [...state.data.exams]
-    .filter((item) => !isTimedItemPast(item.date, item.time))
+  const upcoming = [...state.data.exams].filter((item) => !isTimedItemPast(item.date, item.time));
+  examClassFilter = renderClassFilter(elements.examClassFilter, upcoming, examClassFilter);
+  const sorted = upcoming
+    .filter((item) => examClassFilter === "all" || item.course === examClassFilter)
     .sort(compareByDateTime)
     .map((item) => ({ ...item, effectiveColor: getStoredItemColor("exams", item) }));
   renderCollection({
     target: elements.examList,
     items: sorted,
-    emptyMessage: "No exams added yet.",
+    emptyMessage: examClassFilter === "all" ? "No exams added yet." : `No upcoming exams for ${examClassFilter}.`,
     config: {
       category: "Exam",
       meta: (item) =>
@@ -2507,6 +2524,14 @@ function renderExamList() {
       onToggleStatus: toggleExamStatus,
     },
   });
+}
+
+function renderClassFilter(select, items, selectedValue) {
+  const classes = [...new Set(items.map((item) => item.course).filter(Boolean))].sort((left, right) => left.localeCompare(right));
+  const nextValue = selectedValue === "all" || classes.includes(selectedValue) ? selectedValue : "all";
+  select.innerHTML = '<option value="all">All classes</option>' + classes.map((course) => `<option value="${escapeHtml(course)}">${escapeHtml(course)}</option>`).join("");
+  select.value = nextValue;
+  return nextValue;
 }
 
 function renderClassList() {
@@ -3954,14 +3979,17 @@ async function syncCanvasCalendarFeed() {
 function parseCanvasCalendarFeed(ics) {
   const unfolded = ics.replace(/\r?\n[ \t]/g, "");
   return unfolded.split("BEGIN:VEVENT").slice(1).map((block) => {
-    const read = (name) => block.match(new RegExp(`(?:^|\\n)${name}(?:;[^:]*)?:(.*)`, "i"))?.[1]?.trim() || "";
+    const readProperty = (name) => {
+      const match = block.match(new RegExp(`(?:^|\\n)${name}((?:;[^:\\n]*)*):(.*)`, "i"));
+      return match ? { params: match[1] || "", value: match[2].trim() } : null;
+    };
+    const read = (name) => readProperty(name)?.value || "";
     const decode = (value) => value.replace(/\\n/gi, "\n").replace(/\\([,;\\])/g, "$1").trim();
     const summary = decode(read("SUMMARY"));
     const description = decode(read("DESCRIPTION"));
     const uid = read("UID") || `${summary}|${read("DTSTART")}`;
-    const dateValue = read("DTSTART") || read("DUE");
-    const match = dateValue.match(/(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2}))?/);
-    if (!summary || !match) return null;
+    const due = parseIcsDueDate(readProperty("DUE")) || parseIcsDueDate(readProperty("DTSTART"));
+    if (!summary || !due) return null;
     const prefixCourse = summary.match(/^\[([^\]]+)\]\s*(.*)$/);
     const suffixCourse = summary.match(/^(.*?)\s*\[([^\]]+)\]\s*$/);
     const describedCourse = description.match(/(?:^|\n)\s*(?:course|context)\s*:\s*([^\n]+)/i);
@@ -3969,8 +3997,49 @@ function parseCanvasCalendarFeed(ics) {
     const title = (prefixCourse?.[2] || suffixCourse?.[1] || summary).replace(/^assignment\s*:\s*/i, "").trim();
     const course = rawCourse;
     const kind = /\b(exam|quiz|test|midterm|final)\b/i.test(title) ? "exam" : "homework";
-    return { uid, title, course, rawCourse, kind, date: `${match[1]}-${match[2]}-${match[3]}`, time: match[4] ? `${match[4]}:${match[5]}` : "" };
+    return { uid, title, course, rawCourse, kind, date: due.date, time: due.time };
   }).filter((item) => item && item.date >= todayString());
+}
+
+function parseIcsDueDate(property) {
+  if (!property?.value) return null;
+  const match = property.value.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?)?(Z|[+-]\d{4})?$/i);
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second = "00", zoneSuffix = ""] = match;
+  const isAllDay = !hour || /(?:^|;)VALUE=DATE(?:;|$)/i.test(property.params);
+  if (isAllDay) return { date: `${year}-${month}-${day}`, time: "" };
+
+  let instant;
+  if (zoneSuffix.toUpperCase() === "Z") {
+    instant = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second)));
+  } else if (/^[+-]\d{4}$/.test(zoneSuffix)) {
+    const sign = zoneSuffix[0] === "+" ? 1 : -1;
+    const offsetMinutes = sign * (Number(zoneSuffix.slice(1, 3)) * 60 + Number(zoneSuffix.slice(3, 5)));
+    instant = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second)) - offsetMinutes * 60000);
+  } else {
+    const timeZone = property.params.match(/(?:^|;)TZID=([^;:]+)/i)?.[1]?.replace(/^"|"$/g, "");
+    instant = timeZone
+      ? dateFromTimeZone(Number(year), Number(month), Number(day), Number(hour), Number(minute), Number(second), timeZone)
+      : new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
+  }
+  if (!instant || Number.isNaN(instant.getTime())) return null;
+  return { date: isoDate(instant), time: `${String(instant.getHours()).padStart(2, "0")}:${String(instant.getMinutes()).padStart(2, "0")}` };
+}
+
+function dateFromTimeZone(year, month, day, hour, minute, second, timeZone) {
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+    const desiredUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+    let timestamp = desiredUtc;
+    for (let pass = 0; pass < 2; pass += 1) {
+      const parts = Object.fromEntries(formatter.formatToParts(new Date(timestamp)).filter((part) => part.type !== "literal").map((part) => [part.type, Number(part.value)]));
+      const renderedUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+      timestamp += desiredUtc - renderedUtc;
+    }
+    return new Date(timestamp);
+  } catch (error) {
+    return new Date(year, month - 1, day, hour, minute, second);
+  }
 }
 
 async function fetchSchoolItems() {
@@ -4209,7 +4278,8 @@ function renderSchoolImportItems(statusMessage = "") {
       <p class="item-notes">${escapeHtml(item.url || item.notes)}</p>
     `;
     const stateLabel = item.operation === "update" ? "Changed" : item.operation === "current" ? "Current" : "New";
-    card.innerHTML = `<details class="school-import-details"><summary><span>${escapeHtml(item.title)}</span><small>${formatShortDate(item.date)} · ${stateLabel}</small></summary><div class="school-import-details-body">${cardContent}</div></details>`;
+    const stateClass = item.operation === "update" ? " is-changed" : "";
+    card.innerHTML = `<details class="school-import-details"><summary><span>${escapeHtml(item.title)}</span><small class="school-import-state${stateClass}">${formatShortDate(item.date)} · ${stateLabel}</small></summary><div class="school-import-details-body">${cardContent}</div></details>`;
 
     card.querySelector("[data-school-import-kind]")?.addEventListener("change", (event) => {
       item.kind = event.target.value;

@@ -590,6 +590,9 @@ body:has(.mobile-form-dialog[open]) {
 .todo-filters { grid-template-columns: 1fr 1fr; gap: 8px; }
 .todo-filters .field span { font-size: 0.7rem; }
 .todo-filters select { min-height: 40px; padding: 8px; font-size: 0.82rem; }
+.collection-filter { flex-basis: 150px; min-width: 125px; }
+.collection-filter span { font-size: 0.72rem; }
+.collection-filter select { min-height: 38px; padding: 7px 9px; font-size: 0.8rem; }
 .schedule-import-dialog .schedule-import-card { margin: 0; padding: 0; border: 0; background: transparent; }
 .school-import-accordion { margin-bottom: 12px; }
 .school-import-accordion > summary { padding: 13px 42px 13px 14px; }
@@ -679,7 +682,7 @@ body:has(.mobile-form-dialog[open]) {
   }
 }
 
-@media (min-width: 761px) {
+@media (min-width: 761px) and (pointer: fine) {
   body.mobile-preview {
     display: grid;
     justify-items: center;

@@ -51,7 +51,7 @@ async function sendEmail(to, name, plannerUrl) {
 async function sendText(to, plannerUrl) {
   const sid = process.env.TWILIO_ACCOUNT_SID, token = process.env.TWILIO_AUTH_TOKEN, from = process.env.TWILIO_FROM_NUMBER;
   if (!sid || !token || !from) throw new Error("Text reminders are not configured.");
-  const body = new URLSearchParams({ To: to, From: from, Body: `Daily Planner: Review your classes and upcoming homework for the week.${plannerUrl ? ` ${plannerUrl}` : ""}` });
+  const body = new URLSearchParams({ To: to, From: from, Body: `UniPlan: Review your classes and upcoming homework for the week.${plannerUrl ? ` ${plannerUrl}` : ""}` });
   const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/Messages.json`, { method: "POST", headers: { Authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}`, "Content-Type": "application/x-www-form-urlencoded" }, body });
   if (!response.ok) throw new Error(`Text reminder failed: ${await response.text()}`);
 }

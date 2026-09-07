@@ -6,12 +6,12 @@
     <meta name="theme-color" content="#7eaed6" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Daily Planner" />
+    <meta name="apple-mobile-web-app-title" content="UniPlan" />
     <meta
       name="description"
-      content="Daily Planner helps you track homework, class schedules, daily plans, and reminders in one calendar."
+      content="UniPlan helps you track homework, class schedules, daily plans, and reminders in one calendar."
     />
-    <title>Daily Planner | Student Planner</title>
+    <title>UniPlan | Student Planner</title>
     <link rel="stylesheet" href="css/styles.css" />
   </head>
   <body>
@@ -20,7 +20,7 @@
     <main class="auth-screen" id="auth-screen" aria-live="polite">
       <section class="auth-panel">
         <div class="auth-brand">
-          <div class="brand-mark">D</div>
+          <div class="brand-mark">U</div>
           <div>
             <p class="eyebrow">Student planner</p>
             <h1 id="auth-title">Create your login</h1>
@@ -58,6 +58,7 @@
             <input id="setup-phone" type="tel" maxlength="30" placeholder="(555) 123-4567" autocomplete="tel" required />
           </label>
 
+<fieldset class="canvas-setup"><legend>Canvas setup (optional)</legend><p class="settings-note">Set this up now or later in Settings. Every field below is optional.</p><label class="field"><span>School name</span><input id="setup-school" type="text" maxlength="120" autocomplete="organization" placeholder="Your school" /></label><label class="field"><span>Your Canvas website</span><input id="setup-canvas-url" type="url" maxlength="300" placeholder="https://school.instructure.com" /></label><label class="field"><span>Private Canvas calendar feed</span><input id="setup-canvas-feed" type="password" maxlength="500" autocomplete="off" placeholder="Paste your Canvas .ics feed link" /></label><details class="canvas-guide"><summary>How to find your Canvas calendar feed</summary><ol><li>Open your school’s Canvas website in a browser and sign in.</li><li>Select <strong>Calendar</strong> in the Canvas navigation.</li><li>Select <strong>Calendar Feed</strong> in the calendar sidebar. On a phone, try the browser’s desktop website view if the sidebar is hidden.</li><li>Copy the full link ending in <strong>.ics</strong> and paste it into the calendar feed field.</li></ol><p>Keep this link private. UniPlan lets you review dated assignments and exams before adding them.</p><a href="https://community.instructure.com/en/kb/articles/662787-how-do-i-use-the-calendar" target="_blank" rel="noopener noreferrer">Canvas calendar help</a></details><p class="settings-note">If email confirmation is required, return to this browser to finish saving your private feed.</p></fieldset>
           <button class="primary-button" type="submit">Finish setup</button>
           <p class="auth-status" id="setup-status" role="status"></p>
         </form>
@@ -69,14 +70,16 @@
         <div class="topbar-main">
           <div class="brand-block">
             <div class="topbar-shortcuts">
-              <button class="canvas-shortcut-button" id="open-canvas" type="button" title="Open Canvas">Open Canvas</button>
+              <button class="canvas-shortcut-button" id="open-canvas" type="button" title="Open Canvas" aria-label="Open Canvas"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" class="canvas-logomark" aria-hidden="true" focusable="false" x="0" y="0" viewBox="0 0 200 200" width="200" height="200" xml:space="preserve">
+  <path fill="#E23E30" d="M29.2 100c0-14.9-11.2-26.9-25.5-28.4C1.5 80.6 0 89.6 0 100s1.5 19.4 3.7 28.4C18 126.9 29.2 114.2 29.2 100L29.2 100zM46.4 90.3c5 0 9 4 9 9s-4 9-9 9 -9-4-9-9S41.5 90.3 46.4 90.3zM170.8 100c0 14.9 11.2 26.9 25.5 28.4 2.2-9 3.7-18.7 3.7-28.4s-1.5-19.4-3.7-28.4C182 73.1 170.8 85.1 170.8 100L170.8 100zM151.3 90.3c5 0 9 4 9 9s-4 9-9 9c-5 0-9-4-9-9S146.3 90.3 151.3 90.3zM99.6 170.9c-15 0-27 11.2-28.5 25.4 9 2.2 18.7 3.7 28.5 3.7s19.5-1.5 28.5-3.7C126.6 182.1 114.6 170.9 99.6 170.9L99.6 170.9zM98.9 142.5c5 0 9 4 9 9 0 4.9-4 9-9 9 -5 0-9-4-9-9C89.9 146.5 93.9 142.5 98.9 142.5zM99.6 29.1c15 0 27-11.2 28.5-25.4 -9-2.2-18.7-3.7-28.5-3.7S80.1 1.5 71.2 3.7C72.7 17.9 84.6 29.1 99.6 29.1L99.6 29.1zM98.9 38.1c5 0 9 4 9 9s-4 9-9 9c-5 0-9-4-9-9S93.9 38.1 98.9 38.1zM149.8 150c-10.5 10.4-11.2 26.9-2.2 38.1 16.5-9.7 30.7-23.9 40.4-40.3C176.8 138.8 160.3 139.6 149.8 150L149.8 150zM136.3 127.6c5 0 9 4 9 9 0 4.9-4 9-9 9 -5 0-9-4-9-9C127.3 131.6 131.4 127.6 136.3 127.6zM49.4 50c10.5-10.4 11.2-26.9 2.2-38.1C35.2 21.6 21 35.8 11.2 52.2 22.5 61.2 39 60.4 49.4 50L49.4 50zM61.4 53c5 0 9 4 9 9s-4 9-9 9 -9-4-9-9S56.5 53 61.4 53zM149.8 50c10.5 10.4 27 11.2 38.2 2.2 -9.7-16.4-24-30.6-40.4-40.3C138.6 23.1 139.3 39.6 149.8 50L149.8 50zM136.3 53c5 0 9 4 9 9s-4 9-9 9c-5 0-9-4-9-9S131.4 53 136.3 53zM49.4 150c-10.5-10.4-27-11.2-38.2-2.2 9.7 16.4 24 30.6 40.4 40.3C60.7 176.1 59.9 160.4 49.4 150L49.4 150zM61.4 127.6c5 0 9 4 9 9 0 4.9-4 9-9 9s-9-4-9-9C52.4 131.6 56.5 127.6 61.4 127.6z"/>
+</svg></button>
               <button class="mobile-quick-add-button" id="mobile-quick-add" type="button" aria-label="Quick add" title="Quick add"><span aria-hidden="true">➕</span></button>
               <button class="settings-button" id="open-settings" type="button" aria-label="Open settings" title="Settings"><span aria-hidden="true">⚙</span></button>
             </div>
-            <div class="brand-mark">D</div>
+            <div class="brand-mark">U</div>
             <div>
               <p class="eyebrow">Student planner</p>
-              <h1>Daily Planner</h1>
+              <h1>UniPlan</h1>
             </div>
           </div>
 
@@ -186,10 +189,12 @@
                   <span class="todo-count" id="todo-count">0 left</span>
                 </div>
                 <div class="todo-filters">
-                  <label class="field"><span>Show</span><select id="todo-type-filter"><option value="all">All items</option><option value="homework">Homework</option><option value="exam">Exams</option><option value="reminder">Reminders</option></select></label>
+                  <label class="field"><span>Show</span><select id="todo-type-filter"><option value="all">All items</option><option value="academic">Homework &amp; exams</option><option value="homework">Homework</option><option value="exam">Exams</option><option value="reminder">Reminders</option></select></label>
                   <label class="field"><span>Class</span><select id="todo-class-filter"><option value="all">All classes</option></select></label>
+<label class="field"><span>Sort by</span><select id="todo-sort"><option value="date">Due date</option><option value="homework">Homework first</option><option value="exam">Exams first</option></select></label>
                 </div>
                 <div class="todo-list" id="todo-list" aria-live="polite"></div>
+<details class="completed-section" id="todo-completed"><summary>Completed <span id="todo-completed-count">(0)</span></summary><div class="todo-list" id="todo-completed-list"></div></details>
               </article>
             </section>
 
@@ -590,6 +595,7 @@
                   </div>
 
                   <div class="item-list" id="homework-list"></div>
+<details class="completed-section" id="homework-completed"><summary>Completed <span id="homework-completed-count">(0)</span></summary><div class="item-list" id="homework-completed-list"></div></details>
                 </article>
               </div>
             </section>
@@ -684,6 +690,7 @@
                   </div>
 
                   <div class="item-list" id="exam-list"></div>
+<details class="completed-section" id="exam-completed"><summary>Completed <span id="exam-completed-count">(0)</span></summary><div class="item-list" id="exam-completed-list"></div></details>
                 </article>
               </div>
             </section>
@@ -800,6 +807,7 @@
                   </div>
 
                   <div class="item-list" id="reminder-list"></div>
+<details class="completed-section" id="reminder-completed"><summary>Completed <span id="reminder-completed-count">(0)</span></summary><div class="item-list" id="reminder-completed-list"></div></details>
                 </article>
               </div>
             </section>
@@ -1026,52 +1034,7 @@
                       <button class="primary-button" id="sync-canvas-feed" type="button">Check Canvas calendar</button>
                       <p class="settings-note" id="canvas-feed-status" role="status">Finds dated assignments and exams for you to review before adding. Keep this link private.</p>
 
-                      <input id="settings-school-account-id" type="hidden" />
-
-                      <label class="field">
-                        <span>School</span>
-                        <input id="settings-school" type="text" maxlength="120" placeholder="Your school or district" autocomplete="organization" />
-                      </label>
-
-                      <label class="field">
-                        <span>Canvas URL</span>
-                        <input id="settings-canvas-url" type="url" maxlength="160" placeholder="https://school.instructure.com" autocomplete="url" />
-                      </label>
-
-                      <div class="preference-box">
-                        <span>Connect accounts</span>
-                        <div class="preference-options">
-                          <label>
-                            <input id="settings-connect-canvas" type="checkbox" />
-                            Canvas
-                          </label>
-                          <label>
-                            <input id="settings-connect-classroom" type="checkbox" />
-                            Google Classroom
-                          </label>
-                        </div>
-                      </div>
-
-                      <div class="field-row">
-                        <label class="field">
-                          <span>Canvas access token</span>
-                          <input id="settings-canvas-token" type="password" maxlength="240" placeholder="Canvas API token" autocomplete="off" />
-                        </label>
-                        <label class="field">
-                          <span>Google Classroom access token</span>
-                          <input id="settings-classroom-token" type="password" maxlength="240" placeholder="Google OAuth token" autocomplete="off" />
-                        </label>
-                      </div>
-
-                      <input id="settings-school-username" type="hidden" />
-                      <input id="settings-school-password" type="hidden" />
-
-                      <div class="form-actions">
-                        <button class="ghost-button" id="settings-clear-school-account" type="button">Clear account fields</button>
-                        <button class="primary-button" id="settings-add-school-account" type="button">Add school account</button>
-                      </div>
-
-                      <p class="settings-note">Connect with a Canvas API token or Google OAuth token. Your school login password is never requested or stored.</p>
+<details class="canvas-guide"><summary>How to find your Canvas calendar feed</summary><ol><li>Open your school’s Canvas website in a browser and sign in.</li><li>Select <strong>Calendar</strong> in the Canvas navigation.</li><li>Select <strong>Calendar Feed</strong> in the calendar sidebar. On a phone, try the browser’s desktop website view if the sidebar is hidden.</li><li>Copy the full link ending in <strong>.ics</strong> and paste it into the calendar feed field.</li></ol><p>Keep this link private. UniPlan lets you review dated assignments and exams before adding them.</p><a href="https://community.instructure.com/en/kb/articles/662787-how-do-i-use-the-calendar" target="_blank" rel="noopener noreferrer">Canvas calendar help</a></details>
                     </div>
 
                     <div class="form-actions">
@@ -1099,13 +1062,6 @@
                       <p class="panel-label">Saved passwords</p>
                     </div>
                     <div class="settings-summary" id="password-summary"></div>
-                  </div>
-
-                  <div class="subsection">
-                    <div class="subsection-header">
-                      <p class="panel-label">School accounts</p>
-                    </div>
-                    <div class="settings-summary school-account-list" id="school-account-summary"></div>
                   </div>
 
                   <div class="subsection">

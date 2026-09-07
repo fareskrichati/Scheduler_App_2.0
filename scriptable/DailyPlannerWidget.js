@@ -1,4 +1,4 @@
-// Daily Planner widget for Scriptable on iPhone.
+// UniPlan widget for Scriptable on iPhone.
 // Widget parameter: all, today, classes, homework, reminders, exams, events, or tasks.
 
 const CONFIG = {
@@ -59,12 +59,12 @@ async function showSetupMenu(error = null) {
   const menu = new Alert();
   const actions = [];
   const hasSession = Keychain.contains(SESSION_KEY);
-  menu.title = "Daily Planner Widget";
+  menu.title = "UniPlan Widget";
   menu.message = error
     ? String(error.message || error)
     : hasSession
     ? "Your planner account is connected."
-    : "Connect the same account used in Daily Planner.";
+    : "Connect the same account used in UniPlan.";
 
   if (hasSession) {
     menu.addAction("Open full planner");
@@ -108,7 +108,7 @@ async function signOut() {
 async function configureAppUrl() {
   const prompt = new Alert();
   prompt.title = "Planner website";
-  prompt.message = "Enter the public Netlify URL for Daily Planner. Scriptable will open the complete app in a full-screen WebView.";
+  prompt.message = "Enter the public Netlify URL for UniPlan. Scriptable will open the complete app in a full-screen WebView.";
   prompt.addTextField("https://your-site.netlify.app", getAppUrl());
   prompt.addAction("Save");
   prompt.addCancelAction("Cancel");
@@ -147,7 +147,7 @@ function getAppUrl() {
 
 async function signInInteractively() {
   const prompt = new Alert();
-  prompt.title = "Connect Daily Planner";
+  prompt.title = "Connect UniPlan";
   prompt.message = "Enter the email and password used in the planner app. The resulting session is stored securely in iPhone Keychain.";
   prompt.addTextField("Email");
   prompt.addSecureTextField("Password");

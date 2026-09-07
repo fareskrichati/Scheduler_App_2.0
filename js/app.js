@@ -31,6 +31,7 @@ let pendingFirstLogin = null;
 let lastCloudSyncMessage = "";
 let supabaseSetupMessage = "";
 let todoTypeFilter = "all";
+let todoSort = "date";
 let todoClassFilter = "all";
 let homeworkClassFilter = "all";
 let examClassFilter = "all";
@@ -215,22 +216,11 @@ const elements = {
   settingsCurrentPassword: document.querySelector("#settings-current-password"),
   settingsNewPassword: document.querySelector("#settings-new-password"),
   settingsChangePassword: document.querySelector("#settings-change-password"),
-  settingsSchoolAccountId: document.querySelector("#settings-school-account-id"),
-  settingsSchool: document.querySelector("#settings-school"),
-  settingsCanvasUrl: document.querySelector("#settings-canvas-url"),
   settingsCanvasFeed: document.querySelector("#settings-canvas-feed"),
   settingsCanvasShortcutSchool: document.querySelector("#settings-canvas-shortcut-school"),
   settingsCanvasShortcutUrl: document.querySelector("#settings-canvas-shortcut-url"),
   syncCanvasFeed: document.querySelector("#sync-canvas-feed"),
   canvasFeedStatus: document.querySelector("#canvas-feed-status"),
-  settingsConnectCanvas: document.querySelector("#settings-connect-canvas"),
-  settingsConnectClassroom: document.querySelector("#settings-connect-classroom"),
-  settingsCanvasToken: document.querySelector("#settings-canvas-token"),
-  settingsClassroomToken: document.querySelector("#settings-classroom-token"),
-  settingsSchoolUsername: document.querySelector("#settings-school-username"),
-  settingsSchoolPassword: document.querySelector("#settings-school-password"),
-  settingsAddSchoolAccount: document.querySelector("#settings-add-school-account"),
-  settingsClearSchoolAccount: document.querySelector("#settings-clear-school-account"),
   notificationPreference: Array.from(document.querySelectorAll('input[name="notification-preference"]')),
   notificationFrequency: Array.from(document.querySelectorAll('input[name="notification-frequency"]')),
   sendDaySchedulePdf: document.querySelector("#send-day-schedule-pdf"),
@@ -261,7 +251,6 @@ const elements = {
   settingsSummary: document.querySelector("#settings-summary"),
   syncNow: document.querySelector("#sync-now"),
   passwordSummary: document.querySelector("#password-summary"),
-  schoolAccountSummary: document.querySelector("#school-account-summary"),
   schoolImportPanels: Array.from(document.querySelectorAll("[data-school-import-panel]")),
   clearSchoolImports: Array.from(document.querySelectorAll("[data-clear-school-imports]")),
 };
@@ -444,6 +433,7 @@ function bindEvents() {
     homeworkClassFilter = elements.homeworkClassFilter.value;
     renderHomeworkList();
   });
+  document.querySelector("#todo-sort").addEventListener("change", (event) => { todoSort = event.target.value; renderTodoList(); });
   elements.todoTypeFilter.addEventListener("change", () => { todoTypeFilter = elements.todoTypeFilter.value; renderTodoList(); });
   elements.todoClassFilter.addEventListener("change", () => { todoClassFilter = elements.todoClassFilter.value; renderTodoList(); });
 
@@ -488,8 +478,6 @@ function bindEvents() {
   elements.settingsReset.addEventListener("click", resetSettingsForm);
   elements.settingsLogout.addEventListener("click", logout);
   elements.settingsChangePassword.addEventListener("click", changeLoginPassword);
-  elements.settingsAddSchoolAccount.addEventListener("click", saveSchoolAccountFromForm);
-  elements.settingsClearSchoolAccount.addEventListener("click", clearSchoolAccountForm);
   elements.sendDaySchedulePdf.addEventListener("click", sendDaySchedulePdf);
   elements.syncNow.addEventListener("click", syncNow);
   elements.syncCanvasFeed.addEventListener("click", syncCanvasCalendarFeed);
@@ -581,7 +569,7 @@ function setupWidgetSettingsPreview() {
   const button = document.createElement("button"); button.id = "open-widget-preview"; button.type = "button"; button.className = "ghost-button widget-preview-button"; button.textContent = "Preview my widget";
   widgetSettings.appendChild(button);
   const dialog = document.createElement("dialog"); dialog.className = "widget-preview-dialog";
-  dialog.innerHTML = `<div class="widget-preview-dialog-header"><div><p class="panel-label">Live preview</p><h3>Your widget</h3></div><button class="icon-button" type="button" aria-label="Close widget preview">×</button></div><iframe title="Daily Planner widget preview" src="widget-preview.html?embedded=1"></iframe>`;
+  dialog.innerHTML = `<div class="widget-preview-dialog-header"><div><p class="panel-label">Live preview</p><h3>Your widget</h3></div><button class="icon-button" type="button" aria-label="Close widget preview">×</button></div><iframe title="UniPlan widget preview" src="widget-preview.html?embedded=1"></iframe>`;
   document.body.appendChild(dialog);
   button.addEventListener("click", () => { const frame = dialog.querySelector("iframe"); frame.src = `widget-preview.html?embedded=1&t=${Date.now()}`; dialog.showModal(); });
   dialog.querySelector("button").addEventListener("click", () => dialog.close());
@@ -1495,7 +1483,20 @@ async function finishFirstLoginSetup() {
     return;
   }
 
-  await signUpWithSupabase(fullName, phone);
+  const canvasSetup = {
+    school: document.querySelector("#setup-school").value.trim(),
+    url: document.querySelector("#setup-canvas-url").value.trim(),
+    feed: document.querySelector("#setup-canvas-feed").value.trim(),
+  };
+  if (canvasSetup.url && !normalizeCanvasShortcutUrl(canvasSetup.url)) {
+    elements.setupStatus.textContent = "Enter a secure Canvas website link beginning with https://.";
+    return;
+  }
+  if (canvasSetup.feed && !isCanvasFeedUrl(canvasSetup.feed)) {
+    elements.setupStatus.textContent = "Enter a private Canvas calendar feed ending in .ics, or leave it blank to set up later.";
+    return;
+  }
+  await signUpWithSupabase(fullName, phone, canvasSetup);
 }
 
 async function logout() {
@@ -1623,7 +1624,7 @@ async function loginWithSupabase(email, password) {
   updateAuthView();
 }
 
-async function signUpWithSupabase(fullName, phone) {
+async function signUpWithSupabase(fullName, phone, canvasSetup) {
   elements.setupStatus.textContent = "Creating account...";
 
   const { data, error } = await supabaseClient.auth.signUp({
@@ -1633,6 +1634,7 @@ async function signUpWithSupabase(fullName, phone) {
       data: {
         name: fullName,
         phone,
+        canvasShortcut: { school: canvasSetup.school, url: canvasSetup.url },
       },
     },
   });
@@ -1642,6 +1644,9 @@ async function signUpWithSupabase(fullName, phone) {
     return;
   }
 
+  localStorage.setItem(`uniplan-canvas-setup:${data.user.id}`, JSON.stringify(canvasSetup));
+  state.data.settings.canvasShortcut = { school: canvasSetup.school, url: canvasSetup.url };
+  state.data.settings.canvasFeedUrl = canvasSetup.feed;
   authState.profile = {
     email: data.user.email || pendingFirstLogin.email,
     name: fullName,
@@ -1684,8 +1689,18 @@ async function applySupabaseUser(user) {
     state.data = cloudData;
   } else {
     syncSettingsFromAuthProfile();
-    await saveDataToSupabase();
+    const shortcut = user.user_metadata?.canvasShortcut;
+    if (shortcut) state.data.settings.canvasShortcut = { school: typeof shortcut.school === "string" ? shortcut.school : "", url: normalizeCanvasShortcutUrl(shortcut.url) };
   }
+  const pendingCanvas = localStorage.getItem(`uniplan-canvas-setup:${user.id}`);
+  if (pendingCanvas) {
+    try {
+      const setup = JSON.parse(pendingCanvas);
+      if (!state.data.settings.canvasFeedUrl && isCanvasFeedUrl(setup.feed)) state.data.settings.canvasFeedUrl = setup.feed;
+      if (!state.data.settings.canvasShortcut.url) state.data.settings.canvasShortcut = { school: setup.school || "", url: normalizeCanvasShortcutUrl(setup.url) };
+    } catch { /* Ignore invalid pending setup data. */ }
+  }
+  if (!cloudData || pendingCanvas) await saveDataToSupabase();
 
   syncSettingsFromAuthProfile();
   saveDataLocally();
@@ -1762,6 +1777,7 @@ async function saveDataToSupabase() {
     return;
   }
 
+  localStorage.removeItem(`uniplan-canvas-setup:${authState.userId}`);
   lastCloudSyncMessage = `Cloud synced ${new Date().toLocaleTimeString([], {
     hour: "numeric",
     minute: "2-digit",
@@ -1938,9 +1954,9 @@ function render() {
 function renderTodoList() {
   const allItems = [
     ...getNextVisibleOccurrences(state.data.homework, todayString()).map((item) => ({ ...item, color: getStoredItemColor("homework", item), kind: "homework", label: item.course || "Homework" })),
-    ...state.data.exams.filter((item) => item.date >= todayString()).map((item) => ({ ...item, color: getStoredItemColor("exams", item), kind: "exam", label: item.course || "Exam" })),
+    ...state.data.exams.filter((item) => item.status === "done" || item.date >= todayString()).map((item) => ({ ...item, color: getStoredItemColor("exams", item), kind: "exam", label: item.course || "Exam" })),
     ...getNextVisibleOccurrences(state.data.reminders, todayString()).map((item) => ({ ...item, color: getStoredItemColor("reminders", item), kind: "reminder", label: "Reminder" })),
-  ].filter((item) => !isExpiredCompletedItem(item));
+  ];
 
   const courses = [...new Set(allItems.map((item) => item.course).filter(Boolean))].sort();
   const selectedCourse = courses.includes(todoClassFilter) ? todoClassFilter : "all";
@@ -1950,15 +1966,19 @@ function renderTodoList() {
   elements.todoTypeFilter.value = todoTypeFilter;
 
   const items = allItems
-    .filter((item) => todoTypeFilter === "all" || item.kind === todoTypeFilter)
+    .filter((item) => todoTypeFilter === "all" || item.kind === todoTypeFilter || (todoTypeFilter === "academic" && ["homework", "exam"].includes(item.kind)))
     .filter((item) => selectedCourse === "all" || item.course === selectedCourse)
-    .sort(compareByDateTime);
+    .sort((a, b) => (todoSort === "date" ? 0 : Number(b.kind === todoSort) - Number(a.kind === todoSort)) || compareByDateTime(a, b));
 
   elements.todoList.innerHTML = "";
+  const completedList = document.querySelector("#todo-completed-list");
+  completedList.innerHTML = "";
+  const completedCount = items.filter((item) => item.status === "done").length;
+  document.querySelector("#todo-completed-count").textContent = `(${completedCount})`;
+  if (!completedCount) completedList.innerHTML = '<div class="empty-state">No completed items yet.</div>';
   elements.todoCount.textContent = `${items.filter((item) => item.status !== "done").length} left`;
-  if (!items.length) {
+  if (!items.some((item) => item.status !== "done")) {
     elements.todoList.innerHTML = '<div class="empty-state">Nothing upcoming. You’re all caught up.</div>';
-    return;
   }
   items.forEach((item) => {
     const row = document.createElement("article");
@@ -1970,7 +1990,7 @@ function renderTodoList() {
       else if (item.kind === "exam") toggleExamStatus(item.id);
       else toggleReminderStatus(item.id);
     });
-    elements.todoList.appendChild(row);
+    (item.status === "done" ? completedList : elements.todoList).appendChild(row);
   });
 }
 
@@ -2384,7 +2404,7 @@ function buildDaySchedulePdfHtml(date, items) {
   </head>
   <body>
     <header>
-      <p class="eyebrow">Daily Planner</p>
+      <p class="eyebrow">UniPlan</p>
       <h1>${escapeHtml(formatLongDate(date))}</h1>
     </header>
     <main>${rows}</main>
@@ -2487,8 +2507,8 @@ function getNextVisibleOccurrences(collection, fromDate = "") {
   const series = new Map();
 
   collection.forEach((item) => {
-    if (fromDate && item.date < fromDate) return;
-    if (!item.seriesId) {
+    if (fromDate && item.date < fromDate && item.status !== "done") return;
+    if (!item.seriesId || item.status === "done") {
       singles.push(item);
       return;
     }
@@ -2504,7 +2524,7 @@ function getNextVisibleOccurrences(collection, fromDate = "") {
 }
 
 function renderExamList() {
-  const upcoming = [...state.data.exams].filter((item) => !isTimedItemPast(item.date, item.time));
+  const upcoming = [...state.data.exams].filter((item) => item.status === "done" || !isTimedItemPast(item.date, item.time));
   examClassFilter = renderClassFilter(elements.examClassFilter, upcoming, examClassFilter);
   const sorted = upcoming
     .filter((item) => examClassFilter === "all" || item.course === examClassFilter)
@@ -2609,44 +2629,9 @@ function renderReminderList() {
 }
 
 function groupReminderEntries() {
-  const singles = [];
-  const seriesMap = new Map();
-
-  state.data.reminders
-    .sort(compareByDateTime)
-    .forEach((item) => {
-      if (!item.seriesId) {
-        singles.push({
-          ...item,
-          effectiveColor: getStoredItemColor("reminders", item),
-        });
-        return;
-      }
-
-      if (!seriesMap.has(item.seriesId)) {
-        seriesMap.set(item.seriesId, []);
-      }
-
-      seriesMap.get(item.seriesId).push(item);
-    });
-
-  const grouped = Array.from(seriesMap.entries()).map(([seriesId, items]) => {
-    const sortedItems = [...items].sort(compareByDateTime);
-    const activeItem = sortedItems.find((item) => item.status !== "done") || sortedItems[0];
-    const last = sortedItems[sortedItems.length - 1];
-
-    return {
-      ...activeItem,
-      actionKey: seriesId,
-      grouped: true,
-      lastDate: last.date,
-      repeatSummary: formatRepeatDaysFromItems(sortedItems),
-      effectiveColor: getStoredItemColor("reminders", activeItem),
-      status: sortedItems.every((item) => item.status === "done") ? "done" : "pending",
-    };
-  });
-
-  return [...grouped, ...singles].sort(compareByDateTime);
+  return getNextVisibleOccurrences(state.data.reminders)
+    .map((item) => ({ ...item, effectiveColor: getStoredItemColor("reminders", item) }))
+    .sort(compareByDateTime);
 }
 
 function groupScheduleEntries(type) {
@@ -2715,6 +2700,19 @@ function countGroupedItemsOnDate(type, date) {
 }
 
 function renderCollection({ target, items, emptyMessage, config }) {
+  if (["homework-list", "exam-list", "reminder-list"].includes(target.id)) {
+    const kind = target.id.replace("-list", "");
+    const completed = items.filter((item) => item.status === "done");
+    document.querySelector(`#${kind}-completed-count`).textContent = `(${completed.length})`;
+    renderCollection({
+      target: document.querySelector(`#${kind}-completed-list`),
+      items: completed,
+      emptyMessage: "No completed items yet.",
+      config,
+    });
+    items = items.filter((item) => item.status !== "done");
+    if (!items.length && completed.length) emptyMessage = "You’re all caught up. Finished items are in Completed below.";
+  }
   target.innerHTML = "";
 
   if (!items.length) {
@@ -2749,7 +2747,9 @@ function renderCollection({ target, items, emptyMessage, config }) {
 
     if (config.onToggleStatus) {
       statusButton.hidden = false;
-      statusButton.textContent = item.status === "done" ? "Mark pending" : "Mark done";
+      statusButton.textContent = item.status === "done" ? "✓ Completed" : "Mark done";
+      statusButton.setAttribute("aria-pressed", String(item.status === "done"));
+      statusButton.setAttribute("aria-label", item.status === "done" ? "Mark pending" : "Mark done");
       statusButton.addEventListener("click", () => config.onToggleStatus(actionKey));
     }
 
@@ -3510,6 +3510,10 @@ function resetReminderForm() {
   toggleRepeatOptions("reminder");
 }
 
+function isCanvasFeedUrl(value) {
+  return typeof value === "string" && /^https:\/\/[^/]+\.instructure\.com\/feeds\/calendars\/[^/]+\.ics(?:\?.*)?$/i.test(value);
+}
+
 async function saveSettings() {
   const notificationPreference =
     elements.notificationPreference.find((input) => input.checked)?.value || "email";
@@ -3524,6 +3528,10 @@ async function saveSettings() {
     return;
   }
 
+  if (elements.settingsCanvasFeed.value.trim() && !isCanvasFeedUrl(elements.settingsCanvasFeed.value.trim())) {
+    elements.settingsStatus.textContent = "Enter a valid Canvas calendar feed ending in .ics.";
+    return;
+  }
   state.data.settings = {
     name: elements.settingsName.value.trim(),
     email: elements.settingsEmail.value.trim(),
@@ -3621,7 +3629,6 @@ function renderSettings(statusMessage = "") {
   renderCanvasShortcut();
   elements.settingsCurrentPassword.value = "";
   elements.settingsNewPassword.value = "";
-  clearSchoolAccountForm();
   elements.notificationPreference.forEach((input) => {
     input.checked = input.value === settings.notificationPreference;
   });
@@ -3652,7 +3659,7 @@ function renderSettings(statusMessage = "") {
     ["Storage", getStorageStatus()],
     ["Automatic sync", authState.isAuthenticated ? "Within 1 second of changes" : "Available after login"],
     ["Last sync", lastCloudSyncMessage || "Waiting for first sync"],
-    ["School accounts", String(settings.schoolAccounts.length)],
+    ["Canvas calendar", settings.canvasFeedUrl ? "Feed saved" : "Not set up"],
   ].forEach(([label, value]) => {
     const row = document.createElement("div");
     row.className = "settings-summary-row";
@@ -3661,7 +3668,6 @@ function renderSettings(statusMessage = "") {
   });
 
   renderPasswordSummary();
-  renderSchoolAccountSummary();
   elements.settingsStatus.textContent = statusMessage || lastCloudSyncMessage;
 }
 
@@ -3715,91 +3721,6 @@ async function changeSupabasePassword(nextPassword) {
   renderSettings("Login password changed.");
 }
 
-function saveSchoolAccountFromForm() {
-  const settings = getSettings();
-  const schoolAccount = {
-    id: elements.settingsSchoolAccountId.value || crypto.randomUUID(),
-    school: elements.settingsSchool.value.trim(),
-    canvasUrl: normalizeUrl(elements.settingsCanvasUrl.value.trim()),
-    username: elements.settingsSchoolUsername.value.trim(),
-    password: elements.settingsSchoolPassword.value,
-    canvasToken: elements.settingsCanvasToken.value.trim(),
-    classroomToken: elements.settingsClassroomToken.value.trim(),
-    connections: {
-      canvas: elements.settingsConnectCanvas.checked,
-      googleClassroom: elements.settingsConnectClassroom.checked,
-    },
-  };
-
-  if (!schoolAccount.school) {
-    elements.settingsStatus.textContent = "Add a school name before saving the account.";
-    elements.settingsSchool.focus();
-    return;
-  }
-
-  const existingIndex = settings.schoolAccounts.findIndex((account) => account.id === schoolAccount.id);
-  if (existingIndex >= 0) {
-    settings.schoolAccounts.splice(existingIndex, 1, schoolAccount);
-  } else {
-    settings.schoolAccounts.push(schoolAccount);
-  }
-
-  state.data.settings = {
-    ...settings,
-    school: settings.schoolAccounts[0]?.school || "",
-    canvasUrl: settings.schoolAccounts[0]?.canvasUrl || "",
-    schoolUsername: settings.schoolAccounts[0]?.username || "",
-    connections: settings.schoolAccounts[0]?.connections || getDefaultSettings().connections,
-  };
-
-  saveData();
-  renderSettings(`${schoolAccount.school} was saved.`);
-}
-
-function editSchoolAccount(accountId) {
-  const account = getSettings().schoolAccounts.find((item) => item.id === accountId);
-  if (!account) {
-    return;
-  }
-
-  elements.settingsSchoolAccountId.value = account.id;
-  elements.settingsSchool.value = account.school;
-  elements.settingsCanvasUrl.value = account.canvasUrl;
-  elements.settingsSchoolUsername.value = account.username;
-  elements.settingsSchoolPassword.value = account.password;
-  elements.settingsCanvasToken.value = account.canvasToken;
-  elements.settingsClassroomToken.value = account.classroomToken;
-  elements.settingsConnectCanvas.checked = account.connections.canvas;
-  elements.settingsConnectClassroom.checked = account.connections.googleClassroom;
-  elements.settingsStatus.textContent = `Editing ${account.school}.`;
-}
-
-function deleteSchoolAccount(accountId) {
-  const settings = getSettings();
-  settings.schoolAccounts = settings.schoolAccounts.filter((account) => account.id !== accountId);
-  state.data.settings = {
-    ...settings,
-    school: settings.schoolAccounts[0]?.school || "",
-    canvasUrl: settings.schoolAccounts[0]?.canvasUrl || "",
-    schoolUsername: settings.schoolAccounts[0]?.username || "",
-    connections: settings.schoolAccounts[0]?.connections || getDefaultSettings().connections,
-  };
-  saveData();
-  renderSettings("School account removed.");
-}
-
-function clearSchoolAccountForm() {
-  elements.settingsSchoolAccountId.value = "";
-  elements.settingsSchool.value = "";
-  elements.settingsCanvasUrl.value = "";
-  elements.settingsSchoolUsername.value = "";
-  elements.settingsSchoolPassword.value = "";
-  elements.settingsCanvasToken.value = "";
-  elements.settingsClassroomToken.value = "";
-  elements.settingsConnectCanvas.checked = false;
-  elements.settingsConnectClassroom.checked = false;
-}
-
 function renderPasswordSummary() {
   elements.passwordSummary.innerHTML = "";
 
@@ -3809,43 +3730,6 @@ function renderPasswordSummary() {
     supabaseClient ? "Managed by Supabase" : "Supabase unavailable"
   }</strong>`;
   elements.passwordSummary.appendChild(row);
-}
-
-function renderSchoolAccountSummary() {
-  const accounts = getSettings().schoolAccounts;
-  elements.schoolAccountSummary.innerHTML = "";
-
-  if (!accounts.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-    empty.textContent = "No school accounts saved yet.";
-    elements.schoolAccountSummary.appendChild(empty);
-    return;
-  }
-
-  accounts.forEach((account) => {
-    const card = document.createElement("article");
-    card.className = "settings-account-card";
-    card.innerHTML = `
-      <div class="item-card-top">
-        <div>
-          <p class="item-category">${escapeHtml(formatSchoolConnections(account.connections))}</p>
-          <h4 class="item-title">${escapeHtml(account.school)}</h4>
-        </div>
-        <div class="item-actions">
-          <button class="small-button edit-school-account" type="button">Edit</button>
-          <button class="small-button delete-school-account" type="button">Delete</button>
-        </div>
-      </div>
-      <div class="settings-summary-row"><span>Canvas URL</span><strong>${escapeHtml(account.canvasUrl || "Not added")}</strong></div>
-      <div class="settings-summary-row"><span>Canvas API</span><strong>${account.canvasToken ? "Connected" : "Not connected"}</strong></div>
-      <div class="settings-summary-row"><span>Google Classroom API</span><strong>${account.classroomToken ? "Connected" : "Not connected"}</strong></div>
-    `;
-
-    card.querySelector(".edit-school-account").addEventListener("click", () => editSchoolAccount(account.id));
-    card.querySelector(".delete-school-account").addEventListener("click", () => deleteSchoolAccount(account.id));
-    elements.schoolAccountSummary.appendChild(card);
-  });
 }
 
 function scheduleNotificationCheck() {
@@ -3865,7 +3749,7 @@ function checkScheduledNotifications() {
     return;
   }
 
-  const title = "Daily Planner check-in";
+  const title = "UniPlan check-in";
   const message = buildNotificationMessage(schedule);
 
   if ("Notification" in window && Notification.permission === "granted") {
@@ -4042,193 +3926,23 @@ function dateFromTimeZone(year, month, day, hour, minute, second, timeZone) {
   }
 }
 
-async function fetchSchoolItems() {
-  saveSettings();
-  renderSchoolImportItems("Checking connected school accounts...");
-
-  const settings = getSettings();
-    const requests = [];
-
-    settings.schoolAccounts.forEach((account) => {
-      if (account.connections.canvas) {
-        requests.push(fetchCanvasItems(account));
-      }
-
-      if (account.connections.googleClassroom) {
-        requests.push(fetchGoogleClassroomItems(account));
-      }
-    });
-
-    if (!requests.length) {
-      renderSchoolImportItems("Add a school account with Canvas, Google Classroom, or both before checking.");
-      return;
-    }
-
-    const results = await Promise.allSettled(requests);
-    const classes = getImportableClasses();
-    const items = results
-      .flatMap((result) => (result.status === "fulfilled" ? result.value : []))
-      .map((item) => applyImportedClassMatch(item, classes));
-    const errors = results
-      .filter((result) => result.status === "rejected")
-      .map((result) => result.reason?.message || "A school import failed.");
-
-    schoolImportItems = dedupeSchoolItems([
-      ...schoolImportItems.filter((item) => item.source === "Canvas calendar"),
-      ...items,
-    ]);
-
-    if (schoolImportItems.length) {
-      renderSchoolImportItems(
-        `Found ${schoolImportItems.length} item${schoolImportItems.length === 1 ? "" : "s"} to review.`,
-      );
-      return;
-    }
-
-    renderSchoolImportItems(errors[0] || "No upcoming school items were found.");
-}
-
 let schoolImportRefreshPromise = null;
 
 function refreshSchoolImports() {
   if (schoolImportRefreshPromise) return schoolImportRefreshPromise;
   schoolImportRefreshPromise = (async () => {
     const settings = getSettings();
-    const hasConnectedAccount = settings.schoolAccounts.some((account) => account.connections.canvas || account.connections.googleClassroom);
     const feedUrl = elements.settingsCanvasFeed.value.trim() || settings.canvasFeedUrl;
-    if (!hasConnectedAccount && !feedUrl) {
-      renderSchoolImportItems("Connect a school account or add a Canvas calendar feed in Settings first.");
+    if (!feedUrl) {
+      renderSchoolImportItems("Add a Canvas calendar feed in Settings first.");
       return;
     }
-    if (hasConnectedAccount) await fetchSchoolItems();
     if (feedUrl) {
       elements.settingsCanvasFeed.value = feedUrl;
       await syncCanvasCalendarFeed();
     }
   })().finally(() => { schoolImportRefreshPromise = null; });
   return schoolImportRefreshPromise;
-}
-
-async function fetchCanvasItems(account) {
-  const token = account.canvasToken;
-  if (!account.canvasUrl || !token) {
-    throw new Error("Canvas needs a Canvas URL and access token.");
-  }
-
-  const startDate = todayString();
-  const endDate = offsetDate(startDate, 60);
-  const url = new URL("/api/v1/planner/items", account.canvasUrl);
-  url.searchParams.set("start_date", startDate);
-  url.searchParams.set("end_date", endDate);
-  url.searchParams.set("per_page", "100");
-
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error("Canvas did not return school items. Check the URL and token.");
-  }
-
-  const data = await response.json();
-  if (!Array.isArray(data)) {
-    return [];
-  }
-
-  return data.map((item) => mapCanvasPlannerItem(item, account)).filter(Boolean);
-}
-
-async function fetchGoogleClassroomItems(account) {
-  const token = account.classroomToken;
-  if (!token) {
-    throw new Error("Google Classroom needs an OAuth access token.");
-  }
-
-  const coursesResponse = await fetch(
-    "https://classroom.googleapis.com/v1/courses?courseStates=ACTIVE&pageSize=20",
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      },
-    },
-  );
-
-  if (!coursesResponse.ok) {
-    throw new Error("Google Classroom did not return courses. Check the OAuth token.");
-  }
-
-  const coursesData = await coursesResponse.json();
-  const courses = Array.isArray(coursesData.courses) ? coursesData.courses : [];
-  const courseWorkResponses = await Promise.all(
-    courses.map(async (course) => {
-      const url = `https://classroom.googleapis.com/v1/courses/${encodeURIComponent(
-        course.id,
-      )}/courseWork?courseWorkStates=PUBLISHED&pageSize=50`;
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        return [];
-      }
-
-      const data = await response.json();
-      return (Array.isArray(data.courseWork) ? data.courseWork : []).map((item) =>
-        mapGoogleCourseWork(item, course, account),
-      );
-    }),
-  );
-
-  return courseWorkResponses.flat().filter(Boolean);
-}
-
-function mapCanvasPlannerItem(item, account) {
-  const plannable = item.plannable || {};
-  const dueAt = plannable.due_at || item.plannable_date;
-  const dateParts = parseSchoolDateTime(dueAt);
-  if (!dateParts) {
-    return null;
-  }
-
-  const title = plannable.title || item.context_name || "Canvas item";
-  return {
-    id: `canvas:${item.plannable_type || "item"}:${item.plannable_id || plannable.id || dueAt}`,
-    source: "Canvas",
-    title,
-    kind: /\b(exam|quiz|test|midterm|final)\b/i.test(title) ? "exam" : "homework",
-    course: item.context_name || account.school || "Canvas",
-    date: dateParts.date,
-    time: dateParts.time,
-    url: item.html_url || plannable.html_url || "",
-    notes: `Imported from Canvas${account.school ? ` for ${account.school}` : ""}.`,
-  };
-}
-
-function mapGoogleCourseWork(item, course, account) {
-  const due = parseGoogleDueDate(item.dueDate, item.dueTime);
-  if (!due) {
-    return null;
-  }
-
-  const title = item.title || "Classroom assignment";
-  return {
-    id: `classroom:${course.id}:${item.id}`,
-    source: "Google Classroom",
-    title,
-    kind: /\b(exam|quiz|test|midterm|final)\b/i.test(title) ? "exam" : "homework",
-    course: course.name || account.school || "Google Classroom",
-    date: due.date,
-    time: due.time,
-    url: item.alternateLink || "",
-    notes: `Imported from Google Classroom${account.school ? ` for ${account.school}` : ""}.`,
-  };
 }
 
 function applyImportedClassMatch(item, classes = getImportableClasses()) {
@@ -4689,6 +4403,7 @@ function normalizeCanvasShortcutUrl(value) {
 function renderCanvasShortcut() {
   const shortcut = getSettings().canvasShortcut;
   elements.openCanvas.title = shortcut.url ? `Open ${shortcut.school || "Canvas"}` : "Set up Canvas shortcut";
+  elements.openCanvas.setAttribute("aria-label", elements.openCanvas.title);
   elements.openCanvas.classList.toggle("is-unconfigured", !shortcut.url);
 }
 
@@ -4873,7 +4588,7 @@ function getItemsForDate(date) {
       notes: item.notes,
       color: getStoredItemColor("schedule", item),
       status: item.type === "event" ? item.status || "pending" : "pending",
-      displayTime: item.start ? formatTime(item.start) : "",
+      displayTime: item.start ? `${formatTime(item.start)}${item.end ? ` – ${formatTime(item.end)}` : ""}` : "",
       sortKey: item.start,
     }));
 
@@ -4931,9 +4646,6 @@ function setItemStatus(item, status) {
 
 function pruneExpiredCompletedItems() {
   const now = Date.now();
-  state.data.homework = state.data.homework.filter((item) => !isExpiredCompletedItem(item, now));
-  state.data.exams = state.data.exams.filter((item) => !isExpiredCompletedItem(item, now));
-  state.data.reminders = state.data.reminders.filter((item) => !isExpiredCompletedItem(item, now));
   state.data.schedule = state.data.schedule.filter((item) =>
     item.type === "event" ? !isExpiredCompletedItem(item, now) : true,
   );
@@ -4954,7 +4666,7 @@ function scheduleCompletionSweep() {
   }
 
   const now = Date.now();
-  const nextExpiryAt = getTrackedItems()
+  const nextExpiryAt = state.data.schedule.filter((item) => item.type === "event")
     .filter((item) => item.status === "done" && item.completedAt)
     .map((item) => Number(item.completedAt) + DONE_DISAPPEAR_DELAY_MS)
     .filter((timestamp) => Number.isFinite(timestamp) && timestamp > now)

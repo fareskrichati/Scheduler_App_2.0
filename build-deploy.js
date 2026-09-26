@@ -3,8 +3,11 @@ const path = require("path");
 
 const root = __dirname;
 const sharedCss = readSource(["css/styles.css", "styles.css"]);
+const customizationCss = readSource(["css/customization.css"]);
 const mobileCss = readSource(["css/mobile.css", "mobile.css"]);
 const configJs = readSource(["js/config.js", "config.js"]);
+const customizationJs = readSource(["js/customization.js"]);
+const scheduleShareJs = readSource(["js/schedule-share.js"]);
 const appJs = readSource(["js/app.js", "app.js"]);
 const redirectJs = readSource(["js/device-redirect.js", "device-redirect.js"]);
 
@@ -67,9 +70,10 @@ function buildPage({ source, target, extraCss, includeRedirect }) {
 
   html = html.replace(
     /    <link rel="stylesheet" href="css\/styles\.css" \/>\n?/,
-    `    <style>\n${sharedCss}\n${extraCss}\n    </style>\n`,
+    `    <style>\n${sharedCss}\n${extraCss}\n${customizationCss}\n    </style>\n`,
   );
   html = html.replace(/    <link rel="stylesheet" href="css\/mobile\.css" \/>\n?/, "");
+  html = html.replace(/    <link rel="stylesheet" href="css\/customization\.css" \/>\n?/, "");
   html = html.replace(
     /    <script src="js\/config\.js"><\/script>/,
     `    <script>\n${configJs}\n    </script>`,
@@ -85,9 +89,16 @@ function buildPage({ source, target, extraCss, includeRedirect }) {
   }
 
   html = html.replace(
+    /    <script src="js\/customization\.js"><\/script>/,
+    () => `    <script>\n${customizationJs}\n    </script>`,
+  );
+
+  html = html.replace(
     /    <script src="js\/app\.js"><\/script>/,
     `    <script>\n${appJs}\n    </script>`,
   );
+
+  html = html.replace(/    <script src="js\/schedule-share\.js"><\/script>/, () => `    <script>\n${scheduleShareJs}\n    </script>`);
 
   fs.writeFileSync(resolvePath(target), html);
 }

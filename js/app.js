@@ -9,6 +9,8 @@ const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_DELAY_MS = 1000;
 const FOREVER_REPEAT_YEARS = 5;
 const SUPABASE_TABLE = "planner_profiles";
+const WHATS_NEW_VERSION = "1.0";
+const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new";
 const PLANNER_TABS = ["calendar", "todo", "classes", "events", "homework", "exams", "reminders", "settings"];
 
 if (new URLSearchParams(window.location.search).get("scriptable") === "1") {
@@ -44,7 +46,7 @@ const state = {
   activeTab: getInitialTab(),
   selectedDate: todayString(),
   visibleMonth: startOfMonth(todayString()),
-  calendarView: "week",
+  calendarView: null,
   calendarFilter: "all",
   data: loadData(),
 };
@@ -82,12 +84,16 @@ const elements = {
   quickAddDialog: document.querySelector("#quick-add-dialog"),
   quickAddType: document.querySelector("#quick-add-type"),
   quickAddContinue: document.querySelector("#quick-add-continue"),
+  whatsNewDialog: document.querySelector("#whats-new-dialog"),
+  whatsNewClose: document.querySelector("#whats-new-close"),
+  whatsNewDone: document.querySelector("#whats-new-done"),
+  settingsWhatsNew: document.querySelector("#settings-whats-new"),
   topbarSync: document.querySelector("#topbar-sync"),
   tabShell: document.querySelector(".tab-shell"),
-  homeworkCount: document.querySelector("#homework-count"),
-  examCount: document.querySelector("#exam-count"),
+  headerTodoCount: document.querySelector("#header-todo-count"),
+  headerHomeworkCount: document.querySelector("#header-homework-count"),
+  headerExamCount: document.querySelector("#header-exam-count"),
   todayClassesCount: document.querySelector("#today-classes-count"),
-  reminderCount: document.querySelector("#reminder-count"),
   calendarMonthLabel: document.querySelector("#calendar-month-label"),
   calendarWeekdays: document.querySelector("#calendar-weekdays"),
   calendarGrid: document.querySelector("#calendar-grid"),
@@ -99,6 +105,7 @@ const elements = {
   todoClassFilter: document.querySelector("#todo-class-filter"),
   prevMonth: document.querySelector("#prev-month"),
   nextMonth: document.querySelector("#next-month"),
+  calendarViewSwitch: document.querySelector(".calendar-view-switch"),
   calendarViewButtons: Array.from(document.querySelectorAll("[data-calendar-view]")),
   calendarFilter: document.querySelector("#calendar-filter"),
   daySchedulerTitle: document.querySelector("#day-scheduler-title"),
@@ -261,6 +268,15 @@ async function initialize() {
   pruneExpiredCompletedItems();
   renderWeekdays();
   bindEvents();
+  PlannerCustomization.init(getSettings, (appearance, resetView) => {
+    const previous = getSettings();
+    const viewChanged = previous.customization.defaultView !== appearance.customization.defaultView;
+    state.data.settings = { ...previous, ...appearance };
+    try { saveData(); } catch (error) { state.data.settings = previous; throw error; }
+    if (viewChanged || resetView) state.calendarView = appearance.customization.defaultView;
+    PlannerCustomization.apply(state.data.settings);
+    renderCalendar();
+  });
   setupClassScheduleImport();
   setupHomeworkPhotoImport();
   setupExamPhotoImport();
@@ -338,6 +354,10 @@ function bindEvents() {
   elements.mobileQuickAdd?.addEventListener("click", () => {
     elements.quickAddDialog.showModal();
   });
+  elements.settingsWhatsNew?.addEventListener("click", () => showWhatsNew(true));
+  elements.whatsNewClose?.addEventListener("click", () => elements.whatsNewDialog.close());
+  elements.whatsNewDone?.addEventListener("click", () => elements.whatsNewDialog.close());
+  elements.whatsNewDialog?.addEventListener("close", markWhatsNewSeen);
 
   elements.quickAddContinue.addEventListener("click", (event) => {
     event.preventDefault();
@@ -357,12 +377,11 @@ function bindEvents() {
     navigateCalendar(1);
   });
   setupCalendarSwipe();
+  setupCalendarViewDrag();
 
   elements.calendarViewButtons.forEach((button) => {
     button.addEventListener("click", () => {
-      state.calendarView = button.dataset.calendarView;
-      if (state.calendarView === "month") state.visibleMonth = startOfMonth(state.selectedDate);
-      renderCalendar();
+      setCalendarView(button.dataset.calendarView);
     });
   });
   elements.calendarFilter?.addEventListener("change", () => {
@@ -479,6 +498,9 @@ function bindEvents() {
   elements.settingsLogout.addEventListener("click", logout);
   elements.settingsChangePassword.addEventListener("click", changeLoginPassword);
   elements.sendDaySchedulePdf.addEventListener("click", sendDaySchedulePdf);
+  document.querySelectorAll("#share-school-schedule, #calendar-share-schedule").forEach((button) => {
+    button.addEventListener("click", () => UniPlanScheduleShare.open(state.data.schedule, state.data.courses));
+  });
   elements.syncNow.addEventListener("click", syncNow);
   elements.syncCanvasFeed.addEventListener("click", syncCanvasCalendarFeed);
   elements.schoolImportPanels.forEach((panel) => panel.addEventListener("toggle", () => {
@@ -679,8 +701,9 @@ async function readHomeworkPhotos() {
       const match = findMatchingImportedClass(item.course || "", classes);
       return { ...item, kind: item.kind === "exam" ? "exam" : "homework", course: match?.title || "", color: match?.color || "#7eaed6", notes: item.notes || "Imported from a Canvas screenshot." };
     }) : [];
-    detectedHomeworkItems = dedupeDetectedHomework(found);
-    if (!detectedHomeworkItems.length) throw new Error("No incomplete coursework with readable due dates was found. Keep the date heading, course, title, and due time visible.");
+    const detected = dedupeDetectedHomework(found);
+    detectedHomeworkItems = removeAlreadyAddedCoursework(detected);
+    if (!detectedHomeworkItems.length) throw new Error("Everything found is already in your planner with the same name and date.");
     renderDetectedHomework(); document.querySelector("#homework-photo-review").hidden = false;
     status.textContent = `Found ${detectedHomeworkItems.length} coursework item${detectedHomeworkItems.length === 1 ? "" : "s"}. Review the type, class, and due date before adding.`;
   } catch (error) { status.textContent = error.message || "The screenshots could not be read."; }
@@ -778,7 +801,20 @@ function importedCanvasCourseCode(value) {
 
 function dedupeDetectedHomework(items) {
   const seen = new Set();
-  return items.filter((item) => { const key = `${item.title.toLowerCase()}|${item.date}|${item.course.toLowerCase()}`; if (seen.has(key)) return false; seen.add(key); return true; });
+  return items.filter((item) => { const key = courseworkIdentity(item); if (seen.has(key)) return false; seen.add(key); return true; });
+}
+
+function normalizedCourseworkName(value) {
+  return String(value || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/gi, " ").trim().toLowerCase();
+}
+
+function courseworkIdentity(item) {
+  return `${normalizedCourseworkName(item?.title)}|${item?.date || ""}`;
+}
+
+function removeAlreadyAddedCoursework(items) {
+  const existing = new Set([...state.data.homework, ...state.data.exams].map(courseworkIdentity));
+  return items.filter((item) => !existing.has(courseworkIdentity(item)));
 }
 
 function renderDetectedHomework() {
@@ -800,13 +836,15 @@ function saveDetectedHomework() {
   const invalid = detectedHomeworkItems.find((item) => !item.title.trim() || !item.course || !item.date);
   const status = document.querySelector("#homework-photo-status");
   if (invalid) { status.textContent = "Each item needs a title, matching class, and due date."; return; }
-  detectedHomeworkItems.forEach((item) => {
+  const newItems = removeAlreadyAddedCoursework(dedupeDetectedHomework(detectedHomeworkItems));
+  const skipped = detectedHomeworkItems.length - newItems.length;
+  newItems.forEach((item) => {
     const record = { id: crypto.randomUUID(), title: item.title.trim(), course: item.course, date: item.date, time: item.time, status: "pending", color: item.color, notes: item.notes, priority: false };
     (item.kind === "exam" ? state.data.exams : state.data.homework).push(record);
   });
-  const count = detectedHomeworkItems.length; detectedHomeworkItems = [];
+  const count = newItems.length; detectedHomeworkItems = [];
   document.querySelector("#homework-photo-review").hidden = true; persistAndRender();
-  status.textContent = `${count} coursework item${count === 1 ? "" : "s"} added with matching class colors.`;
+  status.textContent = `${count} coursework item${count === 1 ? "" : "s"} added.${skipped ? ` ${skipped} already existed with the same name and date.` : ""}`;
 }
 
 function setupEventPhotoImport() {
@@ -889,7 +927,7 @@ async function readEventPhotos() {
   if (!files.length) { status.textContent = "Choose at least one schedule screenshot."; return; }
   if (files.length > 4) { status.textContent = "Choose up to 4 screenshots at a time."; return; }
   button.disabled = true;
-  status.textContent = "Reading event names, dates, times, and locations…";
+  status.textContent = "Reading the text in your event photos…";
   try {
     if (window.location.protocol === "file:") throw new Error("Photo import needs the deployed Netlify site or Netlify Dev.");
     const accessToken = await getValidAccessToken();
@@ -904,11 +942,11 @@ async function readEventPhotos() {
     const result = await response.json().catch(() => ({}));
     if (response.status === 404) throw new Error("The event-photo-import function is not deployed yet. Redeploy the latest project first.");
     if (!response.ok) throw new Error(result.error || `Event schedule import failed (${response.status}).`);
-    detectedEventItems = Array.isArray(result.events) ? result.events.map((item, index) => ({ ...item, color: classColorForIndex(index), notes: item.notes || "Imported from an event schedule screenshot." })) : [];
+    detectedEventItems = Array.isArray(result.events) ? result.events.map((item, index) => ({ ...item, color: classColorForIndex(index), notes: item.notes || "Pulled from text read in an event photo." })) : [];
     if (!detectedEventItems.length) throw new Error("No dated events were found. Try a clearer screenshot that includes the schedule heading and dates.");
     renderDetectedEvents();
     document.querySelector("#event-photo-review").hidden = false;
-    status.textContent = `Found ${detectedEventItems.length} event${detectedEventItems.length === 1 ? "" : "s"}. Review them before adding.`;
+    status.textContent = `Read the photo text and found ${detectedEventItems.length} event${detectedEventItems.length === 1 ? "" : "s"}. Review them before adding.`;
   } catch (error) {
     status.textContent = error.message || "The event screenshots could not be read.";
   } finally {
@@ -1534,6 +1572,7 @@ function updateAuthView() {
   document.body.classList.toggle("is-authenticated", authState.isAuthenticated);
 
   if (authState.isAuthenticated) {
+    window.setTimeout(() => showWhatsNew(), 150);
     return;
   }
 
@@ -1557,6 +1596,27 @@ function updateAuthView() {
     authMode === "login" ? "current-password" : "new-password",
   );
   elements.loginEmail.focus();
+}
+
+function getWhatsNewStorageKey() {
+  const accountKey = authState.userId || authState.profile?.email || "local";
+  return `${WHATS_NEW_STORAGE_PREFIX}:${accountKey}`;
+}
+
+function hasSeenWhatsNew() {
+  return localStorage.getItem(getWhatsNewStorageKey()) === WHATS_NEW_VERSION;
+}
+
+function markWhatsNewSeen() {
+  if (!authState.isAuthenticated) return;
+  localStorage.setItem(getWhatsNewStorageKey(), WHATS_NEW_VERSION);
+}
+
+function showWhatsNew(force = false) {
+  if (!authState.isAuthenticated || !elements.whatsNewDialog) return false;
+  if (!force && hasSeenWhatsNew()) return false;
+  if (!elements.whatsNewDialog.open) elements.whatsNewDialog.showModal();
+  return true;
 }
 
 function createSupabaseClient() {
@@ -1951,13 +2011,16 @@ function render() {
   prefillForms();
 }
 
-function renderTodoList() {
-  const allItems = [
-    ...getNextVisibleOccurrences(state.data.homework, todayString()).map((item) => ({ ...item, color: getStoredItemColor("homework", item), kind: "homework", label: item.course || "Homework" })),
-    ...state.data.exams.filter((item) => item.status === "done" || item.date >= todayString()).map((item) => ({ ...item, color: getStoredItemColor("exams", item), kind: "exam", label: item.course || "Exam" })),
-    ...getNextVisibleOccurrences(state.data.reminders, todayString()).map((item) => ({ ...item, color: getStoredItemColor("reminders", item), kind: "reminder", label: "Reminder" })),
+function getTodoItems() {
+  return [
+    ...getNextVisibleOccurrences(state.data.homework).map((item) => ({ ...item, color: getStoredItemColor("homework", item), kind: "homework", label: item.course || "Homework" })),
+    ...state.data.exams.map((item) => ({ ...item, color: getStoredItemColor("exams", item), kind: "exam", label: item.course || "Exam" })),
+    ...getNextVisibleOccurrences(state.data.reminders).map((item) => ({ ...item, color: getStoredItemColor("reminders", item), kind: "reminder", label: "Reminder" })),
   ];
+}
 
+function renderTodoList() {
+  const allItems = getTodoItems();
   const courses = [...new Set(allItems.map((item) => item.course).filter(Boolean))].sort();
   const selectedCourse = courses.includes(todoClassFilter) ? todoClassFilter : "all";
   todoClassFilter = selectedCourse;
@@ -2008,7 +2071,8 @@ function renderTabs() {
 
 function renderWeekdays() {
   elements.calendarWeekdays.innerHTML = "";
-  WEEKDAYS.forEach((day) => {
+  const start = getSettings().customization.weekStart === "monday" ? 1 : 0;
+  Array.from({length: 7}, (_, index) => WEEKDAYS[(index + start) % 7]).forEach((day) => {
     const label = document.createElement("div");
     label.className = "weekday-pill";
     label.textContent = day;
@@ -2018,17 +2082,18 @@ function renderWeekdays() {
 
 function renderHeaderStats() {
   const today = state.selectedDate;
-  elements.homeworkCount.textContent = String(
-    getNextVisibleOccurrences(state.data.homework).filter((item) => item.status !== "done").length,
-  );
-  elements.examCount.textContent = String(state.data.exams.filter((item) => item.status !== "done" && item.date >= todayString()).length);
+  const pendingTodos = getTodoItems().filter((item) => item.status !== "done");
+  elements.headerTodoCount.textContent = String(pendingTodos.length);
+  elements.headerHomeworkCount.textContent = String(pendingTodos.filter((item) => item.kind === "homework").length);
+  elements.headerExamCount.textContent = String(pendingTodos.filter((item) => item.kind === "exam").length);
   elements.todayClassesCount.textContent = String(countGroupedItemsOnDate("class", today));
-  elements.reminderCount.textContent = String(
-    groupReminderEntries().filter((item) => item.status !== "done").length,
-  );
 }
 
 function renderCalendar() {
+  const customization = getSettings().customization;
+  if (!state.calendarView) state.calendarView = customization.defaultView;
+  renderWeekdays();
+  const weekStart = customization.weekStart === "monday" ? 1 : 0;
   const monthDate = new Date(`${state.visibleMonth}T00:00:00`);
   const anchor = new Date(`${state.selectedDate}T00:00:00`);
   const view = state.calendarView || "month";
@@ -2036,6 +2101,8 @@ function renderCalendar() {
   elements.calendarViewButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.calendarView === view);
   });
+  const viewSwitch = elements.calendarViewSwitch;
+  if (viewSwitch) viewSwitch.dataset.activeIndex = String(["month", "week", "day"].indexOf(view));
   elements.calendarGrid.dataset.view = view;
   elements.calendarWeekdays.hidden = view === "day";
   elements.calendarGrid.innerHTML = "";
@@ -2044,10 +2111,10 @@ function renderCalendar() {
   let cellCount = 42;
   if (view === "month") {
     elements.calendarMonthLabel.textContent = monthDate.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-    firstDay.setDate(firstDay.getDate() - firstDay.getDay());
+    firstDay.setDate(firstDay.getDate() - (firstDay.getDay() - weekStart + 7) % 7);
   } else if (view === "week") {
     firstDay = new Date(anchor);
-    firstDay.setDate(firstDay.getDate() - firstDay.getDay());
+    firstDay.setDate(firstDay.getDate() - (firstDay.getDay() - weekStart + 7) % 7);
     const lastDay = new Date(firstDay);
     lastDay.setDate(lastDay.getDate() + 6);
     elements.calendarMonthLabel.textContent = `${formatShortDate(isoDate(firstDay))} – ${formatShortDate(isoDate(lastDay))}`;
@@ -2091,14 +2158,18 @@ function renderCalendar() {
     const markers = document.createElement("div");
     markers.className = "calendar-markers";
 
-    const markerLimit = isMobileCalendar && view === "month" ? 3 : isMobileCalendar ? items.length : view === "month" ? 3 : items.length;
-    items.slice(0, markerLimit).forEach((item) => {
+    items.forEach((item) => {
       const marker = document.createElement("div");
       const canComplete = ["homework", "exam", "reminder"].includes(item.kind) || item.sourceType === "event";
       marker.className = `calendar-marker marker-${item.kind}${item.status === "done" ? " is-complete" : ""}`;
       const monthTime = item.displayTime ? `<span class="calendar-marker-time">${escapeHtml(item.displayTime)}</span>` : "";
-      marker.innerHTML = `<span class="calendar-marker-row">${canComplete ? `<button class="calendar-marker-check" type="button" aria-label="${item.status === "done" ? "Mark pending" : "Mark done"}: ${escapeHtml(item.title)}">${item.status === "done" ? "✓" : ""}</button>` : ""}<span class="calendar-marker-title">${escapeHtml(item.title)}</span></span>${monthTime}`;
+      marker.innerHTML = `<span class="calendar-marker-row">${canComplete ? `<button class="calendar-marker-check" type="button" aria-label="${item.status === "done" ? "Mark pending" : "Mark done"}: ${escapeHtml(item.title)}">${item.status === "done" ? "✓" : ""}</button>` : ""}<button class="calendar-item-open" type="button" aria-label="View details: ${escapeHtml(item.title)}"><span class="calendar-marker-title">${escapeHtml(item.title)}</span>${monthTime}</button></span>`;
+      marker.title = `${item.title}${item.displayTime ? ` · ${item.displayTime}` : ""}`;
       applyItemColor(marker, item.color);
+      marker.querySelector(".calendar-item-open").addEventListener("click", (event) => {
+        event.stopPropagation();
+        openCalendarItemDetails(item, dateString);
+      });
       marker.querySelector(".calendar-marker-check")?.addEventListener("click", (event) => {
         event.stopPropagation();
         if (item.kind === "homework") toggleHomeworkStatus(item.sourceId);
@@ -2108,13 +2179,6 @@ function renderCalendar() {
       });
       markers.appendChild(marker);
     });
-
-    if (items.length > markerLimit) {
-      const extra = document.createElement("div");
-      extra.className = "calendar-marker";
-      extra.textContent = `+${items.length - markerLimit} more`;
-      markers.appendChild(extra);
-    }
 
     button.appendChild(markers);
     button.addEventListener("click", () => {
@@ -2141,6 +2205,19 @@ function renderCalendar() {
     empty.textContent = "Nothing planned this month yet.";
     elements.calendarGrid.appendChild(empty);
   }
+}
+
+function openCalendarItemDetails(item, date) {
+  document.querySelector("#calendar-item-dialog")?.close();
+  const dialog = document.createElement("dialog");
+  dialog.id = "calendar-item-dialog";
+  dialog.className = "calendar-item-dialog";
+  dialog.setAttribute("aria-labelledby", "calendar-item-title");
+  dialog.innerHTML = `<div class="panel-header"><div><p class="panel-label">${escapeHtml(item.label)}</p><h3 id="calendar-item-title">${escapeHtml(item.title)}</h3></div><button class="icon-button" type="button" aria-label="Close event details">×</button></div><p>${escapeHtml(formatLongDate(date))}</p><p class="item-meta">${escapeHtml(item.meta)}${buildLocationMapLinks(item.location)}</p>${item.notes ? `<p class="calendar-item-notes">${escapeHtml(item.notes)}</p>` : ""}`;
+  dialog.querySelector("button").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("close", () => dialog.remove());
+  document.body.appendChild(dialog);
+  dialog.showModal();
 }
 
 function shiftCalendar(direction) {
@@ -2188,7 +2265,7 @@ function setupCalendarSwipe() {
     elements.calendarGrid.classList.add("is-dragging");
     holdTriggered = false;
     holdDay = event.target.closest("[data-calendar-date]");
-    if (holdDay) {
+    if (holdDay && !event.target.closest("button, a")) {
       const heldDate = holdDay.dataset.calendarDate;
       holdTimer = window.setTimeout(() => {
         holdTriggered = true;
@@ -2197,7 +2274,7 @@ function setupCalendarSwipe() {
         state.visibleMonth = startOfMonth(heldDate);
         renderHeaderStats();
         renderSelectedDayViews();
-        prefillForms();
+        prefillForms(true);
         elements.quickAddDialog.showModal();
         window.navigator.vibrate?.(20);
         holdTimer = null;
@@ -2245,6 +2322,71 @@ function setupCalendarSwipe() {
   }, true);
 }
 
+function setCalendarView(view) {
+  if (!["month", "week", "day"].includes(view)) return;
+  state.calendarView = view;
+  if (view === "month") state.visibleMonth = startOfMonth(state.selectedDate);
+  renderCalendar();
+}
+
+function setupCalendarViewDrag() {
+  const viewSwitch = elements.calendarViewSwitch;
+  if (!viewSwitch) return;
+  const views = ["month", "week", "day"];
+  let dragging = false;
+  let pointerId = null;
+  let suppressPointerClick = false;
+
+  const indexAt = (clientX) => {
+    const bounds = viewSwitch.getBoundingClientRect();
+    return Math.max(0, Math.min(2, Math.floor(((clientX - bounds.left) / bounds.width) * 3)));
+  };
+  const preview = (clientX) => {
+    const index = indexAt(clientX);
+    viewSwitch.dataset.activeIndex = String(index);
+    elements.calendarViewButtons.forEach((button, buttonIndex) => {
+      button.classList.toggle("is-active", buttonIndex === index);
+    });
+    return index;
+  };
+
+  viewSwitch.addEventListener("pointerdown", (event) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    dragging = true;
+    pointerId = event.pointerId;
+    viewSwitch.classList.add("is-dragging");
+    viewSwitch.setPointerCapture?.(event.pointerId);
+    preview(event.clientX);
+  });
+  viewSwitch.addEventListener("pointermove", (event) => {
+    if (!dragging || event.pointerId !== pointerId) return;
+    event.preventDefault();
+    preview(event.clientX);
+  });
+  const finish = (event) => {
+    if (!dragging || event.pointerId !== pointerId) return;
+    const index = preview(event.clientX);
+    dragging = false;
+    pointerId = null;
+    suppressPointerClick = true;
+    viewSwitch.classList.remove("is-dragging");
+    setCalendarView(views[index]);
+    window.setTimeout(() => { suppressPointerClick = false; }, 0);
+  };
+  viewSwitch.addEventListener("pointerup", finish);
+  viewSwitch.addEventListener("pointercancel", () => {
+    dragging = false;
+    pointerId = null;
+    viewSwitch.classList.remove("is-dragging");
+    renderCalendar();
+  });
+  viewSwitch.addEventListener("click", (event) => {
+    if (!suppressPointerClick) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
+}
+
 function renderSelectedDayViews() {
   const formattedDate = formatLongDate(state.selectedDate);
   elements.selectedDateTitle.textContent = formattedDate;
@@ -2258,6 +2400,13 @@ function renderSelectedDayViews() {
 function filterCalendarItems(items) {
   const filter = state.calendarFilter || "all";
   return filter === "all" ? items : items.filter((item) => item.kind === filter);
+}
+
+function buildLocationMapLinks(location) {
+  const address = typeof location === "string" ? location.trim() : "";
+  if (!address) return "";
+  const query = encodeURIComponent(address);
+  return `<span class="location-map-links" role="group" aria-label="Open location in maps"><a href="https://www.google.com/maps/search/?api=1&amp;query=${escapeHtml(query)}" target="_blank" rel="noopener noreferrer" aria-label="Open ${escapeHtml(address)} in Google Maps">Google Maps ↗</a><a href="https://maps.apple.com/?q=${escapeHtml(query)}" target="_blank" rel="noopener noreferrer" aria-label="Open ${escapeHtml(address)} in Apple Maps">Apple Maps ↗</a></span>`;
 }
 
 function renderDaySummary(target, items) {
@@ -2278,7 +2427,7 @@ function renderDaySummary(target, items) {
     card.innerHTML = `
       <p class="item-category">${item.label}</p>
       <h4>${escapeHtml(item.title)}</h4>
-      <p class="item-meta">${escapeHtml(item.meta)}</p>
+      <p class="item-meta">${escapeHtml(item.meta)}${buildLocationMapLinks(item.location)}</p>
       ${item.notes ? `<p class="item-notes">${escapeHtml(item.notes)}</p>` : ""}
     `;
 
@@ -2737,6 +2886,7 @@ function renderCollection({ target, items, emptyMessage, config }) {
     category.textContent = config.category;
     title.textContent = item.title;
     meta.textContent = config.meta(item);
+    meta.insertAdjacentHTML("beforeend", buildLocationMapLinks(item.location));
     notes.textContent = config.notes(item) || "No notes";
     applyItemColor(card, item.effectiveColor || item.color);
     card.classList.toggle("is-complete", item.status === "done");
@@ -3375,24 +3525,24 @@ function setActiveTab(tabId) {
   renderTabs();
 }
 
-function prefillForms() {
-  if (!elements.classDate.value) {
+function prefillForms(forceSelectedDate = false) {
+  if (forceSelectedDate || !elements.classDate.value) {
     elements.classDate.value = state.selectedDate;
   }
 
-  if (!elements.eventDate.value) {
+  if (forceSelectedDate || !elements.eventDate.value) {
     elements.eventDate.value = state.selectedDate;
   }
 
-  if (!elements.homeworkDate.value) {
+  if (forceSelectedDate || !elements.homeworkDate.value) {
     elements.homeworkDate.value = state.selectedDate;
   }
 
-  if (!elements.reminderDate.value) {
+  if (forceSelectedDate || !elements.reminderDate.value) {
     elements.reminderDate.value = state.selectedDate;
   }
 
-  if (!elements.examDate.value) {
+  if (forceSelectedDate || !elements.examDate.value) {
     elements.examDate.value = state.selectedDate;
   }
 
@@ -3533,6 +3683,8 @@ async function saveSettings() {
     return;
   }
   state.data.settings = {
+    theme: currentSettings.theme,
+    customization: currentSettings.customization,
     name: elements.settingsName.value.trim(),
     email: elements.settingsEmail.value.trim(),
     phone: elements.settingsPhone.value.trim(),
@@ -3610,6 +3762,7 @@ function resetSettingsForm() {
 function renderSettings(statusMessage = "") {
   const settings = getSettings();
 
+  PlannerCustomization.render(settings);
   elements.settingsName.value = settings.name;
   elements.settingsEmail.value = settings.email;
   elements.settingsPhone.value = settings.phone;
@@ -3825,6 +3978,7 @@ async function syncCanvasCalendarFeed() {
     const items = parseCanvasCalendarFeed(result.ics || "");
     const classes = getImportableClasses();
     const savedByUid = new Map();
+    const savedByNameAndDate = new Map();
     const importedSourceIds = new Set([
       ...state.data.homework.map((item) => item.schoolImportId),
       ...state.data.exams.map((item) => item.schoolImportId),
@@ -3832,13 +3986,16 @@ async function syncCanvasCalendarFeed() {
     ].filter(Boolean));
     state.data.homework.forEach((item) => { if (item.canvasFeedUid) savedByUid.set(item.canvasFeedUid, { record: item, kind: "homework" }); });
     state.data.exams.forEach((item) => { if (item.canvasFeedUid) savedByUid.set(item.canvasFeedUid, { record: item, kind: "exam" }); });
+    state.data.homework.forEach((item) => savedByNameAndDate.set(courseworkIdentity(item), { record: item, kind: "homework" }));
+    state.data.exams.forEach((item) => savedByNameAndDate.set(courseworkIdentity(item), { record: item, kind: "exam" }));
     const reviewItems = items.map((item) => {
       const match = findMatchingImportedClass(item.course, classes);
-      const saved = savedByUid.get(item.uid);
+      const saved = savedByUid.get(item.uid) || savedByNameAndDate.get(courseworkIdentity(item));
       const importId = `canvas-feed:${item.uid}`;
       const wasImported = importedSourceIds.has(importId);
       const course = match?.title || saved?.record.course || "";
-      const changed = saved && (saved.record.title !== item.title || saved.record.course !== course || saved.record.date !== item.date || saved.record.time !== item.time || saved.kind !== item.kind);
+      const matchedByNameAndDate = saved && courseworkIdentity(saved.record) === courseworkIdentity(item);
+      const changed = saved && !matchedByNameAndDate && (saved.record.title !== item.title || saved.record.course !== course || saved.record.date !== item.date || saved.record.time !== item.time || saved.kind !== item.kind);
       return { ...item, id: importId, source: "Canvas calendar", course, color: match?.color || saved?.record.color || (item.kind === "exam" ? "#6d9fd0" : "#7eaed6"), operation: saved ? (changed ? "update" : "current") : wasImported ? "current" : "add", missingTime: !item.time, notes: `${match ? `Matched Canvas course “${item.rawCourse}” to ${match.title}.` : `Canvas course: ${item.rawCourse}. Choose the correct class before adding.`}${!item.time ? " Canvas did not provide a due time; enter it below." : ""}` };
     });
     const actionableItems = reviewItems.filter((item) => item.operation !== "current");
@@ -4035,8 +4192,9 @@ function addSchoolItemAsHomework(item) {
   const match = findMatchingImportedClass(item.course);
   const course = match?.title || item.course;
   const target = item.kind === "exam" ? state.data.exams : state.data.homework;
-  const existingHomeworkIndex = state.data.homework.findIndex((saved) => saved.canvasFeedUid === item.uid);
-  const existingExamIndex = state.data.exams.findIndex((saved) => saved.canvasFeedUid === item.uid);
+  const identity = courseworkIdentity(item);
+  const existingHomeworkIndex = state.data.homework.findIndex((saved) => saved.canvasFeedUid === item.uid || courseworkIdentity(saved) === identity);
+  const existingExamIndex = state.data.exams.findIndex((saved) => saved.canvasFeedUid === item.uid || courseworkIdentity(saved) === identity);
   const existing = existingHomeworkIndex >= 0 ? state.data.homework[existingHomeworkIndex] : existingExamIndex >= 0 ? state.data.exams[existingExamIndex] : null;
   const record = {
     id: existing?.id || crypto.randomUUID(),
@@ -4173,6 +4331,8 @@ function normalizeSettings(settings) {
     : defaults.notificationPreference;
 
   return {
+    customization: PlannerCustomization.normalize(settings.customization),
+    theme: ["classic", "christmas", "halloween", "valentine", "spring", "autumn", "ocean", "lavender", "sunset"].includes(settings.theme) ? settings.theme : defaults.theme,
     name: typeof settings.name === "string" ? settings.name : defaults.name,
     email: typeof settings.email === "string" ? settings.email : defaults.email,
     phone: typeof settings.phone === "string" ? settings.phone : defaults.phone,
@@ -4199,6 +4359,8 @@ function normalizeSettings(settings) {
 
 function getDefaultSettings() {
   return {
+    theme: "classic",
+    customization: PlannerCustomization.defaults(),
     name: "",
     email: "",
     phone: "",
@@ -4581,6 +4743,7 @@ function getItemsForDate(date) {
     .map((item) => ({
       sourceId: item.id,
       sourceType: item.type,
+      location: item.location,
       kind: item.type === "event" ? "event" : "class",
       label: item.type === "class" ? "Class" : "Scheduled event",
       title: item.title,

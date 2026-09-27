@@ -85,6 +85,23 @@ test('Imported coursework stays linked to its class color', () => {
   }), '#22aa66');
 });
 
+test('Canvas course hints match class names with extra term and section text', () => {
+  const context = vm.createContext({
+    getImportableClasses: () => [],
+    importedCanvasCourseCode: () => '',
+    normalizedCourseworkName: value => String(value).replace(/[^a-z0-9]+/gi, ' ').trim().toLowerCase(),
+    Set,
+  });
+  load(context, 'findMatchingImportedClass', 'importedCanvasCourseCode');
+  const classes = [
+    { key: 'engineering surveying', title: 'Engineering Surveying', color: '#dd6633' },
+    { key: 'environmental geology', title: 'Environmental Geology', color: '#22aa66' },
+  ];
+  const match = context.findMatchingImportedClass('Fall 2026 Section 03 — Engineering Surveying course calendar', classes);
+  assert.equal(match.title, 'Engineering Surveying');
+  assert.equal(match.color, '#dd6633');
+});
+
 test('App customization is presented as a dropdown on desktop and mobile', () => {
   for (const page of ['index.html', 'mobile.html']) {
     const html = fs.readFileSync(path.join(__dirname, '..', page), 'utf8');

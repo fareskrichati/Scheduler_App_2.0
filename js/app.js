@@ -823,11 +823,31 @@ function importedCourseKey(value) {
 }
 
 function findMatchingImportedClass(text, classes = getImportableClasses()) {
-  const normalized = text.replace(/[^a-z0-9]/gi, "").toLowerCase();
+  const normalized = String(text || "").replace(/[^a-z0-9]/gi, "").toLowerCase();
   const canvasCode = importedCanvasCourseCode(text);
-  return classes.find((item) => canvasCode && importedCanvasCourseCode(item.title) === canvasCode)
+  const directMatch = classes.find((item) => canvasCode && importedCanvasCourseCode(item.title) === canvasCode)
     || classes.find((item) => normalized.includes(item.key.replace(/[^a-z0-9]/gi, "")))
     || classes.find((item) => normalized.includes(item.title.replace(/[^a-z0-9]/gi, "").toLowerCase()));
+  if (directMatch) return directMatch;
+
+  const hintTokens = importedCourseTokens(text);
+  if (!hintTokens.length) return undefined;
+  const scored = classes.map((item) => {
+    const classTokens = importedCourseTokens(item.title);
+    const matches = classTokens.filter((token) => hintTokens.includes(token));
+    return { item, matches: matches.length, total: classTokens.length };
+  }).filter((entry) => entry.matches > 0)
+    .sort((left, right) => right.matches - left.matches || (right.matches / Math.max(right.total, 1)) - (left.matches / Math.max(left.total, 1)));
+  const best = scored[0];
+  if (!best) return undefined;
+  const tied = scored[1] && scored[1].matches === best.matches && scored[1].total === best.total;
+  const enoughEvidence = best.matches >= 2 || (best.total === 1 && best.matches === 1);
+  return enoughEvidence && !tied ? best.item : undefined;
+}
+
+function importedCourseTokens(value) {
+  const ignored = new Set(["canvas", "course", "courses", "class", "section", "assignment", "homework", "quiz", "exam", "test", "fall", "winter", "spring", "summer"]);
+  return normalizedCourseworkName(value).split(" ").filter((token) => token.length >= 3 && !ignored.has(token) && !/^\d{4}$/.test(token));
 }
 
 function importedCanvasCourseCode(value) {
@@ -4038,7 +4058,7 @@ async function syncCanvasCalendarFeed() {
     state.data.homework.forEach((item) => savedByNameAndDate.set(courseworkIdentity(item), { record: item, kind: "homework" }));
     state.data.exams.forEach((item) => savedByNameAndDate.set(courseworkIdentity(item), { record: item, kind: "exam" }));
     const reviewItems = items.map((item) => {
-      const match = findMatchingImportedClass(item.course, classes);
+      const match = findMatchingImportedClass(item.courseHint || item.course, classes);
       const saved = savedByUid.get(item.uid) || savedByNameAndDate.get(courseworkIdentity(item));
       const importId = `canvas-feed:${item.uid}`;
       const wasImported = importedSourceIds.has(importId);
@@ -4083,11 +4103,15 @@ function parseCanvasCalendarFeed(ics) {
     const prefixCourse = summary.match(/^\[([^\]]+)\]\s*(.*)$/);
     const suffixCourse = summary.match(/^(.*?)\s*\[([^\]]+)\]\s*$/);
     const describedCourse = description.match(/(?:^|\n)\s*(?:course|context)\s*:\s*([^\n]+)/i);
-    const rawCourse = (prefixCourse?.[1] || suffixCourse?.[2] || describedCourse?.[1] || "Canvas").trim();
+    const category = decode(read("CATEGORIES"));
+    const location = decode(read("LOCATION"));
+    const url = decode(read("URL"));
+    const rawCourse = (prefixCourse?.[1] || suffixCourse?.[2] || describedCourse?.[1] || category || "Canvas").trim();
     const title = (prefixCourse?.[2] || suffixCourse?.[1] || summary).replace(/^assignment\s*:\s*/i, "").trim();
     const course = rawCourse;
     const kind = /\b(exam|quiz|test|midterm|final)\b/i.test(title) ? "exam" : "homework";
-    return { uid, title, course, rawCourse, kind, date: due.date, time: due.time };
+    const courseHint = [rawCourse, category, location, description, url].filter(Boolean).join(" ");
+    return { uid, title, course, rawCourse, courseHint, kind, date: due.date, time: due.time };
   }).filter((item) => item && item.date >= todayString());
 }
 
@@ -4152,7 +4176,7 @@ function refreshSchoolImports() {
 }
 
 function applyImportedClassMatch(item, classes = getImportableClasses()) {
-  const match = findMatchingImportedClass(item.rawCourse || item.course || "", classes);
+  const match = findMatchingImportedClass(item.courseHint || item.rawCourse || item.course || "", classes);
   if (!match) return item;
   return { ...item, course: match.title, color: match.color, matchedClass: true };
 }

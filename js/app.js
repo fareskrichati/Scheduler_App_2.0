@@ -266,13 +266,21 @@ initialize();
 
 function setupMobileCurrentDate() {
   const dateLabel = document.querySelector("#mobile-current-date");
-  if (!dateLabel) return;
+  const jumpTodayLabel = document.querySelector("#jump-today-label");
+  if (!dateLabel && !jumpTodayLabel) return;
   const update = () => {
     const today = new Date();
-    dateLabel.dateTime = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-    dateLabel.textContent = today.toLocaleDateString(undefined, {
-      weekday: "short", month: "long", day: "numeric", year: "numeric",
-    });
+    if (dateLabel) {
+      dateLabel.dateTime = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      dateLabel.textContent = today.toLocaleDateString(undefined, {
+        weekday: "short", month: "long", day: "numeric", year: "numeric",
+      });
+    }
+    if (jumpTodayLabel) {
+      jumpTodayLabel.textContent = today.toLocaleDateString(undefined, {
+        weekday: "short", month: "short", day: "numeric",
+      });
+    }
   };
   update();
   window.setInterval(update, 30000);

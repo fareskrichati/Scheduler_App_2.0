@@ -102,6 +102,19 @@ test('Canvas course hints match class names with extra term and section text', (
   assert.equal(match.color, '#dd6633');
 });
 
+test('Unmatched Canvas courses receive stable distinct fallback colors', () => {
+  const context = vm.createContext({
+    normalizedCourseworkName: value => String(value).replace(/[^a-z0-9]+/gi, ' ').trim().toLowerCase(),
+    classColorForIndex: index => ['#111111', '#222222', '#333333', '#444444', '#555555', '#666666', '#777777', '#888888'][index % 8],
+  });
+  load(context, 'importedCourseFallbackColor', 'importedCanvasCourseCode');
+  const geology = context.importedCourseFallbackColor('GEOL 3313 - Engineering Geology');
+  assert.equal(context.importedCourseFallbackColor('GEOL 3313 - Engineering Geology'), geology);
+  const colors = new Set(['Geology', 'Surveying', 'Calculus', 'Physics', 'Chemistry'].map(name => context.importedCourseFallbackColor(name)));
+  assert.ok(colors.size > 1);
+  assert.equal(context.importedCourseFallbackColor('Canvas', '#7eaed6'), '#7eaed6');
+});
+
 test('App customization is presented as a dropdown on desktop and mobile', () => {
   for (const page of ['index.html', 'mobile.html']) {
     const html = fs.readFileSync(path.join(__dirname, '..', page), 'utf8');

@@ -850,6 +850,14 @@ function importedCourseTokens(value) {
   return normalizedCourseworkName(value).split(" ").filter((token) => token.length >= 3 && !ignored.has(token) && !/^\d{4}$/.test(token));
 }
 
+function importedCourseFallbackColor(value, fallback = "#7eaed6") {
+  const key = normalizedCourseworkName(value);
+  if (!key || key === "canvas") return fallback;
+  let hash = 0;
+  for (const character of key) hash = ((hash * 31) + character.charCodeAt(0)) >>> 0;
+  return classColorForIndex(hash);
+}
+
 function importedCanvasCourseCode(value) {
   const match = String(value || "").match(/\b([a-z]{2,})\s*[- ]?([a-z]?)\s*(\d{2,4})\b/i);
   return match ? `${match[1]}${match[2]}${match[3]}`.toLowerCase() : "";
@@ -4065,7 +4073,8 @@ async function syncCanvasCalendarFeed() {
       const course = match?.title || saved?.record.course || "";
       const matchedByNameAndDate = saved && courseworkIdentity(saved.record) === courseworkIdentity(item);
       const changed = saved && !matchedByNameAndDate && (saved.record.title !== item.title || saved.record.course !== course || saved.record.date !== item.date || saved.record.time !== item.time || saved.kind !== item.kind);
-      return { ...item, id: importId, source: "Canvas calendar", course, color: match?.color || saved?.record.color || (item.kind === "exam" ? "#6d9fd0" : "#7eaed6"), operation: saved ? (changed ? "update" : "current") : wasImported ? "current" : "add", missingTime: !item.time, notes: `${match ? `Matched Canvas course “${item.rawCourse}” to ${match.title}.` : `Canvas course: ${item.rawCourse}. Choose the correct class before adding.`}${!item.time ? " Canvas did not provide a due time; enter it below." : ""}` };
+      const fallbackColor = importedCourseFallbackColor(item.rawCourse, item.kind === "exam" ? "#6d9fd0" : "#7eaed6");
+      return { ...item, id: importId, source: "Canvas calendar", course, color: match?.color || saved?.record.color || fallbackColor, operation: saved ? (changed ? "update" : "current") : wasImported ? "current" : "add", missingTime: !item.time, notes: `${match ? `Matched Canvas course “${item.rawCourse}” to ${match.title}.` : `Canvas course: ${item.rawCourse}. Choose the correct class before adding.`}${!item.time ? " Canvas did not provide a due time; enter it below." : ""}` };
     });
     const actionableItems = reviewItems.filter((item) => item.operation !== "current");
     schoolImportItems = [...schoolImportItems.filter((item) => item.source !== "Canvas calendar"), ...actionableItems];

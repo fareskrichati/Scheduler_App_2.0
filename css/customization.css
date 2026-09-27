@@ -52,10 +52,18 @@
 }
 :root[data-mode="light"] { color-scheme: light; }
 :root[data-mode="dark"] :is(.topbar,.tab-shell,.panel-card,.mini-stat,.auth-panel,.item-card,.todo-item,.day-card,.settings-accordion,.desktop-add-accordion,.school-import-accordion,.mobile-form-dialog-card,.widget-preview-dialog-header) { background: var(--surface); color: var(--ink); border-color: var(--line); }
-:root[data-mode="dark"] :is(.tab-button,.ghost-button,.small-button,.settings-button,.canvas-shortcut-button,.icon-button,.view-switch-button,.calendar-view-switch,.auth-mode-switch) { background: var(--surface-strong); color: var(--ink); }
+:root[data-mode="dark"] :is(.tab-button,.ghost-button,.small-button,.settings-button,.canvas-shortcut-button,.icon-button,.view-switch-button,.calendar-view-switch,.auth-mode-switch) {
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+  color: var(--ink);
+}
 :root[data-mode="dark"] :is(input,select,textarea) { background: var(--surface-strong); color: var(--ink); border-color: var(--line); }
-:root[data-mode="dark"] .tab-button.is-active, :root[data-mode="dark"] .view-switch-button.is-active { background: var(--accent-soft); color: var(--accent-deep); }
-:root[data-mode="dark"] .calendar-grid .calendar-marker { background: color-mix(in srgb, var(--item-color, var(--accent)) 20%, #222c3a); color: #f0f3f9; border-color: color-mix(in srgb, var(--item-color, var(--accent)) 50%, #222c3a); }
+:root[data-mode="dark"] .tab-button.is-active,
+:root[data-mode="dark"] .view-switch-button.is-active {
+  border-color: var(--accent-deep);
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
 :root[data-mode="dark"] :is(.todo-check,.calendar-marker-check) { background: #222c3a; }
 :root[data-mode="dark"] .calendar-panel { background: var(--custom-calendar, var(--surface-strong)); color: var(--calendar-ink, var(--ink)); }
 :root[data-mode="dark"] .calendar-grid .calendar-day { color: inherit; }
@@ -95,3 +103,18 @@
 }
 body.mobile-preview .customization-controls { grid-template-columns: 1fr; }
 body.mobile-preview .customization-presets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* Item colors belong to their saved records, independently of planner appearance. */
+:root .calendar-grid .calendar-marker {
+  background: color-mix(in srgb, var(--item-color, #7eaed6) 22%, white);
+  color: color-mix(in srgb, var(--item-color, #7eaed6) 68%, #161616);
+  border-color: color-mix(in srgb, var(--item-color, #7eaed6) 28%, white);
+}
+:root[data-mode] :is(.item-card, .todo-item, .day-card) {
+  border-left-color: var(--item-color, #7eaed6);
+}
+:root[data-mode] .day-card {
+  background: color-mix(in srgb, var(--item-color, #7eaed6) 8%, white);
+  color: #161616;
+}
+:root[data-mode] .day-card :is(.item-meta, .item-notes) { color: #586174; }

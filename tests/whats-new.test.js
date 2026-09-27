@@ -17,7 +17,7 @@ function makeContext() {
   const dialog = { open: false, showModal() { this.open = true; } };
   const context = vm.createContext({
     WHATS_NEW_STORAGE_PREFIX: 'uniplan-whats-new',
-    WHATS_NEW_VERSION: '1.0',
+    WHATS_NEW_VERSION: '1.5',
     authState: { isAuthenticated: true, userId: 'student-1', profile: { email: 'student@example.com' } },
     elements: { whatsNewDialog: dialog },
     localStorage: {
@@ -49,7 +49,7 @@ test('Settings can reopen what’s new after it has been seen', () => {
 test('what’s new stays scoped to each signed-in account', () => {
   const { context, values } = makeContext();
   context.markWhatsNewSeen();
-  assert.equal(values.get('uniplan-whats-new:student-1'), '1.0');
+  assert.equal(values.get('uniplan-whats-new:student-1'), '1.5');
   context.authState.userId = 'student-2';
   assert.equal(context.hasSeenWhatsNew(), false);
 });
@@ -59,10 +59,10 @@ test('desktop and mobile include the update dialog and reopen button', () => {
     const html = fs.readFileSync(path.join(__dirname, '..', page), 'utf8');
     assert.match(html, /id="whats-new-dialog"/);
     assert.match(html, /id="settings-whats-new"/);
-    assert.match(html, /Update 1\.0/);
-    assert.match(html, /Customize UniPlan/);
-    assert.match(html, /Share your class schedule/);
-    assert.match(html, /Open locations in Maps/);
-    assert.match(html, /A more useful calendar/);
+    assert.match(html, /Update 1\.5/);
+    assert.match(html, /Cleaner mobile header/);
+    assert.match(html, /Compact month view/);
+    assert.match(html, /Consistent mobile controls/);
+    assert.match(html, /Better themes/);
   }
 });

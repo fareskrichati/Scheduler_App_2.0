@@ -683,8 +683,8 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-markers {
 
 .calendar-marker-check:hover,
 .calendar-marker-check:focus-visible {
-  background: color-mix(in srgb, var(--item-color, var(--accent)) 18%, white);
-  outline: 2px solid color-mix(in srgb, var(--item-color, var(--accent)) 35%, transparent);
+  background: color-mix(in srgb, var(--item-color, #7eaed6) 18%, white);
+  outline: 2px solid color-mix(in srgb, var(--item-color, #7eaed6) 35%, transparent);
   outline-offset: 1px;
 }
 
@@ -748,10 +748,10 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-markers {
   display: block;
   min-width: 0;
   padding: 7px 9px;
-  border: 1px solid color-mix(in srgb, var(--item-color, var(--accent)) 28%, white);
+  border: 1px solid color-mix(in srgb, var(--item-color, #7eaed6) 28%, white);
   border-radius: 9px;
-  background: color-mix(in srgb, var(--item-color, var(--accent)) 22%, white);
-  color: color-mix(in srgb, var(--item-color, var(--accent)) 68%, #161616);
+  background: color-mix(in srgb, var(--item-color, #7eaed6) 22%, white);
+  color: color-mix(in srgb, var(--item-color, #7eaed6) 68%, #161616);
   text-align: left;
   white-space: normal;
 }
@@ -946,10 +946,10 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-day-number {
   display: block;
   min-width: 0;
   padding: 7px 9px;
-  border: 1px solid color-mix(in srgb, var(--item-color, var(--accent)) 28%, white);
+  border: 1px solid color-mix(in srgb, var(--item-color, #7eaed6) 28%, white);
   border-radius: 9px;
-  background: color-mix(in srgb, var(--item-color, var(--accent)) 22%, white);
-  color: color-mix(in srgb, var(--item-color, var(--accent)) 68%, #161616);
+  background: color-mix(in srgb, var(--item-color, #7eaed6) 22%, white);
+  color: color-mix(in srgb, var(--item-color, #7eaed6) 68%, #161616);
   text-align: left;
   white-space: normal;
 }
@@ -1238,7 +1238,7 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-day-number {
 .item-card,
 .day-card,
 .calendar-marker {
-  --item-color: var(--accent);
+  --item-color: #7eaed6;
 }
 
 .calendar-marker {
@@ -1598,7 +1598,7 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-day-number {
   .field input, .field select, .field textarea { width: 100%; max-width: 100%; }
   .field-row { grid-template-columns: minmax(0, 1fr); }
   .form-actions { flex-wrap: wrap; }
-  .form-actions > button { flex: 1 1 140px; white-space: normal; }
+  .form-actions > button { flex: 0 1 auto; min-height: 44px; padding: 10px 14px; white-space: normal; }
   .settings-summary-row { flex-wrap: wrap; gap: 8px; overflow-wrap: anywhere; }
   .settings-summary-row > * { min-width: 0; max-width: 100%; }
   .todo-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1761,13 +1761,13 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-day-number {
   filter: drop-shadow(0 1px 0 #c8e0ec);
 }
 :root[data-theme="halloween"] .calendar-grid .calendar-marker {
-  border-style: dashed; border-color: #9365ab;
+  border-style: dashed;
 }
 :root[data-theme="valentine"] .calendar-grid .calendar-marker {
-  box-shadow: inset 3px 0 #d782a0;
+  box-shadow: inset 3px 0 var(--item-color, #7eaed6);
 }
 :root[data-theme="spring"] .calendar-grid .calendar-marker {
-  box-shadow: inset 3px 0 #8dbd80;
+  box-shadow: inset 3px 0 var(--item-color, #7eaed6);
 }
 
 /* Schedule sharing preview */

@@ -74,6 +74,7 @@ body:has(.mobile-form-dialog[open]) {
 .topbar {
   position: relative;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   border-radius: 20px;
   padding: 10px;
@@ -560,9 +561,9 @@ body:has(.mobile-form-dialog[open]) {
   min-height: 0;
   padding: 5px 4px;
   border-radius: 7px;
-  border: 1px solid color-mix(in srgb, var(--item-color, var(--accent)) 28%, white);
-  background: color-mix(in srgb, var(--item-color, var(--accent)) 22%, white);
-  color: color-mix(in srgb, var(--item-color, var(--accent)) 68%, #161616);
+  border: 1px solid color-mix(in srgb, var(--item-color, #7eaed6) 28%, white);
+  background: color-mix(in srgb, var(--item-color, #7eaed6) 22%, white);
+  color: color-mix(in srgb, var(--item-color, #7eaed6) 68%, #161616);
   font-size: 0.62rem;
   line-height: 1.15;
   text-align: left;
@@ -635,10 +636,10 @@ body:has(.mobile-form-dialog[open]) {
 .calendar-grid[data-view="week"] .calendar-marker {
   display: block;
   padding: 5px 4px;
-  border: 1px solid color-mix(in srgb, var(--item-color, var(--accent)) 28%, white);
+  border: 1px solid color-mix(in srgb, var(--item-color, #7eaed6) 28%, white);
   border-radius: 7px;
-  background: color-mix(in srgb, var(--item-color, var(--accent)) 22%, white);
-  color: color-mix(in srgb, var(--item-color, var(--accent)) 68%, #161616);
+  background: color-mix(in srgb, var(--item-color, #7eaed6) 22%, white);
+  color: color-mix(in srgb, var(--item-color, #7eaed6) 68%, #161616);
   font-size: 0.62rem;
   line-height: 1.15;
   text-align: left;
@@ -757,7 +758,7 @@ body:has(.mobile-form-dialog[open]) {
 .field input, .field select, .field textarea { width: 100%; max-width: 100%; }
 .field-row { grid-template-columns: minmax(0, 1fr); }
 .form-actions { flex-wrap: wrap; }
-.form-actions > button { flex: 1 1 140px; white-space: normal; }
+.form-actions > button { flex: 0 1 auto; min-height: 44px; padding: 10px 14px; white-space: normal; }
 .settings-summary-row { flex-wrap: wrap; gap: 8px; overflow-wrap: anywhere; }
 .settings-summary-row > * { min-width: 0; max-width: 100%; }
 .todo-filters .field:last-child { grid-column: 1 / -1; }
@@ -791,3 +792,108 @@ body:has(.mobile-form-dialog[open]) {
 .calendar-grid[data-view="month"] .calendar-marker-title { font-size: .62rem; }
 .calendar-grid[data-view="month"] .calendar-marker-time { margin-top: 1px; font-size: .56rem; }
 .topbar-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* Mobile header: today's date above the summary tabs and vertical shortcuts. */
+.topbar-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  gap: 8px 10px;
+  align-items: center;
+}
+.brand-block { grid-column: 1 / -1; padding: 0; }
+.mobile-current-date {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  color: var(--accent-deep);
+  font-size: .95rem;
+  font-weight: 700;
+  text-align: right;
+}
+.topbar-main > .topbar-shortcuts {
+  position: static;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.topbar-stats { gap: 8px; }
+
+/* Keep the filters together so the actual to-dos start higher on the screen. */
+.todo-panel { padding: 10px; }
+.todo-panel > .panel-header { gap: 4px; margin-bottom: 10px; }
+.todo-panel h3 { font-size: 1.05rem; }
+.todo-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.todo-filters .field { gap: 4px; }
+.todo-filters .field:last-child { grid-column: auto; }
+.todo-filters .field span { font-size: .7rem; }
+.todo-filters .field select {
+  min-height: 36px;
+  padding: 6px 3px;
+  border-radius: 9px;
+  font-size: 12px;
+}
+
+/* Slimmer month entries with wrapping titles; retain every event. */
+.calendar-grid[data-view="month"] .calendar-day {
+  min-height: 130px;
+  padding: 36px 1px 6px;
+}
+.calendar-grid[data-view="month"] .calendar-marker { padding: 2px 1px; }
+.calendar-grid[data-view="month"] .calendar-marker-title {
+  font-size: .56rem;
+  line-height: 1.15;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  overflow: visible;
+  text-overflow: clip;
+}
+.calendar-grid[data-view="month"] .calendar-marker-time { font-size: .5rem; }
+
+/* Keep form checkboxes attached to their labels instead of stretching like fields. */
+.mobile-dialog-form .checkbox-row {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+.mobile-dialog-form .checkbox-row input[type="checkbox"] {
+  flex: 0 0 20px;
+  width: 20px;
+  min-width: 20px;
+  max-width: 20px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0;
+  margin: 0;
+}
+.mobile-dialog-form .checkbox-row > span {
+  flex: 0 1 auto;
+  min-width: 0;
+  text-align: left;
+}
+
+/* Keep mobile month cards slim even when an appearance density is selected. */
+:root body.mobile-preview .calendar-grid[data-view="month"] .calendar-markers {
+  gap: 2px;
+}
+:root body.mobile-preview .calendar-grid[data-view="month"] .calendar-marker {
+  padding: 1px;
+  border-radius: 3px;
+}
+:root body.mobile-preview .calendar-grid[data-view="month"] .calendar-marker-title {
+  font-size: .56rem;
+  line-height: 1.05;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+:root body.mobile-preview .calendar-grid[data-view="month"] .calendar-marker-time {
+  margin-top: 0;
+  font-size: .5rem;
+  line-height: 1.05;
+}
+body.mobile-preview .calendar-grid[data-view="month"] .calendar-marker-row {
+  gap: 2px;
+  align-items: start;
+}

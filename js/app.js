@@ -9,7 +9,7 @@ const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_DELAY_MS = 1000;
 const FOREVER_REPEAT_YEARS = 5;
 const SUPABASE_TABLE = "planner_profiles";
-const WHATS_NEW_VERSION = "1.0";
+const WHATS_NEW_VERSION = "1.5";
 const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new";
 const PLANNER_TABS = ["calendar", "todo", "classes", "events", "homework", "exams", "reminders", "settings"];
 
@@ -264,7 +264,24 @@ const elements = {
 
 initialize();
 
+function setupMobileCurrentDate() {
+  const dateLabel = document.querySelector("#mobile-current-date");
+  if (!dateLabel) return;
+  const update = () => {
+    const today = new Date();
+    dateLabel.dateTime = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    dateLabel.textContent = today.toLocaleDateString(undefined, {
+      weekday: "short", month: "long", day: "numeric", year: "numeric",
+    });
+  };
+  update();
+  window.setInterval(update, 30000);
+  document.addEventListener("visibilitychange", update);
+  window.addEventListener("pageshow", update);
+}
+
 async function initialize() {
+  setupMobileCurrentDate();
   pruneExpiredCompletedItems();
   renderWeekdays();
   bindEvents();

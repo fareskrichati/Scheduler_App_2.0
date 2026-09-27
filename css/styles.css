@@ -1838,6 +1838,10 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-day-number {
 }
 .whats-new-list h3 { margin: 1px 0 5px; font-family: inherit; font-size: 1rem; letter-spacing: 0; }
 .whats-new-list p { margin: 0; color: var(--muted); font-size: 0.9rem; line-height: 1.42; }
+.update-history { margin: -8px 0 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-soft); }
+.update-history > summary { cursor: pointer; padding: 14px 16px; color: var(--accent-deep); font-weight: 750; }
+.update-history-list { margin: 0; padding: 0 12px 12px; }
+.update-history-list article { background: var(--surface-strong); }
 .whats-new-done { width: 100%; }
 
 @media (max-width: 520px) {

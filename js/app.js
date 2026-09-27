@@ -9,7 +9,7 @@ const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_DELAY_MS = 1000;
 const FOREVER_REPEAT_YEARS = 5;
 const SUPABASE_TABLE = "planner_profiles";
-const WHATS_NEW_VERSION = "1.5";
+const WHATS_NEW_VERSION = "1.5.1";
 const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new";
 const PLANNER_TABS = ["calendar", "todo", "classes", "events", "homework", "exams", "reminders", "settings"];
 
@@ -739,11 +739,22 @@ function getImportableClasses() {
   const map = new Map();
   state.data.courses.forEach((item) => {
     const key = importedCourseKey(item.title);
-    if (!map.has(key)) map.set(key, { key, title: item.title, color: normalizeColor(item.color, "#7eaed6"), online: true });
+    if (!map.has(key)) map.set(key, {
+      key,
+      title: item.title,
+      color: getStoredItemColor("courses", item),
+      matchSourceKey: makeSourceKey("courses", item.id),
+      online: true,
+    });
   });
   state.data.schedule.filter((item) => item.type === "class").forEach((item) => {
     const key = importedCourseKey(item.title);
-    if (!map.has(key)) map.set(key, { key, title: item.title, color: getStoredItemColor("schedule", item) });
+    if (!map.has(key)) map.set(key, {
+      key,
+      title: item.title,
+      color: getStoredItemColor("schedule", item),
+      matchSourceKey: makeSourceKey("schedule", item.id),
+    });
   });
   return Array.from(map.values());
 }
@@ -850,7 +861,7 @@ function renderDetectedHomework() {
     card.innerHTML = `<div class="field-row"><label class="field"><span>Coursework</span><input data-homework-field="title" value="${escapeHtml(item.title)}" /></label><label class="field"><span>Type</span><select data-homework-field="kind"><option value="homework"${item.kind !== "exam" ? " selected" : ""}>Homework</option><option value="exam"${item.kind === "exam" ? " selected" : ""}>Exam or quiz</option></select></label></div><div class="field-row"><label class="field"><span>Class</span><select data-homework-field="course"><option value="">Choose a class</option>${classes.map((course) => `<option value="${escapeHtml(course.title)}"${course.title === item.course ? " selected" : ""}>${escapeHtml(course.title)}</option>`).join("")}</select></label><label class="field color-field"><span>Matching color</span><input data-homework-field="color" type="color" value="${item.color}" /></label></div><div class="field-row"><label class="field"><span>Due date</span><input data-homework-field="date" type="date" value="${item.date}" /></label><label class="field"><span>Due time</span><input data-homework-field="time" type="time" value="${item.time}" /></label></div><button class="small-button" type="button" data-remove-homework="${index}">Remove</button>`;
     card.querySelectorAll("[data-homework-field]").forEach((input) => input.addEventListener("input", () => {
       const field = input.dataset.homeworkField; detectedHomeworkItems[index][field] = input.value;
-      if (field === "course") { const match = classes.find((course) => course.title === input.value); if (match) { detectedHomeworkItems[index].color = match.color; card.querySelector('[data-homework-field="color"]').value = match.color; } }
+      if (field === "course") { const match = classes.find((course) => course.title === input.value); if (match) { detectedHomeworkItems[index].color = match.color; detectedHomeworkItems[index].matchSourceKey = match.matchSourceKey; card.querySelector('[data-homework-field="color"]').value = match.color; } }
     }));
     card.querySelector("[data-remove-homework]").addEventListener("click", () => { detectedHomeworkItems.splice(index, 1); renderDetectedHomework(); });
     list.appendChild(card);
@@ -864,7 +875,8 @@ function saveDetectedHomework() {
   const newItems = removeAlreadyAddedCoursework(dedupeDetectedHomework(detectedHomeworkItems));
   const skipped = detectedHomeworkItems.length - newItems.length;
   newItems.forEach((item) => {
-    const record = { id: crypto.randomUUID(), title: item.title.trim(), course: item.course, date: item.date, time: item.time, status: "pending", color: item.color, notes: item.notes, priority: false };
+    const matchedClass = getImportableClasses().find((course) => course.title === item.course);
+    const record = { id: crypto.randomUUID(), title: item.title.trim(), course: item.course, date: item.date, time: item.time, status: "pending", color: matchedClass?.color || item.color, matchSourceKey: matchedClass?.matchSourceKey || item.matchSourceKey, notes: item.notes, priority: false };
     (item.kind === "exam" ? state.data.exams : state.data.homework).push(record);
   });
   const count = newItems.length; detectedHomeworkItems = [];
@@ -932,7 +944,16 @@ function renderDetectedExams() {
   detectedExamItems.forEach((item, index) => {
     const card = document.createElement("article"); card.className = "detected-class-card";
     card.innerHTML = `<label class="field"><span>Exam or quiz</span><input data-exam-field="title" value="${escapeHtml(item.title)}"></label><div class="field-row"><label class="field"><span>Class</span><select data-exam-field="course"><option value="">Choose a class</option>${classes.map((course) => `<option value="${escapeHtml(course.title)}"${course.title === item.course ? " selected" : ""}>${escapeHtml(course.title)}</option>`).join("")}</select></label><label class="field"><span>Date</span><input data-exam-field="date" type="date" value="${item.date}"></label><label class="field"><span>Time</span><input data-exam-field="time" type="time" value="${item.time}"></label></div><button class="small-button" type="button">Remove</button>`;
-    card.querySelectorAll("[data-exam-field]").forEach((input) => input.addEventListener("input", () => { detectedExamItems[index][input.dataset.examField] = input.value; }));
+    card.querySelectorAll("[data-exam-field]").forEach((input) => input.addEventListener("input", () => {
+      detectedExamItems[index][input.dataset.examField] = input.value;
+      if (input.dataset.examField === "course") {
+        const match = classes.find((course) => course.title === input.value);
+        if (match) {
+          detectedExamItems[index].color = match.color;
+          detectedExamItems[index].matchSourceKey = match.matchSourceKey;
+        }
+      }
+    }));
     card.querySelector("button").addEventListener("click", () => { detectedExamItems.splice(index, 1); renderDetectedExams(); });
     list.appendChild(card);
   });
@@ -941,7 +962,10 @@ function renderDetectedExams() {
 function saveDetectedExams() {
   const status = document.querySelector("#exam-photo-status");
   if (detectedExamItems.some((item) => !item.title.trim() || !item.course || !item.date)) { status.textContent = "Each item needs a title, class, and date."; return; }
-  detectedExamItems.forEach((item) => state.data.exams.push({ id: crypto.randomUUID(), title: item.title.trim(), course: item.course, date: item.date, time: item.time, status: "pending", color: colorForSelectedClass(item.course, "#6d9fd0"), notes: "Imported from a Canvas screenshot." }));
+  detectedExamItems.forEach((item) => {
+    const matchedClass = getImportableClasses().find((course) => course.title === item.course);
+    state.data.exams.push({ id: crypto.randomUUID(), title: item.title.trim(), course: item.course, date: item.date, time: item.time, status: "pending", color: matchedClass?.color || colorForSelectedClass(item.course, "#6d9fd0"), matchSourceKey: matchedClass?.matchSourceKey || item.matchSourceKey, notes: "Imported from a Canvas screenshot." });
+  });
   const count = detectedExamItems.length; detectedExamItems = []; document.querySelector("#exam-photo-review").hidden = true; persistAndRender(); status.textContent = `${count} exam or quiz item${count === 1 ? "" : "s"} added.`;
 }
 
@@ -4189,6 +4213,7 @@ function renderSchoolImportItems(statusMessage = "") {
       const match = importableClasses.find((course) => course.title === item.course);
       if (match) {
         item.color = match.color;
+        item.matchSourceKey = match.matchSourceKey;
         item.matchedClass = true;
         card.style.setProperty("--school-import-color", match.color);
       }
@@ -4229,6 +4254,7 @@ function addSchoolItemAsHomework(item) {
     time: item.time,
     status: existing?.status || "pending",
     color: match?.color || item.color || (item.kind === "exam" ? "#6d9fd0" : "#7eaed6"),
+    matchSourceKey: match?.matchSourceKey || item.matchSourceKey,
     priority: existing?.priority || false,
     notes: existing?.notes || [item.notes, item.url].filter(Boolean).join(" "),
     canvasFeedUid: item.uid || undefined,
@@ -5043,6 +5069,13 @@ function getStoredItemColor(collectionName, item, visited = new Set()) {
       nextVisited.add(sourceKey);
       return getStoredItemColor(target.collectionName, target.item, nextVisited);
     }
+  }
+
+  const isImportedCoursework = (collectionName === "homework" || collectionName === "exams")
+    && (item.canvasFeedUid || item.schoolImportId || item.notes === "Imported from a Canvas screenshot.");
+  if (isImportedCoursework && item.course) {
+    const matchedClass = findMatchingImportedClass(item.course);
+    if (matchedClass) return matchedClass.color;
   }
 
   return normalizeColor(item.color, "#7eaed6");

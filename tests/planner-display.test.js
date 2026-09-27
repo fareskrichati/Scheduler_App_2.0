@@ -54,6 +54,37 @@ test('Coursework imports skip an existing name and date but retain a changed dat
   );
 });
 
+test('Imported coursework stays linked to its class color', () => {
+  const context = vm.createContext({
+    state: { data: {
+      courses: [],
+      schedule: [{ id: 'class-1', type: 'class', title: 'BIO 101', color: '#22aa66' }],
+    } },
+    importedCourseKey: value => value.toLowerCase(),
+    getStoredItemColor: (_collection, item) => item.color,
+    makeSourceKey: (collection, id) => `${collection}:${id}`,
+  });
+  load(context, 'getImportableClasses', 'renderClassCourseOptions');
+  const matchedClass = context.getImportableClasses()[0];
+  assert.equal(matchedClass.color, '#22aa66');
+  assert.equal(matchedClass.matchSourceKey, 'schedule:class-1');
+
+  const colorContext = vm.createContext({
+    Set,
+    makeSourceKey: () => 'homework:assignment-1',
+    findSourceItem: () => null,
+    findMatchingImportedClass: () => ({ color: '#22aa66' }),
+    normalizeColor: color => color,
+  });
+  load(colorContext, 'getStoredItemColor', 'findSourceItem');
+  assert.equal(colorContext.getStoredItemColor('homework', {
+    id: 'assignment-1',
+    course: 'BIO 101',
+    color: '#7eaed6',
+    schoolImportId: 'canvas-feed:item-1',
+  }), '#22aa66');
+});
+
 test('App customization is presented as a dropdown on desktop and mobile', () => {
   for (const page of ['index.html', 'mobile.html']) {
     const html = fs.readFileSync(path.join(__dirname, '..', page), 'utf8');

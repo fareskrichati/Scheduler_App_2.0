@@ -4066,7 +4066,10 @@ async function syncCanvasCalendarFeed() {
     state.data.homework.forEach((item) => savedByNameAndDate.set(courseworkIdentity(item), { record: item, kind: "homework" }));
     state.data.exams.forEach((item) => savedByNameAndDate.set(courseworkIdentity(item), { record: item, kind: "exam" }));
     const reviewItems = items.map((item) => {
-      const match = findMatchingImportedClass(item.courseHint || item.course, classes);
+      const savedCourseMatches = getSettings().canvasCourseMatches || {};
+      const savedCourseTitle = savedCourseMatches[importedCourseKey(item.rawCourse)];
+      const savedCourseMatch = classes.find((course) => course.title === savedCourseTitle);
+      const match = savedCourseMatch || findMatchingImportedClass(item.courseHint || item.course, classes);
       const saved = savedByUid.get(item.uid) || savedByNameAndDate.get(courseworkIdentity(item));
       const importId = `canvas-feed:${item.uid}`;
       const wasImported = importedSourceIds.has(importId);
@@ -4074,7 +4077,7 @@ async function syncCanvasCalendarFeed() {
       const matchedByNameAndDate = saved && courseworkIdentity(saved.record) === courseworkIdentity(item);
       const changed = saved && !matchedByNameAndDate && (saved.record.title !== item.title || saved.record.course !== course || saved.record.date !== item.date || saved.record.time !== item.time || saved.kind !== item.kind);
       const fallbackColor = importedCourseFallbackColor(item.rawCourse, item.kind === "exam" ? "#6d9fd0" : "#7eaed6");
-      return { ...item, id: importId, source: "Canvas calendar", course, color: match?.color || saved?.record.color || fallbackColor, operation: saved ? (changed ? "update" : "current") : wasImported ? "current" : "add", missingTime: !item.time, notes: `${match ? `Matched Canvas course “${item.rawCourse}” to ${match.title}.` : `Canvas course: ${item.rawCourse}. Choose the correct class before adding.`}${!item.time ? " Canvas did not provide a due time; enter it below." : ""}` };
+      return { ...item, id: importId, source: "Canvas calendar", course, color: match?.color || saved?.record.color || fallbackColor, matchSourceKey: match?.matchSourceKey, matchedClass: Boolean(match), operation: saved ? (changed ? "update" : "current") : wasImported ? "current" : "add", missingTime: !item.time, notes: `${match ? `Matched Canvas course “${item.rawCourse}” to ${match.title}.` : `Canvas course: ${item.rawCourse}. Choose the correct class before adding.`}${!item.time ? " Canvas did not provide a due time; enter it below." : ""}` };
     });
     const actionableItems = reviewItems.filter((item) => item.operation !== "current");
     schoolImportItems = [...schoolImportItems.filter((item) => item.source !== "Canvas calendar"), ...actionableItems];
@@ -4214,6 +4217,7 @@ function renderSchoolImportItems(statusMessage = "") {
     const card = document.createElement("article");
     card.className = "item-card school-import-card";
     card.style.setProperty("--school-import-color", item.color || "#7eaed6");
+    card.dataset.classMatched = String(Boolean(item.matchedClass));
     const actionLabel = item.operation === "update" ? "Update planner item" : item.operation === "current" ? "Already current" : item.kind === "exam" ? "Add exam" : "Add homework";
     const cardContent = `
       <div class="item-card-top">
@@ -4232,7 +4236,7 @@ function renderSchoolImportItems(statusMessage = "") {
     `;
     const stateLabel = item.operation === "update" ? "Changed" : item.operation === "current" ? "Current" : "New";
     const stateClass = item.operation === "update" ? " is-changed" : "";
-    card.innerHTML = `<details class="school-import-details"><summary><span>${escapeHtml(item.title)}</span><small class="school-import-state${stateClass}">${formatShortDate(item.date)} · ${stateLabel}</small></summary><div class="school-import-details-body">${cardContent}</div></details>`;
+    card.innerHTML = `<details class="school-import-details"><summary><span class="school-import-title-group"><span>${escapeHtml(item.title)}</span><small class="school-import-course">${escapeHtml(item.matchedClass ? item.course : "Choose a class")}</small></span><small class="school-import-state${stateClass}">${formatShortDate(item.date)} · ${stateLabel}</small></summary><div class="school-import-details-body">${cardContent}</div></details>`;
 
     card.querySelector("[data-school-import-kind]")?.addEventListener("change", (event) => {
       item.kind = event.target.value;
@@ -4245,10 +4249,18 @@ function renderSchoolImportItems(statusMessage = "") {
       item.course = event.target.value;
       const match = importableClasses.find((course) => course.title === item.course);
       if (match) {
-        item.color = match.color;
-        item.matchSourceKey = match.matchSourceKey;
-        item.matchedClass = true;
-        card.style.setProperty("--school-import-color", match.color);
+        const canvasCourseKey = importedCourseKey(item.rawCourse);
+        const settings = getSettings();
+        settings.canvasCourseMatches = { ...(settings.canvasCourseMatches || {}), [canvasCourseKey]: match.title };
+        state.data.settings = settings;
+        schoolImportItems.filter((candidate) => importedCourseKey(candidate.rawCourse) === canvasCourseKey).forEach((candidate) => {
+          candidate.course = match.title;
+          candidate.color = match.color;
+          candidate.matchSourceKey = match.matchSourceKey;
+          candidate.matchedClass = true;
+        });
+        saveData();
+        renderSchoolImportItems(`${item.rawCourse} matched to ${match.title}.`);
       }
     });
 
@@ -4434,6 +4446,9 @@ function normalizeSettings(settings) {
     connections: normalizeConnections(settings.connections),
     schoolAccounts: normalizeSchoolAccounts(settings),
     canvasFeedUrl: typeof settings.canvasFeedUrl === "string" ? settings.canvasFeedUrl : defaults.canvasFeedUrl,
+    canvasCourseMatches: settings.canvasCourseMatches && typeof settings.canvasCourseMatches === "object"
+      ? Object.fromEntries(Object.entries(settings.canvasCourseMatches).filter(([key, value]) => key && typeof value === "string"))
+      : defaults.canvasCourseMatches,
     canvasShortcut: {
       school: typeof settings.canvasShortcut?.school === "string" ? settings.canvasShortcut.school : defaults.canvasShortcut.school,
       url: normalizeCanvasShortcutUrl(settings.canvasShortcut?.url) || defaults.canvasShortcut.url,
@@ -4479,6 +4494,7 @@ function getDefaultSettings() {
     },
     school: "",
     canvasUrl: "",
+    canvasCourseMatches: {},
     canvasShortcut: { school: "", url: "" },
     schoolUsername: "",
     connections: {

@@ -62,10 +62,17 @@ test('desktop and mobile include the update dialog and reopen button', () => {
     assert.match(html, /Update 1\.5\.1/);
     assert.match(html, /Today’s date on laptop/);
     assert.match(html, /Canvas imports match class colors/);
+    assert.match(html, /class="update-comparison"/);
+    assert.match(html, /Before and now/);
     assert.match(html, /<summary>View Update 1\.5<\/summary>/);
+    assert.match(html, /<summary>View Update 1\.0<\/summary>/);
     assert.match(html, /Cleaner mobile header/);
     assert.match(html, /Compact month view/);
     assert.match(html, /Consistent mobile controls/);
     assert.match(html, /Better themes/);
+    assert.match(html, /Customize UniPlan/);
+    assert.match(html, /Share your class schedule/);
+    assert.match(html, /Open locations in Maps/);
+    assert.match(html, /A more useful calendar/);
   }
 });

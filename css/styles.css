@@ -1850,6 +1850,20 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-day-number {
 }
 .whats-new-list h3 { margin: 1px 0 5px; font-family: inherit; font-size: 1rem; letter-spacing: 0; }
 .whats-new-list p { margin: 0; color: var(--muted); font-size: 0.9rem; line-height: 1.42; }
+.update-comparison { margin: -8px 0 24px; }
+.update-comparison figcaption { margin-bottom: 10px; color: var(--accent-deep); font-size: .82rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.update-comparison-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.update-snapshot { min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface-soft); }
+.update-snapshot > strong { display: block; margin-bottom: 9px; font-size: .82rem; }
+.snapshot-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, 18px); gap: 5px; align-items: center; margin-bottom: 9px; padding: 7px; border-radius: 9px; background: var(--surface-strong); }
+.snapshot-toolbar span { overflow: hidden; color: var(--accent-deep); font-size: .64rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.snapshot-toolbar i { display: block; width: 18px; height: 18px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-soft); }
+.snapshot-import { display: grid; gap: 5px; }
+.snapshot-import span { height: 24px; border-left: 4px solid var(--snapshot-color, #7eaed6); border-radius: 7px; background: color-mix(in srgb, var(--snapshot-color, #7eaed6) 12%, var(--surface-strong)); }
+.update-snapshot.is-now .snapshot-import span:nth-child(1) { --snapshot-color: #3f8091; }
+.update-snapshot.is-now .snapshot-import span:nth-child(2) { --snapshot-color: #9b78c6; }
+.update-snapshot.is-now .snapshot-import span:nth-child(3) { --snapshot-color: #d08a65; }
+.update-snapshot small { display: block; margin-top: 9px; color: var(--muted); font-size: .68rem; line-height: 1.3; }
 .update-history { margin: -8px 0 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-soft); }
 .update-history > summary { cursor: pointer; padding: 14px 16px; color: var(--accent-deep); font-weight: 750; }
 .update-history-list { margin: 0; padding: 0 12px 12px; }
@@ -1860,6 +1874,7 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-day-number {
   .whats-new-card { padding: 20px; }
   .whats-new-list article { grid-template-columns: 40px minmax(0, 1fr); padding: 13px; }
   .whats-new-list article > span { width: 40px; height: 40px; border-radius: 12px; }
+  .update-comparison-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 760px) {

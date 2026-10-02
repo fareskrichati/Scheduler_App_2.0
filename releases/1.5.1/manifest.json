@@ -1,0 +1,30 @@
+{
+  "version": "1.5.1",
+  "files": {
+    "index.html": "e96322483273998f4c2f8cc232c67410b17f2e8d84862df2d1936df370006194",
+    "mobile.html": "c0b7168137d3c158967e3e1d523b1408a6cd1bc341230c82b844bdc8f4b61025",
+    "widget-preview.html": "d4c98fe3deca737e0ace04faf5a9bef5de8ac647a96ecdce1bc781cd1f2c4082",
+    "build-deploy.js": "980e787e7ba1017a14d87e1fdf7001aa4cc3fe8649a5a3f2c626bbdd65e18582",
+    "netlify.toml": "cd79f38c111d6d883de4142a9c29acf50d94dc092f60cca5244d20aaf699c4b0",
+    "supabase-schema.sql": "91c73e4e9ad21d8a6f8e0fdf231305c945586d67e9ef42baa5d0c6ea72705a86",
+    "SCRIPTABLE_SETUP.md": "354dad4128c13a65a0507e6ee9b6628abc84772eca20ac5c2ef69c9a7efe468f",
+    "IMAGE_IMPORT_SETUP.md": "1f8736e1cf5d7fbe4d99cc4a9ab39a8e9eaf33b5aec6b5febcd43fa2593c8716",
+    "fall-schedule.png": "2c071df5b58a84f284e6defcc2c74ac0794c21a9b83571732053cf186accd7dd",
+    "css/customization.css": "6bd0f22688fe9143b26fc59cef39f5911c0eaebaff2a896a7bf9c574c49d7758",
+    "css/styles.css": "f33323ce4e0438f79d3c8d30f17a87ec967b7c5666d1786053f77ced77de1e0e",
+    "css/widget-preview.css": "c61210828d65b076d993bcccbf0c0900c90cf751ae669ec21abc08730a672a6c",
+    "css/mobile.css": "933880297dadb4dbd39740eb04684cfd2efa5e8f43bcc71657b37912ea5c6e20",
+    "js/device-redirect.js": "eb9e48a74bc0ed0466bceeea25fb58a050f7c8091fa1e4907bdff13a91e787d5",
+    "js/config.js": "f3e029ba39e1906416dd9ed5f983b967d4db39b68ed802e98be9e9f3d235aaf2",
+    "js/widget-preview.js": "ca9726c9e3f918dcb40ccf5307053c3f654caff7a0d45c0f48e95c4e06281deb",
+    "js/customization.js": "b47ad685af0dc6a2c62cb3f5e12d1a5933e06a4d968df022eb54700d5bb551b0",
+    "js/app.js": "d043a700e6185fc604f03413d37f90d6ce607b7812a76df0a034dfefa222d1e3",
+    "js/schedule-share.js": "0c22bf7bc5d3313ccc000fd034bcb578dc22c6f7de3ab1cda07459c291969fd4",
+    "scriptable/DailyPlannerWidget.js": "fe6e126fce6ffdced46f5450a315c972cc4550ce724d3f7bc16b9b7c01fb5ab6",
+    "netlify/functions/canvas-calendar-feed.js": "60a8119a20f83ffd9b3a177a549789e9e8353950b0e63b57950ae77a8135a795",
+    "netlify/functions/weekly-schedule-reminders.js": "f1734f19ad6f70eb3364a7e8f084e4f3ff994ce66326077df7ebac765c4ad5fe",
+    "netlify/functions/event-photo-import.js": "38e43d64bc1bcbcf128e0b24b516bbfe9439a79e52fe02291f89538cda49f47e",
+    "netlify/functions/academic-calendar.js": "a710fa64ecb8656b0420a878e3cd493b3835d47ff815f8a6773c18ec9e23879e",
+    "netlify/functions/homework-photo-import.js": "f467fa77c616d5f1fc1158a7c7609f5f5dca4b51938c56fe50ad1f57b12e6d7e"
+  }
+}

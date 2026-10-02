@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#7eaed6" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="UniPlan" />
+    <meta
+      name="description"
+      content="UniPlan helps you track homework, class schedules, daily plans, and reminders in one calendar."
+    />
+    <title>UniPlan | Student Planner</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/mobile.css" />
+    <link rel="stylesheet" href="css/customization.css" />
+  </head>
+  <body class="mobile-preview">
+    <div class="background-layer"></div>
+
+    <main class="auth-screen" id="auth-screen" aria-live="polite">
+      <section class="auth-panel">
+        <div class="auth-brand">
+          <div class="brand-mark">U</div>
+          <div>
+            <p class="eyebrow">Student planner</p>
+            <h1 id="auth-title">Create your login</h1>
+          </div>
+        </div>
+
+        <div class="auth-mode-switch" role="group" aria-label="Choose login or sign up">
+          <button class="auth-mode-button is-active" id="login-mode" type="button" data-auth-mode="login">Log in</button>
+          <button class="auth-mode-button" id="signup-mode" type="button" data-auth-mode="signup">Sign up</button>
+        </div>
+
+        <form class="auth-form" id="login-form">
+          <label class="field">
+            <span>Email</span>
+            <input id="login-email" type="email" maxlength="120" placeholder="you@example.com" autocomplete="email" required />
+          </label>
+
+          <label class="field">
+            <span>Password</span>
+            <input id="login-password" type="password" minlength="6" maxlength="80" placeholder="At least 6 characters" autocomplete="new-password" required />
+          </label>
+
+          <button class="primary-button" type="submit" id="login-submit">Continue</button>
+          <p class="auth-status" id="login-status" role="status"></p>
+        </form>
+
+        <form class="auth-form" id="profile-setup-form" hidden>
+          <label class="field">
+            <span>Full name</span>
+            <input id="setup-name" type="text" maxlength="80" placeholder="Your full name" autocomplete="name" required />
+          </label>
+
+          <label class="field">
+            <span>Phone number</span>
+            <input id="setup-phone" type="tel" maxlength="30" placeholder="(555) 123-4567" autocomplete="tel" required />
+          </label>
+
+<fieldset class="canvas-setup"><legend>Canvas setup (optional)</legend><p class="settings-note">Set this up now or later in Settings. Every field below is optional.</p><label class="field"><span>School name</span><input id="setup-school" type="text" maxlength="120" autocomplete="organization" placeholder="Your school" /></label><label class="field"><span>Your Canvas website</span><input id="setup-canvas-url" type="url" maxlength="300" placeholder="https://school.instructure.com" /></label><label class="field"><span>Private Canvas calendar feed</span><input id="setup-canvas-feed" type="password" maxlength="500" autocomplete="off" placeholder="Paste your Canvas .ics feed link" /></label><details class="canvas-guide"><summary>How to find your Canvas calendar feed</summary><ol><li>Open your school’s Canvas website in a browser and sign in.</li><li>Select <strong>Calendar</strong> in the Canvas navigation.</li><li>Select <strong>Calendar Feed</strong> in the calendar sidebar. On a phone, try the browser’s desktop website view if the sidebar is hidden.</li><li>Copy the full link ending in <strong>.ics</strong> and paste it into the calendar feed field.</li></ol><p>Keep this link private. UniPlan lets you review dated assignments and exams before adding them.</p><a href="https://community.instructure.com/en/kb/articles/662787-how-do-i-use-the-calendar" target="_blank" rel="noopener noreferrer">Canvas calendar help</a></details><p class="settings-note">If email confirmation is required, return to this browser to finish saving your private feed.</p></fieldset>
+          <button class="primary-button" type="submit">Finish setup</button>
+          <p class="auth-status" id="setup-status" role="status"></p>
+        </form>
+      </section>
+    </main>
+
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="topbar-main">
+          <div class="brand-block">
+            <div class="brand-mark">U</div>
+            <div>
+              <p class="eyebrow">Student planner</p>
+              <h1>UniPlan</h1>
+            </div>
+            <time class="mobile-current-date" id="mobile-current-date"></time>
+          </div>
+
+          <div class="topbar-stats">
+            <button class="mini-stat stat-button" data-tab-target="todo" type="button">
+              <span class="mini-label">To-do list</span>
+              <strong id="header-todo-count">0</strong>
+            </button>
+            <button class="mini-stat stat-button" data-tab-target="homework" type="button">
+              <span class="mini-label">Homework</span>
+              <strong id="header-homework-count">0</strong>
+            </button>
+            <button class="mini-stat stat-button" data-tab-target="exams" type="button">
+              <span class="mini-label">Exams</span>
+              <strong id="header-exam-count">0</strong>
+            </button>
+            <button class="mini-stat stat-button" data-tab-target="classes" type="button">
+              <span class="mini-label">Today’s classes</span>
+              <strong id="today-classes-count">0</strong>
+            </button>
+
+          </div>
+            <div class="topbar-shortcuts">
+              <button class="canvas-shortcut-button" id="open-canvas" type="button" title="Open Canvas" aria-label="Open Canvas"><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" class="canvas-logomark" aria-hidden="true" focusable="false" x="0" y="0" viewBox="0 0 200 200" width="200" height="200" xml:space="preserve">
+  <path fill="#E23E30" d="M29.2 100c0-14.9-11.2-26.9-25.5-28.4C1.5 80.6 0 89.6 0 100s1.5 19.4 3.7 28.4C18 126.9 29.2 114.2 29.2 100L29.2 100zM46.4 90.3c5 0 9 4 9 9s-4 9-9 9 -9-4-9-9S41.5 90.3 46.4 90.3zM170.8 100c0 14.9 11.2 26.9 25.5 28.4 2.2-9 3.7-18.7 3.7-28.4s-1.5-19.4-3.7-28.4C182 73.1 170.8 85.1 170.8 100L170.8 100zM151.3 90.3c5 0 9 4 9 9s-4 9-9 9c-5 0-9-4-9-9S146.3 90.3 151.3 90.3zM99.6 170.9c-15 0-27 11.2-28.5 25.4 9 2.2 18.7 3.7 28.5 3.7s19.5-1.5 28.5-3.7C126.6 182.1 114.6 170.9 99.6 170.9L99.6 170.9zM98.9 142.5c5 0 9 4 9 9 0 4.9-4 9-9 9 -5 0-9-4-9-9C89.9 146.5 93.9 142.5 98.9 142.5zM99.6 29.1c15 0 27-11.2 28.5-25.4 -9-2.2-18.7-3.7-28.5-3.7S80.1 1.5 71.2 3.7C72.7 17.9 84.6 29.1 99.6 29.1L99.6 29.1zM98.9 38.1c5 0 9 4 9 9s-4 9-9 9c-5 0-9-4-9-9S93.9 38.1 98.9 38.1zM149.8 150c-10.5 10.4-11.2 26.9-2.2 38.1 16.5-9.7 30.7-23.9 40.4-40.3C176.8 138.8 160.3 139.6 149.8 150L149.8 150zM136.3 127.6c5 0 9 4 9 9 0 4.9-4 9-9 9 -5 0-9-4-9-9C127.3 131.6 131.4 127.6 136.3 127.6zM49.4 50c10.5-10.4 11.2-26.9 2.2-38.1C35.2 21.6 21 35.8 11.2 52.2 22.5 61.2 39 60.4 49.4 50L49.4 50zM61.4 53c5 0 9 4 9 9s-4 9-9 9 -9-4-9-9S56.5 53 61.4 53zM149.8 50c10.5 10.4 27 11.2 38.2 2.2 -9.7-16.4-24-30.6-40.4-40.3C138.6 23.1 139.3 39.6 149.8 50L149.8 50zM136.3 53c5 0 9 4 9 9s-4 9-9 9c-5 0-9-4-9-9S131.4 53 136.3 53zM49.4 150c-10.5-10.4-27-11.2-38.2-2.2 9.7 16.4 24 30.6 40.4 40.3C60.7 176.1 59.9 160.4 49.4 150L49.4 150zM61.4 127.6c5 0 9 4 9 9 0 4.9-4 9-9 9s-9-4-9-9C52.4 131.6 56.5 127.6 61.4 127.6z"/>
+</svg></button>
+              <button class="mobile-quick-add-button" id="mobile-quick-add" type="button" aria-label="Quick add" title="Quick add"><span aria-hidden="true">➕</span></button>
+              <button class="settings-button" id="open-settings" type="button" aria-label="Open settings" title="Settings"><span aria-hidden="true">⚙</span></button>
+            </div>
+
+        </div>
+
+        <div class="topbar-actions">
+          <div class="topbar-action-row">
+            <button class="ghost-button" id="jump-today" type="button"><span aria-hidden="true">📍</span> <span id="jump-today-label">Today</span></button>
+            <button class="primary-button" id="quick-add" type="button" aria-label="Quick add" title="Quick add"><span aria-hidden="true">+</span></button>
+          </div>
+        </div>
+      </header>
+
+      <main class="dashboard">
+        <section class="tab-shell">
+          <div class="tab-row" role="tablist" aria-label="Planner sections">
+            <button class="tab-button is-active" id="tab-calendar" data-tab="calendar" type="button" role="tab" aria-selected="true">
+              <span aria-hidden="true">📅</span><span class="tab-label">Calendar</span>
+            </button>
+            <button class="tab-button" id="tab-todo" data-tab="todo" type="button" role="tab" aria-selected="false">
+              <span aria-hidden="true">✓</span><span class="tab-label">To-Do</span>
+            </button>
+            <button class="tab-button" id="tab-classes" data-tab="classes" type="button" role="tab" aria-selected="false">
+              <span aria-hidden="true">🎓</span><span class="tab-label">Classes</span>
+            </button>
+            <button class="tab-button" id="tab-events" data-tab="events" type="button" role="tab" aria-selected="false">
+              <span aria-hidden="true">🎟️</span><span class="tab-label">Events</span>
+            </button>
+            <button class="tab-button" id="tab-homework" data-tab="homework" type="button" role="tab" aria-selected="false">
+              <span aria-hidden="true">📚</span><span class="tab-label">Homework</span>
+            </button>
+            <button class="tab-button" id="tab-exams" data-tab="exams" type="button" role="tab" aria-selected="false">
+              <span aria-hidden="true">📝</span><span class="tab-label">Exams</span>
+            </button>
+            <button class="tab-button" id="tab-reminders" data-tab="reminders" type="button" role="tab" aria-selected="false">
+              <span aria-hidden="true">🔔</span><span class="tab-label">Reminders</span>
+            </button>
+            <button class="tab-button" id="tab-settings" data-tab="settings" type="button" role="tab" aria-selected="false">
+              <span aria-hidden="true">⚙️</span><span class="tab-label">Settings</span>
+            </button>
+          </div>
+
+          <div class="tab-panels">
+            <section class="tab-panel is-active" id="panel-calendar" data-panel="calendar" role="tabpanel" aria-labelledby="tab-calendar">
+              <div class="panel-grid calendar-layout">
+                <article class="panel-card calendar-panel">
+                  <div class="panel-header calendar-header">
+                    <div class="calendar-heading">
+                      <p class="panel-label">Calendar view <span class="calendar-theme-decoration" aria-hidden="true"><span class="theme-decoration-christmas">🎄 ❄️ 🎁</span><span class="theme-decoration-halloween">🎃 👻 🦇</span><span class="theme-decoration-valentine">💗 💌 💕</span><span class="theme-decoration-spring">🌷 🐣 🌼</span><span class="theme-decoration-autumn">🍂 🍁</span><span class="theme-decoration-sunset">🌅</span></span></p>
+                      <h3 id="calendar-month-label">Month</h3>
+                    </div>
+                    <div class="nav-actions">
+                      <button class="small-button" id="calendar-share-schedule" type="button">↗ Share</button>
+                      <button class="small-button calendar-today-button" id="calendar-today" type="button"><span aria-hidden="true">📍</span> Today</button>
+                      <button class="icon-button" id="prev-month" type="button" aria-label="Previous month">←</button>
+                      <button class="icon-button" id="next-month" type="button" aria-label="Next month">→</button>
+                    </div>
+                  </div>
+
+                  <div class="calendar-view-switch" role="group" aria-label="Calendar view" data-active-index="1">
+                    <button class="view-switch-button" type="button" data-calendar-view="month">Month</button>
+                    <button class="view-switch-button is-active" type="button" data-calendar-view="week">Week</button>
+                    <button class="view-switch-button" type="button" data-calendar-view="day">Day</button>
+                  </div>
+                  <label class="calendar-filter field"><span>Show</span><select id="calendar-filter"><option value="all">Everything</option><option value="class">Classes</option><option value="homework">Homework</option><option value="event">Other events</option><option value="exam">Exams &amp; quizzes</option><option value="reminder">Reminders</option></select></label>
+
+                  <div class="calendar-weekdays" id="calendar-weekdays"></div>
+                  <div class="calendar-grid" id="calendar-grid" aria-live="polite"></div>
+                </article>
+
+                <article class="panel-card day-overview-panel">
+                  <div class="panel-header">
+                    <div>
+                      <p class="panel-label">Selected day</p>
+                      <h3 id="selected-date-title">Today</h3>
+                    </div>
+                  </div>
+
+                  <div class="day-summary" id="calendar-day-summary"></div>
+                </article>
+              </div>
+            </section>
+
+            <section class="tab-panel" id="panel-todo" data-panel="todo" role="tabpanel" aria-labelledby="tab-todo">
+              <article class="panel-card todo-panel">
+                <div class="panel-header"><div><p class="panel-label">Coming up</p><h3>Homework, exams &amp; reminders</h3></div><span class="todo-count" id="todo-count">0 left</span></div>
+                <div class="todo-filters">
+                  <label class="field"><span>Show</span><select id="todo-type-filter"><option value="all">All items</option><option value="academic">Homework &amp; exams</option><option value="homework">Homework</option><option value="exam">Exams</option><option value="reminder">Reminders</option></select></label>
+                  <label class="field"><span>Class</span><select id="todo-class-filter"><option value="all">All classes</option></select></label>
+<label class="field"><span>Sort by</span><select id="todo-sort"><option value="date">Due date</option><option value="homework">Homework first</option><option value="exam">Exams first</option></select></label>
+                </div>
+                <div class="todo-list" id="todo-list" aria-live="polite"></div>
+<details class="completed-section" id="todo-completed"><summary>Completed <span id="todo-completed-count">(0)</span></summary><div class="todo-list" id="todo-completed-list"></div></details>
+              </article>
+            </section>
+
+            <section class="tab-panel" id="panel-classes" data-panel="classes" role="tabpanel" aria-labelledby="tab-classes">
+              <div class="panel-grid split-layout">
+                <article class="panel-card">
+                  <div class="panel-header">
+                    <div>
+                      <p class="panel-label">Add class</p>
+                      <h3>Classes in your schedule</h3>
+                    </div>
+                    <button class="ghost-button" id="share-school-schedule" type="button"><span aria-hidden="true">↗</span> Share schedule</button>
+                  </div>
+
+                  <form class="entry-form" id="class-form">
+                    <input type="hidden" id="class-id" />
+
+                    <label class="field">
+                      <span>Class name</span>
+                      <input id="class-title" type="text" maxlength="80" placeholder="Physics lecture" required />
+                    </label>
+
+                    <label class="checkbox-row online-class-toggle"><input id="class-online" type="checkbox" /><span>Online class with no meeting time</span></label>
+                    <p class="settings-note" id="online-class-hint" hidden>Save the course name so Canvas homework can match it. A date and meeting time are not required.</p>
+
+                    <div class="field-row" id="class-date-location-row">
+                      <label class="field">
+                        <span>Date</span>
+                        <input id="class-date" type="date" required />
+                      </label>
+                      <label class="field">
+                        <span>Location</span>
+                        <input id="class-location" type="text" maxlength="300" placeholder="Place or full street address" aria-describedby="class-location-hint" />
+                        <small id="class-location-hint">Add an address to open it in Google Maps or Apple Maps after saving.</small>
+                      </label>
+                    </div>
+
+                    <div class="field-row" id="class-time-row">
+                      <label class="field">
+                        <span>Start time</span>
+                        <input id="class-start" type="time" required />
+                      </label>
+                      <label class="field">
+                        <span>End time</span>
+                        <input id="class-end" type="time" required />
+                      </label>
+                    </div>
+
+                    <label class="field color-field">
+                      <span>Color</span>
+                      <input id="class-color" type="color" value="#7eaed6" />
+                    </label>
+
+                    <div class="match-box">
+                      <label class="checkbox-row">
+                        <input id="class-match-color" type="checkbox" />
+                        <span>Match another plan's color</span>
+                      </label>
+
+                      <div class="match-options" id="class-match-options">
+                        <label class="field">
+                          <span>Match source</span>
+                          <select id="class-match-source">
+                            <option value="">Select a saved plan</option>
+                          </select>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="repeat-box" id="class-repeat-box">
+                      <label class="checkbox-row">
+                        <input id="class-repeat" type="checkbox" />
+                        <span>Repeat</span>
+                      </label>
+
+                      <div class="repeat-options" id="class-repeat-options">
+                        <label class="field">
+                          <span>Repeat pattern</span>
+                          <select id="class-repeat-mode">
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                          </select>
+                        </label>
+
+                        <div class="field repeat-weekdays" id="class-repeat-weekdays">
+                          <span>Repeat on</span>
+                          <div class="weekday-checks">
+                            <label><input type="checkbox" name="class-repeat-day" value="1" /> Mon</label>
+                            <label><input type="checkbox" name="class-repeat-day" value="2" /> Tue</label>
+                            <label><input type="checkbox" name="class-repeat-day" value="3" /> Wed</label>
+                            <label><input type="checkbox" name="class-repeat-day" value="4" /> Thu</label>
+                            <label><input type="checkbox" name="class-repeat-day" value="5" /> Fri</label>
+                            <label><input type="checkbox" name="class-repeat-day" value="6" /> Sat</label>
+                            <label><input type="checkbox" name="class-repeat-day" value="0" /> Sun</label>
+                          </div>
+                        </div>
+
+                        <label class="field">
+                          <span>Repeat until</span>
+                          <input id="class-repeat-until" type="date" />
+                        </label>
+
+                        <label class="checkbox-row">
+                          <input id="class-repeat-forever" type="checkbox" />
+                          <span>Forever</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <label class="field">
+                      <span>Notes</span>
+                      <textarea id="class-notes" rows="4" maxlength="240" placeholder="Anything important for this class"></textarea>
+                    </label>
+
+                    <div class="form-actions">
+                      <button class="ghost-button" id="class-reset" type="button">Clear</button>
+                      <button class="primary-button" type="submit">Save class</button>
+                    </div>
+                  </form>
+                </article>
+
+                <article class="panel-card">
+                  <div class="panel-header">
+                    <div>
+                      <p class="panel-label">Class list</p>
+                      <h3>Add or remove classes</h3>
+                    </div>
+                  </div>
+
+                  <div class="item-list" id="class-list"></div>
+                </article>
+              </div>
+            </section>
+
+            <section class="tab-panel" id="panel-events" data-panel="events" role="tabpanel" aria-labelledby="tab-events">
+              <div class="panel-grid split-layout">
+                <article class="panel-card">
+                  <div class="panel-header">
+                    <div>
+                      <p class="panel-label">Add event</p>
+                      <h3>Events outside of class</h3>
+                    </div>
+                  </div>
+
+                  <form class="entry-form" id="event-form">
+                    <input type="hidden" id="event-id" />
+
+                    <label class="field">
+                      <span>Event name</span>
+                      <input id="event-title" type="text" maxlength="80" placeholder="Study group" required />
+                    </label>
+
+                    <div class="field-row">
+                      <label class="field">
+                        <span>Date</span>
+                        <input id="event-date" type="date" required />
+                      </label>
+                      <label class="field">
+                        <span>Location</span>
+                        <input id="event-location" type="text" maxlength="300" placeholder="Place or full street address" aria-describedby="event-location-hint" />
+                        <small id="event-location-hint">Add an address to open it in Google Maps or Apple Maps after saving.</small>
+                      </label>
+                    </div>
+
+                    <div class="field-row">
+                      <label class="field">
+                        <span>Start time</span>
+                        <input id="event-start" type="time" required />
+                      </label>
+                      <label class="field">
+                        <span>End time</span>
+                        <input id="event-end" type="time" required />
+                      </label>
+                    </div>
+
+                    <label class="field color-field">
+                      <span>Color</span>
+                      <input id="event-color" type="color" value="#7eaed6" />
+                    </label>
+
+                    <div class="match-box">
+                      <label class="checkbox-row">
+                        <input id="event-match-color" type="checkbox" />
+                        <span>Match another plan's color</span>
+                      </label>
+
+                      <div class="match-options" id="event-match-options">
+                        <label class="field">
+                          <span>Match source</span>
+                          <select id="event-match-source">
+                            <option value="">Select a saved plan</option>
+                          </select>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="repeat-box">
+                      <label class="checkbox-row">
+                        <input id="event-repeat" type="checkbox" />
+                        <span>Repeat</span>
+                      </label>
+
+                      <div class="repeat-options" id="event-repeat-options">
+                        <label class="field">
+                          <span>Repeat pattern</span>
+                          <select id="event-repeat-mode">
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                          </select>
+                        </label>
+
+                        <div class="field repeat-weekdays" id="event-repeat-weekdays">
+                          <span>Repeat on</span>
+                          <div class="weekday-checks">
+                            <label><input type="checkbox" name="event-repeat-day" value="1" /> Mon</label>
+                            <label><input type="checkbox" name="event-repeat-day" value="2" /> Tue</label>
+                            <label><input type="checkbox" name="event-repeat-day" value="3" /> Wed</label>
+                            <label><input type="checkbox" name="event-repeat-day" value="4" /> Thu</label>
+                            <label><input type="checkbox" name="event-repeat-day" value="5" /> Fri</label>
+                            <label><input type="checkbox" name="event-repeat-day" value="6" /> Sat</label>
+                            <label><input type="checkbox" name="event-repeat-day" value="0" /> Sun</label>
+                          </div>
+                        </div>
+
+                        <label class="field">
+                          <span>Repeat until</span>
+                          <input id="event-repeat-until" type="date" />
+                        </label>
+
+                        <label class="checkbox-row">
+                          <input id="event-repeat-forever" type="checkbox" />
+                          <span>Forever</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <label class="field">
+                      <span>Notes</span>
+                      <textarea id="event-notes" rows="4" maxlength="240" placeholder="Anything important for this event"></textarea>
+                    </label>
+
+                    <div class="form-actions">
+                      <button class="ghost-button" id="event-reset" type="button">Clear</button>
+                      <button class="primary-button" type="submit">Save event</button>
+                    </div>
+                  </form>
+                </article>
+
+                <article class="panel-card">
+                  <div class="panel-header">
+                    <div>
+                      <p class="panel-label">Event list</p>
+                      <h3>Add or remove other events</h3>
+                    </div>
+                  </div>
+
+                  <div class="item-list" id="event-list"></div>
+                </article>
+              </div>
+            </section>
+
+            <section class="tab-panel" id="panel-homework" data-panel="homework" role="tabpanel" aria-labelledby="tab-homework">
+              <div class="panel-grid split-layout">
+                <article class="panel-card">
+                  <div class="panel-header">
+                    <div>
+                      <p class="panel-label">Add homework</p>
+                      <h3>Assignments and due dates</h3>
+                    </div>
+                  </div>
+
+                  <details class="school-import-accordion" data-school-import-panel="homework">
+                    <summary>Import homework from school</summary>
+                    <div class="school-import-card">
+                      <p class="settings-note" data-school-import-status role="status" aria-live="polite">Open this dropdown to check for new upcoming homework.</p>
+                      <div class="item-list school-import-list" data-school-import-list></div>
+                      <div class="form-actions import-actions">
+                        <button class="ghost-button" data-clear-school-imports type="button">Clear results</button>
+                      </div>
+                    </div>
+                  </details>
+
+                  <form class="entry-form" id="homework-form">
+                    <input type="hidden" id="homework-id" />
+
+                    <label class="field">
+                      <span>Title</span>
+                      <input id="homework-title" type="text" maxlength="80" placeholder="Calculus worksheet" required />
+                    </label>
+
+                    <div class="field-row">
+                      <label class="field">
+                        <span>Class</span>
+                        <select id="homework-class" required><option value="">Choose a class</option></select>
+                      </label>
+                      <label class="field">
+                        <span>Due date</span>
+                        <input id="homework-date" type="date" required />
+                      </label>
+                    </div>
+
+                    <div class="field-row">
+                      <label class="field">
+                        <span>Due time</span>
+                        <input id="homework-time" type="time" />
+                      </label>
+                      <label class="field">
+                        <span>Status</span>
+                        <select id="homework-status">
+                          <option value="pending">Pending</option>
+                          <option value="done">Done</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <label class="field color-field">
+                      <span>Color</span>
+                      <input id="homework-color" type="color" value="#7eaed6" />
+                    </label>
+                    <label class="checkbox-row"><input id="homework-priority" type="checkbox" /><span>Priority</span></label>
+
+                    <div class="match-box">
+                      <label class="checkbox-row">
+                        <input id="homework-match-color" type="checkbox" />
+                        <span>Match another plan's color</span>
+                      </label>
+
+                      <div class="match-options" id="homework-match-options">
+                        <label class="field">
+                          <span>Match source</span>
+                          <select id="homework-match-source">
+                            <option value="">Select a saved plan</option>
+                          </select>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="repeat-box">
+                      <label class="checkbox-row">
+                        <input id="homework-repeat" type="checkbox" />
+                        <span>Repeat</span>
+                      </label>
+
+                      <div class="repeat-options" id="homework-repeat-options">
+                        <label class="field">
+                          <span>Repeat pattern</span>
+                          <select id="homework-repeat-mode">
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                          </select>
+                        </label>
+
+                        <div class="field repeat-weekdays" id="homework-repeat-weekdays">
+                          <span>Repeat on</span>
+                          <div class="weekday-checks">
+                            <label><input type="checkbox" name="homework-repeat-day" value="1" /> Mon</label>
+                            <label><input type="checkbox" name="homework-repeat-day" value="2" /> Tue</label>
+                            <label><input type="checkbox" name="homework-repeat-day" value="3" /> Wed</label>
+                            <label><input type="checkbox" name="homework-repeat-day" value="4" /> Thu</label>
+                            <label><input type="checkbox" name="homework-repeat-day" value="5" /> Fri</label>
+                            <label><input type="checkbox" name="homework-repeat-day" value="6" /> Sat</label>
+                            <label><input type="checkbox" name="homework-repeat-day" value="0" /> Sun</label>
+                          </div>
+                        </div>
+
+                        <label class="field">
+                          <span>Repeat until</span>
+                          <input id="homework-repeat-until" type="date" />
+                        </label>
+
+                        <label class="checkbox-row">
+                          <input id="homework-repeat-forever" type="checkbox" />
+                          <span>Forever</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <label class="field">
+                      <span>Notes</span>
+                      <textarea id="homework-notes" rows="4" maxlength="240" placeholder="Chapter, problems, or submission details"></textarea>
+                    </label>
+
+                    <div class="form-actions">
+                      <button class="ghost-button" id="homework-reset" type="button">Clear</button>
+                      <button class="primary-button" type="submit">Save homework</button>
+                    </div>
+                  </form>
+                </article>
+
+                <article class="panel-card">
+                  <div class="panel-header">
+                    <div>
+                      <p class="panel-label">Homework list</p>
+                      <h3>Everything you still need to track</h3>
+                    </div>
+                    <label class="field collection-filter"><span>Class</span><select id="homework-class-filter"><option value="all">All classes</option></select></label>
+                  </div>
+
+                  <div class="item-list" id="homework-list"></div>
+<details class="completed-section" id="homework-completed"><summary>Completed <span id="homework-completed-count">(0)</span></summary><div class="item-list" id="homework-completed-list"></div></details>
+                </article>
+              </div>
+            </section>
+
+            <section class="tab-panel" id="panel-exams" data-panel="exams" role="tabpanel" aria-labelledby="tab-exams">
+              <div class="panel-grid split-layout">
+                <article class="panel-card">
+                  <div class="panel-header">
+                    <div>
+                      <p class="panel-label">Add exam</p>
+                      <h3>Tests, quizzes, and finals</h3>
+                    </div>
+                  </div>
+
+                  <details class="school-import-accordion" data-school-import-panel="exam">
+                    <summary>Import exams from school</summary>
+                    <div class="school-import-card">
+                      <p class="settings-note" data-school-import-status role="status" aria-live="polite">Open this dropdown to check for new upcoming exams.</p>
+                      <div class="item-list school-import-list" data-school-import-list></div>
+                      <div class="form-actions import-actions">
+                        <button class="ghost-button" data-clear-school-imports type="button">Clear results</button>
+                      </div>
+                    </div>
+                  </details>
+
+                  <form class="entry-form" id="exam-form">
+                    <input type="hidden" id="exam-id" />
+
+                    <label class="field">
+                      <span>Exam name</span>
+                      <input id="exam-title" type="text" maxlength="80" placeholder="Physics midterm" required />
+                    </label>
+
+                    <div class="field-row">
+                      <label class="field">
+                        <span>Class</span>
+                        <select id="exam-course" required><option value="">Choose a class</option></select>
+                      </label>
+                      <label class="field">
+                        <span>Date</span>
+                        <input id="exam-date" type="date" required />
+                      </label>
+                    </div>
+
+                    <div class="field-row">
+                      <label class="field">
+                        <span>Time</span>
+                        <input id="exam-time" type="time" />
+                      </label>
+                      <label class="field color-field">
+                        <span>Color</span>
+                        <input id="exam-color" type="color" value="#7eaed6" />
+                      </label>
+                    </div>
+                    <label class="checkbox-row"><input id="exam-priority" type="checkbox" /><span>Priority</span></label>
+
+                    <div class="match-box">
+                      <label class="checkbox-row">
+                        <input id="exam-match-color" type="checkbox" />
+                        <span>Match another plan's color</span>
+                      </label>
+
+                      <div class="match-options" id="exam-match-options">
+                        <label class="field">
+                          <span>Match source</span>
+                          <select id="exam-match-source">
+                            <option value="">Select a saved plan</option>
+                          </select>
+                        </label>
+                      </div>
+                    </div>
+
+                    <label class="field">
+                      <span>Notes</span>
+                      <textarea id="exam-notes" rows="4" maxlength="240" placeholder="Room, chapters, or study notes"></textarea>
+                    </label>
+
+                    <div class="form-actions">
+                      <button class="ghost-button" id="exam-reset" type="button">Clear</button>
+                      <button class="primary-button" type="submit">Save exam</button>
+                    </div>
+                  </form>
+                </article>
+
+                <article class="panel-card">
+                  <div class="panel-header">
+                    <div>
+                      <p class="panel-label">Exam list</p>
+                      <h3>Upcoming exams</h3>
+                    </div>
+                    <label class="field collection-filter"><span>Class</span><select id="exam-class-filter"><option value="all">All classes</option></select></label>
+                  </div>
+
+                  <div class="item-list" id="exam-list"></div>
+<details class="completed-section" id="exam-completed"><summary>Completed <span id="exam-completed-count">(0)</span></summary><div class="item-list" id="exam-completed-list"></div></details>
+                </article>
+              </div>
+            </section>
+
+            <section class="tab-panel" id="panel-reminders" data-panel="reminders" role="tabpanel" aria-labelledby="tab-reminders">
+              <div class="panel-grid split-layout">
+                <article class="panel-card">
+                  <div class="panel-header">
+                    <div>
+                      <p class="panel-label">Add reminder</p>
+                      <h3>Other reminders that are not homework</h3>
+                    </div>
+                  </div>
+
+                  <form class="entry-form" id="reminder-form">
+                    <input type="hidden" id="reminder-id" />
+
+                    <label class="field">
+                      <span>Title</span>
+                      <input id="reminder-title" type="text" maxlength="80" placeholder="Call advisor" required />
+                    </label>
+
+                    <div class="field-row">
+                      <label class="field">
+                        <span>Date</span>
+                        <input id="reminder-date" type="date" required />
+                      </label>
+                      <label class="field">
+                        <span>Time</span>
+                        <input id="reminder-time" type="time" />
+                      </label>
+                    </div>
+
+                    <label class="field color-field">
+                      <span>Color</span>
+                      <input id="reminder-color" type="color" value="#7eaed6" />
+                    </label>
+                    <label class="checkbox-row"><input id="reminder-priority" type="checkbox" /><span>Priority</span></label>
+
+                    <div class="match-box">
+                      <label class="checkbox-row">
+                        <input id="reminder-match-color" type="checkbox" />
+                        <span>Match another plan's color</span>
+                      </label>
+
+                      <div class="match-options" id="reminder-match-options">
+                        <label class="field">
+                          <span>Match source</span>
+                          <select id="reminder-match-source">
+                            <option value="">Select a saved plan</option>
+                          </select>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="repeat-box">
+                      <label class="checkbox-row">
+                        <input id="reminder-repeat" type="checkbox" />
+                        <span>Repeat</span>
+                      </label>
+
+                      <div class="repeat-options" id="reminder-repeat-options">
+                        <label class="field">
+                          <span>Repeat pattern</span>
+                          <select id="reminder-repeat-mode">
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                          </select>
+                        </label>
+
+                        <div class="field repeat-weekdays" id="reminder-repeat-weekdays">
+                          <span>Repeat on</span>
+                          <div class="weekday-checks">
+                            <label><input type="checkbox" name="reminder-repeat-day" value="1" /> Mon</label>
+                            <label><input type="checkbox" name="reminder-repeat-day" value="2" /> Tue</label>
+                            <label><input type="checkbox" name="reminder-repeat-day" value="3" /> Wed</label>
+                            <label><input type="checkbox" name="reminder-repeat-day" value="4" /> Thu</label>
+                            <label><input type="checkbox" name="reminder-repeat-day" value="5" /> Fri</label>
+                            <label><input type="checkbox" name="reminder-repeat-day" value="6" /> Sat</label>
+                            <label><input type="checkbox" name="reminder-repeat-day" value="0" /> Sun</label>
+                          </div>
+                        </div>
+
+                        <label class="field">
+                          <span>Repeat until</span>
+                          <input id="reminder-repeat-until" type="date" />
+                        </label>
+
+                        <label class="checkbox-row">
+                          <input id="reminder-repeat-forever" type="checkbox" />
+                          <span>Forever</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <label class="field">
+                      <span>Notes</span>
+                      <textarea id="reminder-notes" rows="4" maxlength="240" placeholder="Any extra details"></textarea>
+                    </label>
+
+                    <div class="form-actions">
+                      <button class="ghost-button" id="reminder-reset" type="button">Clear</button>
+                      <button class="primary-button" type="submit">Save reminder</button>
+                    </div>
+                  </form>
+                </article>
+
+                <article class="panel-card">
+                  <div class="panel-header">
+                    <div>
+                      <p class="panel-label">Reminder list</p>
+                      <h3>Personal reminders and tasks</h3>
+                    </div>
+                  </div>
+
+                  <div class="item-list" id="reminder-list"></div>
+<details class="completed-section" id="reminder-completed"><summary>Completed <span id="reminder-completed-count">(0)</span></summary><div class="item-list" id="reminder-completed-list"></div></details>
+                </article>
+              </div>
+            </section>
+
+            <section class="tab-panel" id="panel-settings" data-panel="settings" role="tabpanel" aria-labelledby="tab-settings">
+              <div class="panel-grid settings-layout">
+                <article class="panel-card">
+                  <div class="panel-header">
+                    <div>
+                      <p class="panel-label">Profile</p>
+                      <h3>Settings</h3>
+                    </div>
+                  </div>
+
+                  <form class="entry-form" id="settings-form">
+                    <details id="app-customization" class="customization-panel customization-dropdown">
+                      <summary>App customization</summary>
+                      <div class="customization-dropdown-body">
+                      <div class="customization-heading"><div><p class="panel-label">Make it yours</p><h3 id="customization-title">App customization</h3></div><button class="small-button" id="customization-default" type="button">Default</button></div>
+                      <p class="settings-note">Choose a coordinated preset or mix your own style. Changes save automatically. Default restores the original appearance and layout.</p>
+                      <div id="customization-presets" class="customization-presets" role="group" aria-label="Combined theme presets"></div>
+                      <div class="customization-controls">
+                      <label class="field"><span>Color theme</span>                      <select id="settings-theme">
+                        <option value="classic">☀️ Classic · warm cream &amp; blue</option>
+                        <option value="christmas">🎄 Christmas · snowy evergreen &amp; cranberry</option>
+                        <option value="halloween">🎃 Halloween · pumpkin &amp; purple</option>
+                        <option value="valentine">💗 Valentine · rose &amp; raspberry</option>
+                        <option value="spring">🌷 Spring · mint &amp; blossom</option>
+                        <option value="autumn">🍂 Autumn · amber &amp; cinnamon</option>
+                        <option value="ocean">🌊 Ocean · sea blue &amp; turquoise</option>
+                        <option value="lavender">🪻 Lavender · soft lilac &amp; plum</option>
+                        <option value="sunset">🌅 Sunset · peach &amp; coral</option>
+                      </select></label>
+                      <label class="field"><span>Appearance</span><select data-customization="mode"><option value="light">Light</option><option value="dark">Dark</option><option value="system">Match device</option></select></label>
+                      <label class="field"><span>Calendar card size</span><select data-customization="density"><option value="compact">Compact · more events</option><option value="comfortable">Comfortable · more space</option></select></label>
+                      <label class="field"><span>Background</span><select data-customization="background"><option value="solid">Solid color</option><option value="gradient">Soft gradient</option><option value="pattern">Subtle dots</option><option value="photo">My photo</option></select></label>
+                      <label class="field"><span>Font</span><select data-customization="font"><option value="system">Classic sans serif</option><option value="rounded">Rounded</option><option value="serif">Book serif</option></select></label>
+                      <label class="field"><span>Text size</span><select data-customization="textSize"><option value="small">Small</option><option value="normal">Normal</option><option value="large">Large</option></select></label>
+                      <label class="field"><span>Week starts on</span><select data-customization="weekStart"><option value="sunday">Sunday</option><option value="monday">Monday</option></select></label>
+                      <label class="field"><span>Default calendar view</span><select data-customization="defaultView"><option value="month">Month</option><option value="week">Week</option><option value="day">Day</option></select></label>
+                      </div>
+                      <label class="customization-toggle"><input type="checkbox" data-customization="decorations" /> Holiday decorations, snow &amp; emojis</label>
+                      <label class="customization-toggle"><input type="checkbox" data-customization="customColors" /> Use my own colors</label>
+                      <div class="customization-controls" id="custom-colors" hidden>
+                        <label class="field"><span>Background color</span><input type="color" data-customization="backgroundColor" /></label>
+                        <label class="field"><span>Accent color</span><input type="color" data-customization="accentColor" /></label>
+                        <label class="field"><span>Calendar color</span><input type="color" data-customization="calendarColor" /></label>
+                      </div>
+                      <div id="custom-photo-controls" hidden>
+                        <label class="field"><span>Background photo</span><input id="custom-photo" type="file" accept="image/jpeg,image/png,image/webp" /></label>
+                        <p class="settings-note">JPG, PNG, or WebP up to 10 MB. Photos stay on this device. On other devices, choose a photo there too.</p>
+                        <button class="small-button" id="custom-photo-remove" type="button">Remove photo</button>
+                      </div>
+                      <details class="customization-dashboard"><summary>Dashboard cards · show, hide &amp; reorder</summary><div id="customization-cards"></div></details>
+                      <p id="customization-status" class="settings-note" role="status" aria-live="polite"></p>
+                      </div>
+                    </details>
+                    <label class="field">
+                      <span>Name</span>
+                      <input id="settings-name" type="text" maxlength="80" placeholder="Your name" autocomplete="name" />
+                    </label>
+
+                    <div class="field-row">
+                      <label class="field">
+                        <span>Email</span>
+                        <input id="settings-email" type="email" maxlength="120" placeholder="you@example.com" autocomplete="email" />
+                      </label>
+                      <label class="field">
+                        <span>Phone number</span>
+                        <input id="settings-phone" type="tel" maxlength="30" placeholder="(555) 123-4567" autocomplete="tel" />
+                      </label>
+                    </div>
+
+                    <div hidden>
+                      <span>Notification preference</span>
+                      <div class="preference-options">
+                        <label>
+                          <input type="radio" name="notification-preference" value="email" />
+                          Email
+                        </label>
+                        <label>
+                          <input type="radio" name="notification-preference" value="text" />
+                          Text
+                        </label>
+                        <label>
+                          <input type="radio" name="notification-preference" value="both" />
+                          Both
+                        </label>
+                      </div>
+                      <button class="ghost-button pdf-button" id="send-day-schedule-pdf" type="button">Send day schedule to me as a PDF</button>
+                    </div>
+
+                    <div hidden>
+                      <span>Notification schedule</span>
+                      <div class="preference-options">
+                        <label>
+                          <input type="radio" name="notification-frequency" value="daily" />
+                          Daily
+                        </label>
+                        <label>
+                          <input type="radio" name="notification-frequency" value="weekly" />
+                          Weekly
+                        </label>
+                        <label>
+                          <input type="radio" name="notification-frequency" value="monthly" />
+                          Monthly
+                        </label>
+                      </div>
+                    </div>
+
+                    <div hidden>
+                      <span>Notify me to check</span>
+                      <div class="preference-options">
+                        <label>
+                          <input id="notify-homework" type="checkbox" />
+                          Homework
+                        </label>
+                        <label>
+                          <input id="notify-events" type="checkbox" />
+                          Events
+                        </label>
+                        <label>
+                          <input id="notify-classes" type="checkbox" />
+                          Classes
+                        </label>
+                        <label>
+                          <input id="notify-exams" type="checkbox" />
+                          Exams
+                        </label>
+                        <label>
+                          <input id="notify-reminders" type="checkbox" />
+                          Other reminders
+                        </label>
+                        <label>
+                          <input id="notify-day-scheduler" type="checkbox" />
+                          Calendar day view
+                        </label>
+                        <label>
+                          <input id="notify-school-accounts" type="checkbox" />
+                          School accounts
+                        </label>
+                        <label>
+                          <input id="notify-school-imports" type="checkbox" />
+                          School imports
+                        </label>
+                        <label>
+                          <input id="notify-settings" type="checkbox" />
+                          Settings
+                        </label>
+                        <label>
+                          <input id="notify-calendar" type="checkbox" />
+                          Update calendar
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="subsection widget-settings">
+                      <div class="subsection-header">
+                        <p class="panel-label">Widget display</p>
+                      </div>
+
+                      <div class="field-row">
+                        <label class="field">
+                          <span>Default widget view</span>
+                          <select id="widget-default-view">
+                            <option value="all">Everything upcoming</option>
+                            <option value="today">Today's planner</option>
+                            <option value="classes">Classes</option>
+                            <option value="homework">Homework</option>
+                            <option value="reminders">Reminders</option>
+                            <option value="tasks">To-Do list</option>
+                            <option value="exams">Exams &amp; quizzes</option>
+                            <option value="events">Events</option>
+                          </select>
+                        </label>
+                        <label class="field">
+                          <span>Scriptable opens to</span>
+                          <select id="scriptable-start-screen">
+                            <option value="calendar">Calendar</option>
+                            <option value="todo">To-Do</option>
+                            <option value="classes">Classes</option>
+                            <option value="events">Other Events</option>
+                            <option value="homework">Homework</option>
+                            <option value="exams">Exams</option>
+                            <option value="reminders">Other Reminders</option>
+                            <option value="settings">Settings</option>
+                          </select>
+                        </label>
+                        <label class="field">
+                          <span>Upcoming range</span>
+                          <select id="widget-days-ahead">
+                            <option value="1">Today only</option>
+                            <option value="3">Next 3 days</option>
+                            <option value="7">Next 7 days</option>
+                            <option value="14">Next 14 days</option>
+                            <option value="all">All upcoming</option>
+                          </select>
+                        </label>
+                        <label class="field">
+                          <span>Maximum items</span>
+                          <select id="widget-item-limit">
+                            <option value="3">3 items</option>
+                            <option value="5">5 items</option>
+                            <option value="8">8 items</option>
+                            <option value="10">10 items</option>
+                            <option value="12">12 items</option>
+                            <option value="14">14 items</option>
+                          </select>
+                        </label>
+                      </div>
+
+                      <label class="field">
+                        <span>Planner website URL for Scriptable</span>
+                        <input id="widget-planner-url" type="url" maxlength="240" placeholder="https://your-site.netlify.app" />
+                      </label>
+
+                      <div class="preference-box">
+                        <span>Show in widgets</span>
+                        <div class="preference-options">
+                          <label><input id="widget-show-classes" type="checkbox" /> Classes</label>
+                          <label><input id="widget-show-homework" type="checkbox" /> Homework</label>
+                          <label><input id="widget-show-events" type="checkbox" /> Events</label>
+                          <label><input id="widget-show-exams" type="checkbox" /> Exams</label>
+                          <label><input id="widget-show-reminders" type="checkbox" /> Reminders</label>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="subsection">
+                      <div class="subsection-header"><p class="panel-label">Canvas shortcut</p></div>
+                      <p class="settings-note">Save your school and Canvas home page for the Open Canvas button in the top bar.</p>
+                      <div class="field-row">
+                        <label class="field"><span>School name</span><input id="settings-canvas-shortcut-school" type="text" maxlength="120" placeholder="San Diego State University" /></label>
+                        <label class="field"><span>Canvas link</span><input id="settings-canvas-shortcut-url" type="url" maxlength="300" placeholder="https://sdsu.instructure.com" autocomplete="url" /></label>
+                      </div>
+                    </div>
+
+                    <div class="subsection">
+                      <div class="subsection-header">
+                        <p class="panel-label">Login password</p>
+                      </div>
+
+                      <div class="field-row">
+                        <label class="field">
+                          <span>Original password</span>
+                          <input id="settings-current-password" type="password" maxlength="80" placeholder="Current login password" autocomplete="current-password" />
+                        </label>
+                        <label class="field">
+                          <span>New password</span>
+                          <input id="settings-new-password" type="password" minlength="6" maxlength="80" placeholder="At least 6 characters" autocomplete="new-password" />
+                        </label>
+                      </div>
+
+                      <button class="ghost-button" id="settings-change-password" type="button">Change password</button>
+                    </div>
+
+                    <div class="subsection">
+                      <div class="subsection-header">
+                        <p class="panel-label">School accounts</p>
+                      </div>
+
+                      <label class="field">
+                        <span>Canvas calendar feed</span>
+                        <input id="settings-canvas-feed" type="password" maxlength="500" placeholder="Paste your private Canvas .ics feed link" autocomplete="off" />
+                      </label>
+                      <button class="primary-button" id="sync-canvas-feed" type="button">Check Canvas calendar</button>
+                      <p class="settings-note" id="canvas-feed-status" role="status">Finds dated assignments and exams for you to review before adding. Keep this link private.</p>
+
+<details class="canvas-guide"><summary>How to find your Canvas calendar feed</summary><ol><li>Open your school’s Canvas website in a browser and sign in.</li><li>Select <strong>Calendar</strong> in the Canvas navigation.</li><li>Select <strong>Calendar Feed</strong> in the calendar sidebar. On a phone, try the browser’s desktop website view if the sidebar is hidden.</li><li>Copy the full link ending in <strong>.ics</strong> and paste it into the calendar feed field.</li></ol><p>Keep this link private. UniPlan lets you review dated assignments and exams before adding them.</p><a href="https://community.instructure.com/en/kb/articles/662787-how-do-i-use-the-calendar" target="_blank" rel="noopener noreferrer">Canvas calendar help</a></details>
+                    </div>
+
+                    <div class="subsection whats-new-setting">
+                      <div class="subsection-header"><p class="panel-label">Latest updates</p></div>
+                      <p class="settings-note">See the newest sharing, maps, and calendar improvements.</p>
+                      <button class="ghost-button" id="settings-whats-new" type="button">View what’s new</button>
+                    </div>
+
+                    <div class="form-actions">
+                      <button class="ghost-button" id="settings-logout" type="button">Log out</button>
+                      <button class="ghost-button" id="settings-reset" type="button">Clear</button>
+                      <button class="primary-button" type="submit">Save settings</button>
+                    </div>
+                    <p class="settings-status" id="settings-status" role="status" aria-live="polite"></p>
+                  </form>
+                </article>
+
+                <article class="panel-card settings-summary-card">
+                  <div class="panel-header">
+                    <div>
+                      <p class="panel-label">Account and sync</p>
+                      <h3 id="settings-summary-title">Your planner</h3>
+                    </div>
+                  </div>
+
+                  <div class="settings-summary" id="settings-summary"></div>
+                  <button class="ghost-button pdf-button" id="sync-now" type="button">Sync now</button>
+
+                  <div class="subsection">
+                    <div class="subsection-header">
+                      <p class="panel-label">Saved passwords</p>
+                    </div>
+                    <div class="settings-summary" id="password-summary"></div>
+                  </div>
+
+                  <div class="subsection">
+                    <div class="subsection-header">
+                      <p class="panel-label">iPhone widgets</p>
+                    </div>
+                    <p class="settings-note">Use Scriptable to show today's schedule, classes, homework, or events on your Home Screen.</p>
+                    <a class="primary-button settings-download-link" href="scriptable/DailyPlannerWidget.js" download>Download Scriptable widget</a>
+                  </div>
+                </article>
+              </div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog class="whats-new-dialog" id="whats-new-dialog" aria-labelledby="whats-new-title">
+      <div class="whats-new-card">
+        <div class="whats-new-header">
+          <div>
+            <p class="panel-label">What’s new in UniPlan</p>
+            <h2 id="whats-new-title">Update 1.5.1</h2>
+            <p>Smarter dates and more reliable Canvas course colors.</p>
+          </div>
+          <button class="icon-button" id="whats-new-close" type="button" aria-label="Close what’s new">×</button>
+        </div>
+        <div class="whats-new-list">
+          <article><span aria-hidden="true">📍</span><div><h3>Today’s date on laptop</h3><p>The laptop Today button now displays the current weekday and date and refreshes automatically.</p></div></article>
+          <article><span aria-hidden="true">🎨</span><div><h3>Canvas imports match class colors</h3><p>Imported homework and exams now stay linked to their class color, including previously imported coursework.</p></div></article>
+        </div>
+        <figure class="update-comparison" aria-labelledby="update-comparison-title">
+          <figcaption id="update-comparison-title">Before and now</figcaption>
+          <div class="update-comparison-grid">
+            <div class="update-snapshot is-before">
+              <strong>Before</strong>
+              <div class="snapshot-toolbar"><span>Today</span><i></i><i></i><i></i></div>
+              <div class="snapshot-import"><span></span><span></span><span></span></div>
+              <small>Generic date button and identical import colors</small>
+            </div>
+            <div class="update-snapshot is-now">
+              <strong>Now</strong>
+              <div class="snapshot-toolbar"><span>📍 Mon, Sep 28</span><i></i><i></i><i></i></div>
+              <div class="snapshot-import"><span></span><span></span><span></span></div>
+              <small>Current date and colors matched to each class</small>
+            </div>
+          </div>
+        </figure>
+        <details class="update-history">
+          <summary>View Update 1.5</summary>
+          <div class="whats-new-list update-history-list">
+            <article><span aria-hidden="true">📱</span><div><h3>Cleaner mobile header</h3><p>Today’s date stays visible while quick actions sit neatly beside the dashboard cards.</p></div></article>
+            <article><span aria-hidden="true">📅</span><div><h3>Compact month view</h3><p>Slimmer calendar cards show more of every class, event, assignment, exam, and reminder name.</p></div></article>
+            <article><span aria-hidden="true">✓</span><div><h3>Consistent mobile controls</h3><p>Buttons and checkboxes are smaller, aligned, and easier to scan throughout mobile forms.</p></div></article>
+            <article><span aria-hidden="true">🎨</span><div><h3>Better themes</h3><p>Theme changes preserve your saved item colors, with clearer button outlines in dark mode.</p></div></article>
+          </div>
+        </details>
+        <details class="update-history">
+          <summary>View Update 1.0</summary>
+          <div class="whats-new-list update-history-list">
+            <article><span aria-hidden="true">🎨</span><div><h3>Customize UniPlan</h3><p>Choose themes, colors, fonts, backgrounds, text size, calendar density, and which dashboard cards you see.</p></div></article>
+            <article><span aria-hidden="true">↗</span><div><h3>Share your class schedule</h3><p>Create one branded page showing each class, its weekdays, and meeting time.</p></div></article>
+            <article><span aria-hidden="true">📍</span><div><h3>Open locations in Maps</h3><p>Saved addresses include direct links for Google Maps and Apple Maps.</p></div></article>
+            <article><span aria-hidden="true">📅</span><div><h3>A more useful calendar</h3><p>Open event details, drag between Month, Week, and Day, or hold a date to add something there.</p></div></article>
+          </div>
+        </details>
+        <button class="primary-button whats-new-done" id="whats-new-done" type="button">Got it</button>
+      </div>
+    </dialog>
+
+    <dialog class="quick-add-dialog" id="quick-add-dialog" aria-labelledby="quick-add-title">
+      <form method="dialog" class="quick-add-card">
+        <div class="panel-header">
+          <div>
+            <p class="panel-label">New planner item</p>
+            <h3 id="quick-add-title">What would you like to add?</h3>
+          </div>
+          <button class="icon-button" value="cancel" aria-label="Close">&times;</button>
+        </div>
+        <label class="field">
+          <span>Item type</span>
+          <select id="quick-add-type">
+            <option value="classes">Class schedule</option>
+            <option value="events">Event</option>
+            <option value="homework">Homework</option>
+            <option value="exams">Exam</option>
+            <option value="reminders">Reminder</option>
+          </select>
+        </label>
+        <div class="form-actions">
+          <button class="ghost-button" value="cancel">Cancel</button>
+          <button class="primary-button" id="quick-add-continue" value="default">Continue</button>
+        </div>
+      </form>
+    </dialog>
+
+    <template id="item-card-template">
+      <article class="item-card">
+        <div class="item-card-top">
+          <div>
+            <p class="item-category"></p>
+            <h4 class="item-title"></h4>
+          </div>
+          <div class="item-actions">
+            <button class="small-button edit-button" type="button">Edit</button>
+            <button class="small-button delete-button" type="button">Delete</button>
+            <button class="small-button status-button" type="button" hidden></button>
+          </div>
+        </div>
+        <p class="item-meta"></p>
+        <p class="item-notes"></p>
+      </article>
+    </template>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config.js"></script>
+    <script src="js/customization.js"></script>
+    <script src="js/schedule-share.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>

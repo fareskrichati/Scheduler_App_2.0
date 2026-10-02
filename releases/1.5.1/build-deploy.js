@@ -102,6 +102,3 @@ function buildPage({ source, target, extraCss, includeRedirect }) {
 
   fs.writeFileSync(resolvePath(target), html);
 }
-
-// Publish 2.0 as the main app and retain the frozen 1.5.1 archive.
-require('./build-v2').buildV2();

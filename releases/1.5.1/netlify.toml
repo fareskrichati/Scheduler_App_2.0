@@ -1,0 +1,24 @@
+[build]
+  command = "node build-deploy.js"
+  publish = "deploy"
+
+[build.environment]
+  # The project URL is intentionally public and is embedded in the browser and widget builds.
+  # Keep secret scanning enabled for OPENAI_API_KEY and SUPABASE_SERVICE_ROLE_KEY.
+  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_URL"
+
+[functions]
+  directory = "netlify/functions"
+
+[functions."weekly-schedule-reminders"]
+  schedule = "*/15 * * * *"
+
+[[headers]]
+  for = "/css/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

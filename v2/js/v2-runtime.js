@@ -11,6 +11,7 @@ function showV2StartupError(error) {
 function setupV2() {
   v2TodayDate=todayString();
   setupV2Tutorial();
+  document.querySelector('#open-customize').addEventListener('click',()=>{setActiveTab('settings');const panel=document.querySelector('.customization-dropdown');if(panel){panel.open=true;panel.scrollIntoView({behavior:'smooth',block:'start'});panel.querySelector('summary')?.focus()}});
   document.querySelectorAll('[data-v2-page]').forEach(b=>b.addEventListener('click',()=>setActiveTab(b.dataset.v2Page)));
   document.querySelector('[data-v2-calendar]').addEventListener('click',()=>{state.selectedDate=v2TodayDate;state.visibleMonth=startOfMonth(v2TodayDate);setActiveTab('calendar');render()});
   document.querySelector('[data-v2-todo]').addEventListener('click',()=>setActiveTab('todo'));
@@ -18,7 +19,7 @@ function setupV2() {
   document.querySelector('#v2-save-import-mode').addEventListener('click',saveV2CanvasPreference);
   document.querySelector('#v2-import-now').addEventListener('click',runV2CanvasNow);
   document.querySelectorAll('[name="v2-canvas-mode"]').forEach(r=>r.addEventListener('change',()=>{document.querySelector('#v2-canvas-status').textContent='Choose Save import preference to apply this change.'}));
-  setInterval(()=>{const old=document.querySelector('#v2-date').textContent;renderV2Date();if(old!==document.querySelector('#v2-date').textContent){v2TodayDate=todayString();renderV2Today()}renderV2Sync()},30000);
+  setInterval(()=>{const old=document.querySelector('#v2-date').textContent;renderV2Date();if(old!==document.querySelector('#v2-date').textContent){v2TodayDate=todayString();renderV2Today()}renderV2Today();renderV2Sync()},30000);
   matchMedia("(max-width: 760px)").addEventListener("change",()=>renderCalendar());
   renderV2Date();
 }
@@ -44,7 +45,7 @@ function renderV2Today(){
  document.querySelector('#v2-agenda-date').textContent=formatLongDate(date);
  const items=getItemsForDate(date),active=items.filter(i=>i.status!=='done'),completed=items.filter(i=>i.status==='done');
  const list=document.querySelector('#v2-day-list'),done=document.querySelector('#v2-day-completed');list.innerHTML='';done.innerHTML='';active.forEach(i=>v2AppendItem(list,i));completed.forEach(i=>v2AppendItem(done,i));if(!active.length)list.innerHTML='<p class="empty-state">Nothing scheduled or due. Add a class, event, or to-do to get started.</p>';if(!completed.length)done.innerHTML='<p class="empty-state">Completed items will stay here.</p>';document.querySelector('#v2-day-completed-count').textContent=`(${completed.length})`;
- const now=new Date(),clock=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;const next=active.find(i=>['class','event'].includes(i.kind)&&(date!==todayString()||i.sortKey>=clock))||active.find(i=>date!==todayString()||i.sortKey>=clock);const up=document.querySelector('#v2-up-next');up.innerHTML=next?`<h2>${escapeHtml(next.title)}</h2><p>${escapeHtml(next.meta)}</p>`:'<h2>You’re all clear.</h2><p>No more upcoming items for this day.</p>';if(next){const b=document.createElement('button');b.className='small-button';b.textContent='View details ↗';b.addEventListener('click',()=>openCalendarItemDetails(next,date));up.append(b)}
+ const now=new Date(),clock=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;const next=active.find(i=>['class','event'].includes(i.kind)&&(date!==todayString()||i.sortKey>=clock))||active.find(i=>i.displayTime&&(date!==todayString()||i.sortKey>=clock));const up=document.querySelector('#v2-up-next');up.innerHTML=next?`<h2>${escapeHtml(next.title)}</h2><p class="v2-countdown">${escapeHtml(v2TimeUntil(date,next.sortKey))}</p><p>${escapeHtml(next.meta)}</p>`:'<h2>You’re all clear.</h2><p>No more upcoming items for this day.</p>';if(next){const b=document.createElement('button');b.className='small-button';b.textContent='View details ↗';b.addEventListener('click',()=>openCalendarItemDetails(next,date));up.append(b)}
  const attention=document.querySelector('#v2-attention');attention.innerHTML='';const todo=getTodoItems().filter(i=>i.status!=='done').sort(compareByDateTime).slice(0,5);todo.forEach(item=>{const converted=getItemsForDate(item.date).find(x=>x.sourceId===item.id&&x.kind===item.kind);if(!converted)return;const row=document.createElement('div');v2AppendItem(row,{...converted,attentionDate:formatShortDate(item.date)},item.date);attention.append(row)});if(!todo.length)attention.innerHTML='<p class="empty-state">All caught up. Completed items are in To-Do.</p>';
  const exam=state.data.exams.filter(i=>i.status!=='done'&&i.date>=todayString()).sort(compareByDateTime)[0];document.querySelector('#v2-next-exam').innerHTML=exam?`<h3>${escapeHtml(exam.title)}</h3><p class="settings-note">${escapeHtml(exam.course)} · ${formatShortDate(exam.date)}${exam.time?' · '+formatTime(exam.time):''}</p>`:'<p class="settings-note">No upcoming exams.</p>';
 }
@@ -82,4 +83,16 @@ function setupV2Tutorial(){
 }
 function v2NextAssignment(classTitle){
  return getNextVisibleOccurrences(state.data.homework).filter(item=>item.status!=='done'&&item.course?.trim().toLowerCase()===classTitle.trim().toLowerCase()).sort(compareByDateTime)[0];
+}
+
+function v2TimeUntil(date,time,now=new Date()){
+ if(!/^\d{2}:\d{2}$/.test(time||''))return 'Coming up';
+ const minutes=Math.max(0,Math.ceil((new Date(`${date}T${time}:00`)-now)/60000));
+ if(!minutes)return 'Starting now';
+ const days=Math.floor(minutes/1440),hours=Math.floor(minutes%1440/60),mins=minutes%60;
+ return 'Starts in '+[days?`${days}d`:'',hours?`${hours}h`:'',mins?`${mins}m`:''].filter(Boolean).join(' ');
+}
+
+function v2ImportMatches(item,panelKind,today){
+ return item.date>=today && (panelKind==='all' || (item.kind||'homework')===panelKind);
 }

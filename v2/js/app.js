@@ -9,8 +9,8 @@ const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_DELAY_MS = 1000;
 const FOREVER_REPEAT_YEARS = 5;
 const SUPABASE_TABLE = "planner_profiles";
-const WHATS_NEW_VERSION = "2.0";
-const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-2.0-launch";
+const WHATS_NEW_VERSION = "2.5";
+const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-2.5";
 const PLANNER_TABS = ["today", "more", "calendar", "todo", "classes", "events", "homework", "exams", "reminders", "settings"];
 
 if (new URLSearchParams(window.location.search).get("scriptable") === "1") {
@@ -600,6 +600,7 @@ function setupMobileAddForms() {
       getPrimaryFieldForTab(tabId)?.focus();
     });
 
+    originalParent.querySelector('.panel-header .panel-label')?.remove();
     originalParent.insertBefore(toggle, originalParent.firstChild);
     form.addEventListener("submit", () => {
       window.setTimeout(() => {
@@ -2245,7 +2246,7 @@ function renderCalendar() {
 
     items.forEach((item) => {
       const marker = document.createElement("div");
-      const canComplete = ["homework", "exam", "reminder"].includes(item.kind) || item.sourceType === "event";
+      const canComplete = ["homework", "exam", "reminder"].includes(item.kind);
       marker.className = `calendar-marker marker-${item.kind}${item.status === "done" ? " is-complete" : ""}`;
       const monthTime = item.displayTime ? `<span class="calendar-marker-time">${escapeHtml(item.displayTime)}</span>` : "";
       marker.innerHTML = `<span class="calendar-marker-row">${canComplete ? `<button class="calendar-marker-check" type="button" aria-label="${item.status === "done" ? "Mark pending" : "Mark done"}: ${escapeHtml(item.title)}">${item.status === "done" ? "✓" : ""}</button>` : ""}<button class="calendar-item-open" type="button" aria-label="View details: ${escapeHtml(item.title)}"><span class="calendar-marker-title">${escapeHtml(item.title)}</span>${monthTime}</button></span>`;
@@ -2260,7 +2261,7 @@ function renderCalendar() {
         if (item.kind === "homework") toggleHomeworkStatus(item.sourceId);
         else if (item.kind === "exam") toggleExamStatus(item.sourceId);
         else if (item.kind === "reminder") toggleReminderStatus(item.sourceId);
-        else if (item.sourceType === "event") toggleEventStatus(item.sourceId);
+
       });
       markers.appendChild(marker);
     });
@@ -2672,12 +2673,6 @@ function buildDayStatusButton(item) {
     return button;
   }
 
-  if (item.sourceType === "event") {
-    button.textContent = item.status === "done" ? "Mark pending" : "Mark done";
-    button.addEventListener("click", () => toggleEventStatus(item.sourceId));
-    return button;
-  }
-
   if (item.kind === "reminder") {
     button.textContent = item.status === "done" ? "Mark pending" : "Mark done";
     button.addEventListener("click", () => toggleReminderStatus(item.sourceId));
@@ -2780,7 +2775,7 @@ function renderExamList() {
     config: {
       category: "Exam",
       meta: (item) =>
-        `${item.course} • ${formatShortDate(item.date)}${item.time ? ` at ${formatTime(item.time)}` : ""} • ${capitalize(item.status || "pending")}`,
+        `${item.course} • ${formatShortDate(item.date)}${item.time ? ` at ${formatTime(item.time)}` : ""}`,
       notes: (item) => item.notes,
       onEdit: editExam,
       onDelete: deleteExam,
@@ -2829,12 +2824,12 @@ function renderEventList() {
       category: "Event",
       meta: (item) =>
         item.grouped
-          ? `${item.repeatSummary} • ${formatShortDate(item.date)} - ${formatShortDate(item.lastDate)} • ${formatTime(item.start)} - ${formatTime(item.end)}${item.location ? ` • ${item.location}` : ""} • ${capitalize(item.status || "pending")}`
-          : `${formatShortDate(item.date)} • ${formatTime(item.start)} - ${formatTime(item.end)}${item.location ? ` • ${item.location}` : ""} • ${capitalize(item.status || "pending")}`,
+          ? `${item.repeatSummary} • ${formatShortDate(item.date)} - ${formatShortDate(item.lastDate)} • ${formatTime(item.start)} - ${formatTime(item.end)}${item.location ? ` • ${item.location}` : ""}`
+          : `${formatShortDate(item.date)} • ${formatTime(item.start)} - ${formatTime(item.end)}${item.location ? ` • ${item.location}` : ""}`,
       notes: (item) => item.notes,
       onEdit: editEventItem,
       onDelete: deleteEventItem,
-      onToggleStatus: toggleEventStatus,
+
     },
   });
 }
@@ -2861,8 +2856,8 @@ function renderReminderList() {
       category: "Reminder",
       meta: (item) =>
         item.grouped
-          ? `${item.repeatSummary} • ${formatShortDate(item.date)} - ${formatShortDate(item.lastDate)}${item.time ? ` at ${formatTime(item.time)}` : ""} • ${capitalize(item.status || "pending")}`
-          : `${formatShortDate(item.date)}${item.time ? ` at ${formatTime(item.time)}` : ""}${item.seriesId ? ` • ${formatRepeatSummary(item)}` : ""} • ${capitalize(item.status || "pending")}`,
+          ? `${item.repeatSummary} • ${formatShortDate(item.date)} - ${formatShortDate(item.lastDate)}${item.time ? ` at ${formatTime(item.time)}` : ""}`
+          : `${formatShortDate(item.date)}${item.time ? ` at ${formatTime(item.time)}` : ""}${item.seriesId ? ` • ${formatRepeatSummary(item)}` : ""}`,
       notes: (item) => item.notes,
       onEdit: editReminder,
       onDelete: deleteReminder,
@@ -2989,7 +2984,7 @@ function renderCollection({ target, items, emptyMessage, config }) {
       notes.after(due);
     }
     applyItemColor(card, item.effectiveColor || item.color);
-    card.classList.toggle("is-complete", item.status === "done");
+    card.classList.toggle("is-complete", config.category !== "Event" && item.status === "done");
 
     const actionKey = item.actionKey || item.id;
     editButton.addEventListener("click", () => config.onEdit(actionKey));
@@ -4225,12 +4220,12 @@ function renderSchoolImportItems(statusMessage = "") {
     if (statusMessage) status.textContent = statusMessage;
     list.innerHTML = "";
     const visibleItems = schoolImportItems
-      .filter((item) => item.date >= todayString() && (item.kind || "homework") === panelKind)
+      .filter((item) => v2ImportMatches(item,panelKind,todayString()))
       .sort(compareByDateTime);
     if (!visibleItems.length) {
       const empty = document.createElement("div");
       empty.className = "empty-state compact-empty-state";
-      empty.textContent = `No upcoming ${panelKind === "exam" ? "exams" : "homework"} found.`;
+      empty.textContent = `No upcoming ${panelKind === "all" ? "homework or exams" : panelKind === "exam" ? "exams" : "homework"} found.`;
       list.appendChild(empty);
       return;
     }
@@ -4705,6 +4700,11 @@ function openCanvasShortcut() {
     elements.settingsStatus.textContent = "Add your school name and Canvas link, then save settings.";
     return;
   }
+  if (window.matchMedia('(max-width: 760px)').matches) {
+    // Canvas documents this URL scheme for opening its mobile app.
+    window.location.href = shortcut.url.replace(/^https:\/\//, 'canvas-courses://');
+    return;
+  }
   const canvasWindow = window.open(shortcut.url, "_blank");
   if (canvasWindow) canvasWindow.opener = null;
   else elements.settingsStatus.textContent = "Your browser blocked the Canvas tab. Allow pop-ups and try again.";
@@ -4872,10 +4872,10 @@ function getItemsForDate(date) {
       kind: item.type === "event" ? "event" : "class",
       label: item.type === "class" ? "Class" : "Scheduled event",
       title: item.title,
-      meta: `${formatTime(item.start)} - ${formatTime(item.end)}${item.location ? ` • ${item.location}` : ""}${item.type === "event" && item.status === "done" ? " • Done" : ""}`,
+      meta: `${formatTime(item.start)} - ${formatTime(item.end)}${item.location ? ` • ${item.location}` : ""}`,
       notes: item.notes,
       color: getStoredItemColor("schedule", item),
-      status: item.type === "event" ? item.status || "pending" : "pending",
+      status: "pending",
       displayTime: item.start ? `${formatTime(item.start)}${item.end ? ` – ${formatTime(item.end)}` : ""}` : "",
       sortKey: item.start,
     }));

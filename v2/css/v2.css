@@ -13,3 +13,21 @@ html{overscroll-behavior:auto;touch-action:pan-y pinch-zoom}body{overflow-x:hidd
 .v2-class-due{display:grid;gap:6px;padding:14px;margin-top:12px;border-radius:14px;background:var(--surface-soft,#eef5fa)}
 .v2-class-due .small-button{justify-self:start}.v2-tour-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
 #v2-tour-copy{line-height:1.7}#panel-todo .school-import-accordion{margin-top:20px}
+/* Update 2.5: consistent controls and compact settings. */
+#panel-calendar .day-overview-panel{display:none!important}
+body .v2-actions #open-canvas,body .v2-actions #open-settings,body .v2-actions #quick-add,body .v2-actions #open-customize{display:inline-flex!important;align-items:center;justify-content:center;width:44px;height:44px;min-width:44px;min-height:44px;max-width:44px;padding:10px;border-radius:13px;box-sizing:border-box;flex:none;font-size:21px;line-height:1;border:1px solid var(--line)}
+body .v2-actions #quick-add span{margin:0}body .v2-actions svg{width:23px;height:23px;flex:none}#open-customize svg{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+#panel-settings>.panel-grid{grid-template-columns:minmax(0,1fr)!important;max-width:1100px;margin-inline:auto}
+#panel-settings .settings-summary-card{order:-1}
+#panel-settings #settings-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:28px}
+#panel-settings .settings-summary-row{padding:12px 0;font-size:12px}
+#settings-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+#settings-form>.customization-dropdown,#settings-form>.form-actions,#settings-form>#settings-status{grid-column:1/-1}
+#settings-form>.customization-dropdown{margin:0}
+.settings-accordion{border:1px solid var(--line);border-radius:13px;padding:14px;background:var(--surface-soft);min-width:0}
+.settings-accordion>summary{font-size:13px;font-weight:600;cursor:pointer}.settings-accordion .subsection{margin-top:14px;padding-top:12px}.settings-accordion .subsection-header{display:none}
+#panel-settings .settings-summary-card>.settings-accordion{margin-top:10px}
+.v2-countdown{font-weight:700;color:var(--accent-deep)!important}.v2-update-history{margin:22px 0;padding:16px;border:1px solid var(--line);border-radius:13px;font-size:13px;line-height:1.6}.v2-update-history summary{cursor:pointer;font-weight:650}
+@media(max-width:760px){.v2-topline{flex-wrap:wrap;gap:12px}.v2-actions{gap:7px}.v2-mobile-brand{font-size:18px}.v2-mobile-brand .brand-mark{width:27px;height:31px}.v2-mobile-brand small{display:none}body .v2-actions #open-canvas,body .v2-actions #open-settings,body .v2-actions #quick-add,body .v2-actions #open-customize{width:38px;height:38px;min-width:38px;min-height:38px;max-width:38px;padding:8px;border-radius:11px}#settings-form,#panel-settings #settings-summary{grid-template-columns:1fr}#panel-settings .settings-summary-row{font-size:11px}.settings-accordion{padding:12px}}
+body.uniplan-v2 .v2-actions #open-canvas,body.uniplan-v2 .v2-actions #open-settings,body.uniplan-v2 .v2-actions #quick-add,body.uniplan-v2 .v2-actions #open-customize{width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;max-width:44px!important;max-height:44px!important;aspect-ratio:1}
+@media(max-width:760px){body.uniplan-v2 .v2-actions #open-canvas,body.uniplan-v2 .v2-actions #open-settings,body.uniplan-v2 .v2-actions #quick-add,body.uniplan-v2 .v2-actions #open-customize{width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important;max-width:38px!important;max-height:38px!important}}

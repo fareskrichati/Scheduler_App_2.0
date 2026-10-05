@@ -2312,7 +2312,7 @@ function openCalendarItemDetails(item, date) {
   if (editor && item.sourceId) {
     const edit = document.createElement("button");
     edit.type = "button";
-    edit.className = "primary-button";
+    edit.className = "small-button";
     edit.textContent = "Edit";
     const actions = document.createElement("div");
     actions.className = "calendar-item-actions";
@@ -2323,6 +2323,7 @@ function openCalendarItemDetails(item, date) {
         ? state.data.schedule
         : state.data[{ homework: "homework", exam: "exams", reminder: "reminders" }[item.kind]];
       const record = collection?.find((entry) => entry.id === item.sourceId);
+      remove.className = "small-button";
       remove.textContent = record?.seriesId ? "Delete series" : "Delete";
       remove.addEventListener("click", () => dialog.close());
       actions.appendChild(remove);
@@ -2985,6 +2986,22 @@ function countGroupedItemsOnDate(type, date) {
 }
 
 function renderCollection({ target, items, emptyMessage, config }) {
+  if (target.id === "event-list") {
+    let pastSection = document.querySelector("#event-past-section");
+    if (!pastSection) {
+      pastSection = document.createElement("details");
+      pastSection.id = "event-past-section";
+      pastSection.className = "completed-section";
+      pastSection.innerHTML = '<summary>Past events <span id="event-past-count"></span></summary><div id="event-past-list" class="item-list"></div>';
+      target.after(pastSection);
+    }
+    const past = items.filter((item) => isScheduleGroupPast(item, "event"));
+    document.querySelector("#event-past-count").textContent = `(${past.length})`;
+    renderCollection({ target: document.querySelector("#event-past-list"), items: past,
+      emptyMessage: "No past events.", config });
+    items = items.filter((item) => !isScheduleGroupPast(item, "event"));
+    if (!items.length && past.length) emptyMessage = "No upcoming events. Previous events are in Past events below.";
+  }
   if (["homework-list", "exam-list", "reminder-list"].includes(target.id)) {
     const kind = target.id.replace("-list", "");
     const completed = items.filter((item) => item.status === "done");

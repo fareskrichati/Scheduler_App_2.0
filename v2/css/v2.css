@@ -37,3 +37,25 @@ body.uniplan-v2 .v2-actions #open-canvas,body.uniplan-v2 .v2-actions #open-setti
 @media(max-width:760px){html,body{max-width:100%;overscroll-behavior-x:none;touch-action:pan-x pan-y}body .calendar-grid,body .calendar-view-switch{touch-action:pan-y}input,select,textarea{font-size:16px!important}}
 
 .calendar-item-actions{display:flex;align-items:center;gap:10px;margin-top:16px}
+
+/* Keep dialogs anchored while their content changes or the keyboard opens. */
+html:has(dialog[open]),body:has(dialog[open]){overflow:hidden;overscroll-behavior:none}
+dialog{position:fixed;inset:24px 0 auto;margin:0 auto;max-width:calc(100% - 28px);max-height:calc(100dvh - 48px);box-sizing:border-box;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-gutter:stable}
+dialog .field,dialog .field-row,dialog form,dialog .panel-header>div{min-width:0;max-width:100%}
+dialog .field-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+dialog input:not([type=checkbox]):not([type=radio]),dialog select,dialog textarea{min-width:0;max-width:100%;width:100%;box-sizing:border-box;font-size:16px}
+dialog textarea{resize:vertical}
+dialog .panel-header .icon-button{flex-shrink:0}
+.calendar-item-dialog,.mobile-form-dialog{max-height:calc(100dvh - 48px);overflow:auto}
+.mobile-form-dialog-card{max-height:none;overflow:visible}
+.mobile-form-dialog-header{position:static;padding-top:0}
+.calendar-item-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.calendar-item-actions .small-button{width:100%;min-height:44px;margin:0;padding:10px 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface-soft);color:var(--ink);font:inherit;font-size:14px;font-weight:600;box-shadow:none}
+@media(max-width:760px){
+  dialog{inset: max(12px,env(safe-area-inset-top)) 0 auto;max-height:calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));max-width:calc(100% - 24px)}
+  .calendar-item-dialog,.mobile-form-dialog{width:calc(100% - 24px);max-height:calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
+  .calendar-item-dialog{padding:18px}
+  dialog .field-row,dialog .mobile-dialog-form .field-row{grid-template-columns:minmax(0,1fr)}
+  dialog .form-actions{display:flex;flex-wrap:wrap;gap:10px}
+  dialog .form-actions>*{min-width:0;max-width:100%}
+}

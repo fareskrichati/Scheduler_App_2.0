@@ -2301,6 +2301,53 @@ function openCalendarItemDetails(item, date) {
   dialog.setAttribute("aria-labelledby", "calendar-item-title");
   dialog.innerHTML = `<div class="panel-header"><div><p class="panel-label">${escapeHtml(item.label)}</p><h3 id="calendar-item-title">${escapeHtml(item.title)}</h3></div><button class="icon-button" type="button" aria-label="Close event details">×</button></div><p>${escapeHtml(formatLongDate(date))}</p><p class="item-meta">${escapeHtml(item.meta)}${buildLocationMapLinks(item.location)}</p>${item.notes ? `<p class="calendar-item-notes">${escapeHtml(item.notes)}</p>` : ""}`;
   dialog.querySelector("button").addEventListener("click", () => dialog.close());
+  const editors = {
+    event: [editEventItem, elements.eventForm, resetEventForm],
+    class: [editClassItem, elements.classForm, resetClassForm],
+    homework: [editHomework, elements.homeworkForm, resetHomeworkForm],
+    exam: [editExam, elements.examForm, resetExamForm],
+    reminder: [editReminder, elements.reminderForm, resetReminderForm],
+  };
+  const editor = editors[item.kind];
+  if (editor && item.sourceId) {
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "primary-button";
+    edit.textContent = "Edit";
+    const actions = document.createElement("div");
+    actions.className = "calendar-item-actions";
+    actions.appendChild(edit);
+    const remove = buildDayDeleteButton(item);
+    if (remove) {
+      const collection = item.kind === "class" || item.kind === "event"
+        ? state.data.schedule
+        : state.data[{ homework: "homework", exam: "exams", reminder: "reminders" }[item.kind]];
+      const record = collection?.find((entry) => entry.id === item.sourceId);
+      remove.textContent = record?.seriesId ? "Delete series" : "Delete";
+      remove.addEventListener("click", () => dialog.close());
+      actions.appendChild(remove);
+    }
+    dialog.appendChild(actions);
+    edit.addEventListener("click", () => {
+      const [populate, form, reset] = editor;
+      populate(item.sourceId, true);
+      const placeholder = document.createComment("detail editor original position");
+      form.before(placeholder);
+      dialog.appendChild(form);
+      edit.remove();
+      const onSubmit = () => {
+        // Successful saves reset the title; validation failures keep the editor open.
+        if (!form.querySelector("input[id$='-title']")?.value) dialog.close();
+      };
+      form.addEventListener("submit", onSubmit);
+      dialog.addEventListener("close", () => {
+        form.removeEventListener("submit", onSubmit);
+        placeholder.replaceWith(form);
+        reset();
+      }, { once: true });
+      form.querySelector("input[id$='-title']")?.focus({ preventScroll: true });
+    }, { once: true });
+  }
   dialog.addEventListener("close", () => dialog.remove());
   document.body.appendChild(dialog);
   dialog.showModal();
@@ -2762,7 +2809,7 @@ function getNextVisibleOccurrences(collection, fromDate = "") {
 }
 
 function renderExamList() {
-  const upcoming = [...state.data.exams].filter((item) => item.status === "done" || !isTimedItemPast(item.date, item.time));
+  const upcoming = [...state.data.exams];
   examClassFilter = renderClassFilter(elements.examClassFilter, upcoming, examClassFilter);
   const sorted = upcoming
     .filter((item) => examClassFilter === "all" || item.course === examClassFilter)
@@ -2793,7 +2840,7 @@ function renderClassFilter(select, items, selectedValue) {
 }
 
 function renderClassList() {
-  const sorted = groupScheduleEntries("class").filter((item) => !isScheduleGroupPast(item, "class"));
+  const sorted = groupScheduleEntries("class");
   const online = state.data.courses.map((item) => ({ ...item, online: true, status: "pending" }));
   renderCollection({
     target: elements.classList,
@@ -2815,7 +2862,7 @@ function renderClassList() {
 }
 
 function renderEventList() {
-  const sorted = groupScheduleEntries("event").filter((item) => !isScheduleGroupPast(item, "event"));
+  const sorted = groupScheduleEntries("event");
   renderCollection({
     target: elements.eventList,
     items: sorted,
@@ -3285,7 +3332,7 @@ function saveReminder() {
   resetReminderForm();
 }
 
-function editHomework(id) {
+function editHomework(id, inline = false) {
   const directMatch = state.data.homework.find((entry) => entry.id === id);
   if (!directMatch) {
     return;
@@ -3297,8 +3344,10 @@ function editHomework(id) {
   const sortedMatches = [...matches].sort(compareByDateTime);
   const item = sortedMatches[0];
 
-  setActiveTab("homework");
-  openMobileAddForm("homework");
+  if (!inline) {
+    setActiveTab("homework");
+    openMobileAddForm("homework");
+  }
   elements.homeworkForm.dataset.seriesId = item.seriesId || "";
   elements.homeworkId.value = item.id;
   elements.homeworkTitle.value = item.title;
@@ -3322,14 +3371,16 @@ function editHomework(id) {
   elements.homeworkNotes.value = item.notes || "";
 }
 
-function editExam(id) {
+function editExam(id, inline = false) {
   const item = state.data.exams.find((entry) => entry.id === id);
   if (!item) {
     return;
   }
 
-  setActiveTab("exams");
-  openMobileAddForm("exams");
+  if (!inline) {
+    setActiveTab("exams");
+    openMobileAddForm("exams");
+  }
   elements.examId.value = item.id;
   elements.examTitle.value = item.title;
   elements.examCourse.value = item.course;
@@ -3341,7 +3392,7 @@ function editExam(id) {
   elements.examNotes.value = item.notes || "";
 }
 
-function editClassItem(id) {
+function editClassItem(id, inline = false) {
   const onlineCourse = state.data.courses.find((item) => item.id === id);
   if (onlineCourse) {
     setActiveTab("classes");
@@ -3365,8 +3416,10 @@ function editClassItem(id) {
   const sortedMatches = [...matches].sort(compareByDateTime);
   const item = sortedMatches[0];
 
-  setActiveTab("classes");
-  openMobileAddForm("classes");
+  if (!inline) {
+    setActiveTab("classes");
+    openMobileAddForm("classes");
+  }
   elements.classOnline.checked = false;
   toggleOnlineClassFields();
   elements.classForm.dataset.seriesId = item.seriesId || "";
@@ -3391,7 +3444,7 @@ function editClassItem(id) {
   elements.classNotes.value = item.notes || "";
 }
 
-function editEventItem(id) {
+function editEventItem(id, inline = false) {
   const matches = state.data.schedule.filter(
     (entry) => entry.type === "event" && (entry.id === id || entry.seriesId === id),
   );
@@ -3402,8 +3455,10 @@ function editEventItem(id) {
   const sortedMatches = [...matches].sort(compareByDateTime);
   const item = sortedMatches[0];
 
-  setActiveTab("events");
-  openMobileAddForm("events");
+  if (!inline) {
+    setActiveTab("events");
+    openMobileAddForm("events");
+  }
   elements.eventForm.dataset.seriesId = item.seriesId || "";
   elements.eventId.value = item.id;
   elements.eventTitle.value = item.title;
@@ -3426,7 +3481,7 @@ function editEventItem(id) {
   elements.eventNotes.value = item.notes || "";
 }
 
-function editReminder(id) {
+function editReminder(id, inline = false) {
   const matches = state.data.reminders.filter(
     (entry) => entry.id === id || entry.seriesId === id,
   );
@@ -3437,8 +3492,10 @@ function editReminder(id) {
   const sortedMatches = [...matches].sort(compareByDateTime);
   const item = sortedMatches[0];
 
-  setActiveTab("reminders");
-  openMobileAddForm("reminders");
+  if (!inline) {
+    setActiveTab("reminders");
+    openMobileAddForm("reminders");
+  }
   elements.reminderForm.dataset.seriesId = item.seriesId || "";
   elements.reminderId.value = item.id;
   elements.reminderTitle.value = item.title;

@@ -17,9 +17,9 @@
   const labels = {today:'Today',calendar:'Calendar',todo:'To-Do',classes:'Classes',events:'Events',homework:'Homework',exams:'Exams',reminders:'Reminders',settings:'Settings',more:'More'};
   const todayNav=document.createElement('button');todayNav.type='button';todayNav.className='tab-button';todayNav.id='tab-today';todayNav.dataset.tab='today';todayNav.setAttribute('role','tab');nav.prepend(todayNav);
   nav.querySelectorAll('button').forEach(b=>{b.innerHTML=`${icon(b.dataset.tab)}<span>${labels[b.dataset.tab]}</span>`});
-  const sidebar=document.createElement('aside');sidebar.className='v2-sidebar';sidebar.innerHTML='<a class="v2-brand" href="index.html"><span class="brand-mark">U</span>UniPlan <small>2.5</small></a><p class="v2-sidebar-caption">YOUR PERSONAL PLANNER</p>';
+  const sidebar=document.createElement('aside');sidebar.className='v2-sidebar';sidebar.innerHTML='<a class="v2-brand" href="index.html"><span class="brand-mark">U</span>UniPlan <small>2.5.1</small></a><p class="v2-sidebar-caption">YOUR PERSONAL PLANNER</p>';
   sidebar.append(nav);const bottom=document.createElement('div');bottom.className='v2-sidebar-bottom';bottom.innerHTML='<button type="button" data-v2-canvas>↗ Canvas & imports</button><p id="v2-profile"></p>';sidebar.append(bottom);
-  const main=document.createElement('div');main.className='v2-main';const header=document.createElement('header');header.className='v2-topline';header.innerHTML='<div class="v2-breadcrumb">My planner <span>/</span> <b id="v2-current-section">Today</b></div><a class="v2-mobile-brand v2-brand" href="index.html"><span class="brand-mark">U</span>UniPlan <small>2.5</small></a><div class="v2-actions"></div>';
+  const main=document.createElement('div');main.className='v2-main';const header=document.createElement('header');header.className='v2-topline';header.innerHTML='<div class="v2-breadcrumb">My planner <span>/</span> <b id="v2-current-section">Today</b></div><a class="v2-mobile-brand v2-brand" href="index.html"><span class="brand-mark">U</span>UniPlan <small>2.5.1</small></a><div class="v2-actions"></div>';
   const add=document.querySelector('#quick-add');add.innerHTML='<span aria-hidden="true">+</span> Add new';header.querySelector('.v2-actions').append(document.querySelector('#open-canvas'),document.querySelector('#open-settings'),add);
   const customize=document.createElement('button');customize.type='button';customize.id='open-customize';customize.className='icon-button';customize.setAttribute('aria-label','Customize app');customize.title='Customize app';customize.innerHTML=icon('customize');header.querySelector('.v2-actions').append(customize);
   add.innerHTML='<span aria-hidden="true">+</span>';add.title='Add new';
@@ -39,5 +39,5 @@
   document.querySelectorAll('.todo-filters,.collection-filter').forEach(el=>el.hidden=true);
   const help=document.createElement('button');help.type='button';help.className='ghost-button';help.dataset.v2Tutorial='';help.textContent='Show tutorial';
   document.querySelector('#settings-whats-new').after(help);
-  document.querySelectorAll('.auth-brand .eyebrow').forEach(x=>x.textContent='UniPlan · Update 2.5');
+  document.querySelectorAll('.auth-brand .eyebrow').forEach(x=>x.textContent='UniPlan · Update 2.5.1');
 })();

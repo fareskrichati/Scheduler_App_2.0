@@ -1,4 +1,4 @@
-const STORAGE_KEY = "pulse-planner-v2";
+const STORAGE_KEY = "uniplan-2.0-data";
 const titles = { all: "Everything upcoming", today: "Today's planner", classes: "Classes + homework", homework: "Homework", reminders: "Reminders", tasks: "To-Do list", exams: "Exams & quizzes", events: "Events" };
 const viewSelect = document.querySelector("#preview-view");
 const dataSourceSelect = document.querySelector("#preview-data-source");
@@ -49,11 +49,19 @@ function getPreviewItems(view) {
   return items.sort((a, b) => a.sort.localeCompare(b.sort));
 }
 
+function savedSettings() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY))?.settings || {}; } catch { return {}; }
+}
 function renderWidgetPreviews() {
+  const settings = savedSettings();
+  const appearance = widgetAppearance(settings, window.matchMedia('(prefers-color-scheme: dark)').matches);
+  Object.entries(appearance).forEach(([key,value]) => { if (typeof value === 'string') document.documentElement.style.setProperty('--widget-'+key,value); });
+  document.documentElement.style.colorScheme = appearance.dark ? 'dark' : 'light';
+
   const view = viewSelect.value, source = getPreviewItems(view);
   widgets.forEach((widget) => {
     const items = source.slice(0, Number(widget.dataset.limit)).map((item) => `<div class="widget-item${item.nested ? " is-nested" : ""}" style="--item-color:${safeColor(item.color)}"><span class="widget-check${item.symbol === "│" ? " is-bar" : ""}">${item.symbol}</span><div class="widget-copy"><p class="widget-name">${escapeHtml(item.title)}</p><p class="widget-meta">${escapeHtml(item.meta)}</p></div></div>`).join("");
-    widget.innerHTML = `<div class="widget-header"><span class="widget-title">${titles[view]}</span><span class="widget-date">${new Date().toLocaleDateString([], { month: "short", day: "numeric" })}</span></div><div class="widget-items">${items || '<p class="widget-meta">Nothing coming up.</p>'}</div><div class="widget-footer">${offline.checked ? "Offline copy" : "Updated just now"}</div>`;
+    widget.innerHTML = `<div class="widget-header"><span class="widget-title">UniPlan</span><span class="widget-date">${new Date().toLocaleDateString([], { month: "short", day: "numeric" })}</span></div><h2 class="widget-heading">${titles[view]}</h2><div class="widget-items">${items || '<p class="widget-meta">Nothing coming up.</p>'}</div><div class="widget-footer">${offline.checked ? "Offline copy" : "Updated just now"}${source.length > Number(widget.dataset.limit) ? ` · +${source.length - Number(widget.dataset.limit)} more` : ""}</div>`;
   });
 }
 
@@ -66,3 +74,6 @@ function safeColor(value) { return /^#[0-9a-f]{6}$/i.test(value || "") ? value :
 function escapeHtml(value) { return String(value || "").replace(/[&<>'"]/g, (char) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "'":"&#39;", '"':"&quot;" })[char]); }
 
 viewSelect.addEventListener("change", renderWidgetPreviews); dataSourceSelect.addEventListener("change", renderWidgetPreviews); offline.addEventListener("change", renderWidgetPreviews); renderWidgetPreviews();
+
+window.addEventListener('storage', renderWidgetPreviews);
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderWidgetPreviews);

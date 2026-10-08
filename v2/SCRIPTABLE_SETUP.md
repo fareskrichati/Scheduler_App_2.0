@@ -56,3 +56,9 @@ Run the latest `supabase-schema.sql`, then configure these Netlify variables:
 - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER` for text messages
 
 `REMINDER_EMAIL_FROM` must use a domain verified with Resend. Text delivery must comply with Twilio messaging registration and consent requirements. The scheduled function checks every 15 minutes and sends once at the weekday, local time, timezone, and delivery method selected in Settings.
+
+## Matching the app appearance
+
+The widget automatically uses your synced app theme, light/dark mode (including system mode), and custom background, accent, and calendar-card colors. Offline widgets keep the appearance from their last successful sync. Photo backgrounds stay in the app.
+
+For an existing installation, replace the script with the updated `scriptable/DailyPlannerWidget.js` and run it once. Your existing Keychain login is retained. Theme changes appear on the next refresh; use **Preview widget** in Scriptable to fetch them immediately. Small, medium, and large widgets show up to 2, 3, and 8 rows respectively, with a count for additional items.

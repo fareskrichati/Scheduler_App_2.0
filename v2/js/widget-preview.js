@@ -10,7 +10,11 @@ function previewData() {
     try { const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)); if (saved && typeof saved === "object") return saved; } catch (_) {}
     return { schedule: [], homework: [], exams: [], reminders: [] };
   }
-  return presetPreviewData();
+  const data = presetPreviewData();
+  if (dataSourceSelect.value === "full") {
+    data.homework = Array.from({length: 26}, (_, index) => ({id: `sample-${index}`, title: ['Chapter review', 'Practice problems', 'Reading response', 'Lab preparation'][index % 4] + ` ${index + 1}`, course: 'CIV E 301', date: todayIso(), time: '23:59', status: 'pending', color: '#7eaed6'}));
+  }
+  return data;
 }
 
 function presetPreviewData() {
@@ -60,8 +64,10 @@ function renderWidgetPreviews() {
 
   const view = viewSelect.value, source = getPreviewItems(view);
   widgets.forEach((widget) => {
-    const items = source.slice(0, Number(widget.dataset.limit)).map((item) => `<div class="widget-item${item.nested ? " is-nested" : ""}" style="--item-color:${safeColor(item.color)}"><span class="widget-check${item.symbol === "│" ? " is-bar" : ""}">${item.symbol}</span><div class="widget-copy"><p class="widget-name">${escapeHtml(item.title)}</p><p class="widget-meta">${escapeHtml(item.meta)}</p></div></div>`).join("");
-    widget.innerHTML = `<div class="widget-header"><span class="widget-title">UniPlan</span><span class="widget-date">${new Date().toLocaleDateString([], { month: "short", day: "numeric" })}</span></div><h2 class="widget-heading">${titles[view]}</h2><div class="widget-items">${items || '<p class="widget-meta">Nothing coming up.</p>'}</div><div class="widget-footer">${offline.checked ? "Offline copy" : "Updated just now"}${source.length > Number(widget.dataset.limit) ? ` · +${source.length - Number(widget.dataset.limit)} more` : ""}</div>`;
+    const requested = settings.widgetPreferences;
+    const limit = requested?.itemLimitMode === "manual" ? Math.min(Number(requested.itemLimit) || Number(widget.dataset.limit), Number(widget.dataset.limit)) : Number(widget.dataset.limit);
+    const items = source.slice(0, limit).map((item) => `<div class="widget-item${item.nested ? " is-nested" : ""}" style="--item-color:${safeColor(item.color)}"><span class="widget-check${item.symbol === "│" ? " is-bar" : ""}">${item.symbol}</span><div class="widget-copy"><p class="widget-name">${escapeHtml(item.title)}</p><p class="widget-meta">${escapeHtml(item.meta)}</p></div></div>`).join("");
+    widget.innerHTML = `<div class="widget-header"><span class="widget-title">${titles[view]}</span><span class="widget-date">${new Date().toLocaleDateString([], { month: "short", day: "numeric" })}</span></div><div class="widget-items">${items || '<p class="widget-meta">Nothing coming up.</p>'}</div><div class="widget-footer">${offline.checked ? "Offline copy" : "Updated just now"}${source.length > limit ? ` · +${source.length - limit} more` : ""}</div>`;
   });
 }
 

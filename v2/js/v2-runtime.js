@@ -47,7 +47,10 @@ function renderV2Today(){
  const list=document.querySelector('#v2-day-list'),done=document.querySelector('#v2-day-completed');list.innerHTML='';done.innerHTML='';active.forEach(i=>v2AppendItem(list,i));completed.forEach(i=>v2AppendItem(done,i));if(!active.length)list.innerHTML='<p class="empty-state">Nothing scheduled or due. Add a class, event, or to-do to get started.</p>';if(!completed.length)done.innerHTML='<p class="empty-state">Completed items will stay here.</p>';document.querySelector('#v2-day-completed-count').textContent=`(${completed.length})`;
  const now=new Date(),clock=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;const next=active.find(i=>['class','event'].includes(i.kind)&&(date!==todayString()||i.sortKey>=clock))||active.find(i=>i.displayTime&&(date!==todayString()||i.sortKey>=clock));const up=document.querySelector('#v2-up-next');up.innerHTML=next?`<h2>${escapeHtml(next.title)}</h2><p class="v2-countdown">${escapeHtml(v2TimeUntil(date,next.sortKey))}</p><p>${escapeHtml(next.meta)}</p>`:'<h2>You’re all clear.</h2><p>No more upcoming items for this day.</p>';if(next){const b=document.createElement('button');b.className='small-button';b.textContent='View details ↗';b.addEventListener('click',()=>openCalendarItemDetails(next,date));up.append(b)}
  const attention=document.querySelector('#v2-attention');attention.innerHTML='';const todo=getTodoItems().filter(i=>i.status!=='done').sort(compareByDateTime).slice(0,5);todo.forEach(item=>{const converted=getItemsForDate(item.date).find(x=>x.sourceId===item.id&&x.kind===item.kind);if(!converted)return;const row=document.createElement('div');v2AppendItem(row,{...converted,attentionDate:formatShortDate(item.date)},item.date);attention.append(row)});if(!todo.length)attention.innerHTML='<p class="empty-state">All caught up. Completed items are in To-Do.</p>';
- const exam=state.data.exams.filter(i=>i.status!=='done'&&i.date>=todayString()).sort(compareByDateTime)[0];document.querySelector('#v2-next-exam').innerHTML=exam?`<h3>${escapeHtml(exam.title)}</h3><p class="settings-note">${escapeHtml(exam.course)} · ${formatShortDate(exam.date)}${exam.time?' · '+formatTime(exam.time):''}</p>`:'<p class="settings-note">No upcoming exams.</p>';
+ const due = v2NextDueCoursework();
+ document.querySelector('#v2-next-exam').innerHTML = due
+  ? `<p class="v2-item-type">${due.kind === 'homework' ? 'Homework' : 'Exam / quiz'} · Next due</p><h3>${escapeHtml(due.title)}</h3><p class="settings-note">${due.course ? escapeHtml(due.course) + ' · ' : ''}${formatShortDate(due.date)}${due.time ? ' · ' + formatTime(due.time) : ''}</p>`
+  : '<p class="settings-note">No upcoming homework, quizzes, or exams.</p>';
 }
 async function v2CanvasRequest(action){
  const token=await getValidAccessToken();if(!token)throw new Error('Sign in before using Canvas imports.');
@@ -95,4 +98,14 @@ function v2TimeUntil(date,time,now=new Date()){
 
 function v2ImportMatches(item,panelKind,today){
  return item.date>=today && (panelKind==='all' || (item.kind||'homework')===panelKind);
+}
+
+function v2NextDueCoursework(now = new Date()) {
+ const today = isoDate(now);
+ const clock = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+ return [
+  ...state.data.homework.map(item => ({...item, kind: 'homework'})),
+  ...state.data.exams.map(item => ({...item, kind: 'exam'})),
+ ].filter(item => item.status !== 'done' && (item.date > today || (item.date === today && (!item.time || item.time >= clock))))
+  .sort((a, b) => `${a.date} ${a.time || '23:59'}`.localeCompare(`${b.date} ${b.time || '23:59'}`))[0];
 }

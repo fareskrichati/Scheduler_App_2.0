@@ -9,8 +9,8 @@ const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_DELAY_MS = 1000;
 const FOREVER_REPEAT_YEARS = 5;
 const SUPABASE_TABLE = "planner_profiles";
-const WHATS_NEW_VERSION = "2.5.1";
-const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-2.5.1";
+const WHATS_NEW_VERSION = "2.5.2";
+const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-2.5.2";
 const PLANNER_TABS = ["today", "more", "calendar", "todo", "classes", "events", "homework", "exams", "reminders", "settings"];
 
 if (new URLSearchParams(window.location.search).get("scriptable") === "1") {
@@ -629,6 +629,12 @@ function setupWeeklyScheduleReminderSettings() {
   section.innerHTML = `<div class="subsection-header"><div><p class="panel-label">Weekly reminder</p><h3>Remember to review your schedule</h3></div></div><label class="checkbox-row"><input id="weekly-schedule-reminder" type="checkbox" /><span>Send me a reminder every week</span></label><div class="weekly-reminder-options"><div class="field-row"><label class="field"><span>Send by</span><select id="weekly-reminder-delivery"><option value="email">Email</option><option value="text">Text</option><option value="both">Email and text</option></select></label><label class="field"><span>Day</span><select id="weekly-reminder-day"><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></label><label class="field"><span>Time</span><input id="weekly-reminder-time" type="time" value="18:00" /></label></div><p class="settings-note">Email requires a valid email above. Text messages require a valid mobile number and may be subject to carrier messaging rates.</p></div>`;
   widgetSettings.parentElement.insertBefore(section, widgetSettings);
   section.querySelector("#weekly-schedule-reminder").addEventListener("change", toggleWeeklyReminderOptions);
+  const save = document.createElement("button");
+  save.type = "button"; save.className = "primary-button"; save.textContent = "Save weekly reminder";
+  save.addEventListener("click", async () => { save.disabled = true; try { await saveSettings(); } finally { save.disabled = false; } });
+  const help = document.createElement("p"); help.className = "settings-note";
+  help.textContent = "Save after changing these options. Times use your device’s time zone. Delivery runs every 15 minutes after the selected time and requires the reminder service to be configured.";
+  section.append(help, save);
 }
 
 function toggleWeeklyReminderOptions() {
@@ -3851,6 +3857,16 @@ async function saveSettings() {
     elements.settingsStatus.textContent = "Enter a valid Canvas calendar feed ending in .ics.";
     return;
   }
+  if (document.querySelector("#weekly-schedule-reminder")?.checked) {
+    const delivery = document.querySelector("#weekly-reminder-delivery").value;
+    const email = elements.settingsEmail.value.trim();
+    const phone = elements.settingsPhone.value.trim();
+    let error = "";
+    if (!authState.isAuthenticated) error = "Sign in before enabling weekly reminders.";
+    else if (["email", "both"].includes(delivery) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) error = "Enter a valid email above for weekly reminders.";
+    else if (["text", "both"].includes(delivery) && !/^\+[1-9]\d{7,14}$/.test(phone)) error = "Enter your phone number with + and country code, for example +15551234567.";
+    if (error) { elements.settingsStatus.textContent = error; elements.settingsStatus.scrollIntoView({block: "nearest"}); return; }
+  }
   state.data.settings = {
     ...currentSettings,
     theme: currentSettings.theme,
@@ -3863,7 +3879,8 @@ async function saveSettings() {
       startScreen: elements.scriptableStartScreen.value,
       plannerUrl: elements.widgetPlannerUrl.value.trim(),
       daysAhead: elements.widgetDaysAhead.value === "all" ? "all" : Number(elements.widgetDaysAhead.value),
-      itemLimit: Number(elements.widgetItemLimit.value),
+      itemLimit: elements.widgetItemLimit.value === "auto" ? "auto" : Number(elements.widgetItemLimit.value),
+      itemLimitMode: elements.widgetItemLimit.value === "auto" ? "auto" : "manual",
       classes: elements.widgetShowClasses.checked,
       homework: elements.widgetShowHomework.checked,
       events: elements.widgetShowEvents.checked,
@@ -3912,12 +3929,12 @@ async function saveSettings() {
     window.clearTimeout(cloudSaveTimer);
     cloudSaveTimer = null;
   }
-  elements.settingsStatus.textContent = "Saving widget settings...";
+  elements.settingsStatus.textContent = "Saving settings and reminder preferences...";
   await saveDataToSupabase();
   scheduleNotificationCheck();
   renderSettings(
     authState.isAuthenticated && authState.userId
-      ? lastCloudSyncMessage || "Widget settings saved."
+      ? lastCloudSyncMessage || "Settings saved."
       : "Settings saved on this device. Log in to sync them with Scriptable.",
   );
 }
@@ -4562,7 +4579,8 @@ function getDefaultSettings() {
       startScreen: "calendar",
       plannerUrl: "",
       daysAhead: "all",
-      itemLimit: 5,
+      itemLimit: "auto",
+      itemLimitMode: "auto",
       classes: true,
       homework: true,
       events: true,
@@ -4628,7 +4646,8 @@ function normalizeWidgetPreferences(preferences) {
     daysAhead: preferences?.daysAhead === "all" || [1, 3, 7, 14].includes(Number(preferences?.daysAhead))
       ? (preferences.daysAhead === "all" ? "all" : Number(preferences.daysAhead))
       : defaults.daysAhead,
-    itemLimit: [3, 5, 8, 10, 12, 14].includes(Number(preferences?.itemLimit))
+    itemLimitMode: preferences?.itemLimitMode === "manual" ? "manual" : "auto",
+    itemLimit: preferences?.itemLimitMode === "manual" && [3, 5, 8, 10, 12, 14].includes(Number(preferences?.itemLimit))
       ? Number(preferences.itemLimit)
       : defaults.itemLimit,
     classes: typeof preferences?.classes === "boolean" ? preferences.classes : defaults.classes,

@@ -93,3 +93,19 @@ body { background: var(--widget-bg); }
 .widget-name, .widget-small .widget-name { line-height: 18px; }
 .widget-meta, .widget-small .widget-meta { line-height: 14px; }
 .widget-item, .widget-small .widget-item { padding-top: 4px; padding-bottom: 4px; }
+
+/* Compact rows fill each size; wider widgets use both columns. */
+.scriptable-widget { padding: 12px; }
+.widget-title, .widget-small .widget-title { font-size: 16px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.widget-header { gap: 6px; }
+.widget-date { flex-shrink: 0; }
+.widget-items, .widget-small .widget-items { gap: 3px 9px; margin-top: 6px; }
+.widget-medium .widget-items, .widget-large .widget-items { grid-auto-flow: column; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(4, 36px); }
+.widget-large .widget-items { grid-template-rows: repeat(11, 36px); }
+.widget-item, .widget-small .widget-item { min-height: 36px; padding: 2px 4px; gap: 6px; grid-template-columns: 16px minmax(0, 1fr); }
+.widget-name, .widget-small .widget-name { font-size: 14px; line-height: 17px; }
+.widget-meta, .widget-small .widget-meta { font-size: 11px; line-height: 13px; }
+.widget-item.is-nested, .widget-small .widget-item.is-nested { margin-left: 5px; padding-left: 4px; }
+.widget-footer, .widget-small .widget-footer { font-size: 11px; }
+.widget-small, .widget-medium { height: 237px; }
+.widget-large { height: 531px; }

@@ -29,7 +29,7 @@ test('Scriptable builds all sizes and preserves completion actions with cached t
   addText(value){const s={value};this.children.push(s);return s;}
   setPadding(){} addSpacer(){} centerAlignContent(){} layoutVertically(){}
  }
- const env=vm.createContext({ListWidget:Stack,LinearGradient:class{},Color:class{constructor(hex){this.hex=hex;}},Font:new Proxy({},{get:()=>()=>({})}),Device:{isUsingDarkAppearance:()=>true},config:{widgetFamily:'small'},URLScheme:{forRunningScript:()=> 'scriptable://test'},Date});
+ const env=vm.createContext({ListWidget:Stack,LinearGradient:class{},Color:class{constructor(hex){this.hex=hex;}},Font:new Proxy({},{get:()=>()=>({})}),Device:{isUsingDarkAppearance:()=>true},config:{widgetFamily:'small'},URLScheme:{forRunningScript:()=> 'scriptable://test'},Date,Size:class {constructor(width,height){this.width=width;this.height=height;}}});
  vm.runInContext(script.replace('await main();',''),env);
  for(const family of ['small','medium','large']){
   env.config.widgetFamily=family;
@@ -37,5 +37,8 @@ test('Scriptable builds all sizes and preserves completion actions with cached t
   assert.equal(w.backgroundGradient.colors[0].hex,'#121722');
   assert.ok(JSON.stringify(w).includes('action=complete'));
   assert.ok(JSON.stringify(w).includes('Offline copy'));
+  const many = {homework:Array.from({length:30},(_,i)=>({id:String(i),title:'Work '+i,date:new Date().toISOString().slice(0,10),status:'pending'}))};
+  const filled = JSON.stringify(env.buildPlannerWidget(many,'homework',false));
+  assert.equal((filled.match(/action=complete/g)||[]).length / 2, {small:4,medium:8,large:22}[family]);
  }
 });

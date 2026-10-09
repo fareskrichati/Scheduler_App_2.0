@@ -11,7 +11,7 @@
       name="description"
       content="UniPlan helps you track homework, class schedules, daily plans, and reminders in one calendar."
     />
-    <title>UniPlan 2.5.1 | Student Planner</title>
+    <title>UniPlan 2.5.2 | Student Planner</title>
     <link rel="stylesheet" href="css/styles.css" />
     <link rel="stylesheet" href="css/mobile.css" media="(max-width: 760px)" />
     <link rel="stylesheet" href="css/customization.css" />
@@ -1017,6 +1017,7 @@
                         <label class="field">
                           <span>Maximum items</span>
                           <select id="widget-item-limit">
+                            <option value="auto">Fill widget (automatic)</option>
                             <option value="3">3 items</option>
                             <option value="5">5 items</option>
                             <option value="8">8 items</option>
@@ -1089,7 +1090,7 @@
 
                     <div class="subsection whats-new-setting">
                       <div class="subsection-header"><p class="panel-label">Latest updates</p></div>
-                      <p class="settings-note">Read update 2.5.1 and previous release notes.</p>
+                      <p class="settings-note">Read update 2.5.2 and previous release notes.</p>
                       <button class="ghost-button" id="settings-whats-new" type="button">View what’s new</button>
                     </div>
 
@@ -1135,8 +1136,14 @@
       </main>
     </div>
 
-    <dialog class="whats-new-dialog" id="whats-new-dialog" aria-labelledby="whats-new-title"><div class="whats-new-card"><div class="whats-new-header"><div><p class="panel-label">Latest update</p><h2 id="whats-new-title">What’s new in update 2.5.1</h2><p>Your widget, with your planner’s look.</p></div><button class="icon-button" id="whats-new-close" type="button" aria-label="Close what’s new">×</button></div>
-    <div class="whats-new-list"><article><span aria-hidden="true">✧</span><div><h3>A widget that matches your app</h3><p>Rounded cards, clearer headings, and cleaner spacing bring your planner’s look to every widget size.</p></div></article><article><span aria-hidden="true">◐</span><div><h3>Your themes, everywhere</h3><p>Widgets follow all nine app themes, light or dark mode, and your custom colors. Your last synced appearance stays available offline.</p></div></article><article><span aria-hidden="true">↻</span><div><h3>An up-to-date preview</h3><p>The widget preview now uses your current planner data and saved appearance. A “+ more” count shows when additional items are available.</p></div></article><article><span aria-hidden="true">↓</span><div><h3>Update your iPhone widget</h3><p>Download the updated widget in Settings and replace your existing script in Scriptable. Run it once; future theme changes appear on the next sync.</p></div></article></div>
+    <dialog class="whats-new-dialog" id="whats-new-dialog" aria-labelledby="whats-new-title"><div class="whats-new-card"><div class="whats-new-header"><div><p class="panel-label">Latest update</p><h2 id="whats-new-title">What’s new in update 2.5.2</h2><p>More room for your planner, and clearer reminders.</p></div><button class="icon-button" id="whats-new-close" type="button" aria-label="Close what’s new">×</button></div>
+    <div class="whats-new-list">
+      <article><span aria-hidden="true">↔</span><div><h3>Roomier tabs and Settings</h3><p>Planner sections stretch across the page. Settings has matching sections, larger fields, and clearer text, with fields stacking on smaller screens.</p></div></article>
+      <article><span aria-hidden="true">▦</span><div><h3>More in every widget</h3><p>Themed widgets fill their space with up to 4, 8, or 22 items. Medium and large sizes use two columns. Download the updated script in Settings to update your iPhone widget.</p></div></article>
+      <article><span aria-hidden="true">◷</span><div><h3>Your next deadline</h3><p>Coming up sits below Up next and shows the next homework, quiz, or exam due. The laptop dashboard keeps its two-column layout.</p></div></article>
+      <article><span aria-hidden="true">↻</span><div><h3>Weekly reminder fixes</h3><p>A dedicated save button and contact checks make setup clearer. The sender now waits until your chosen time and catches up after delayed runs. Email or text delivery still requires the reminder service.</p></div></article>
+    </div>
+    <details class="v2-update-history"><summary>Update 2.5.1 — Widgets that match your planner</summary><p>Added app themes, light and dark mode, custom widget colors, and a preview using current planner data.</p></details>
     <details class="v2-update-history"><summary>Update 2.5 — A clearer planner</summary><div class="whats-new-list"><article><span aria-hidden="true">↧</span><div><h3>Homework and exams, together</h3><p>Review both in To-Do imports. Imports are also available in Homework and Exams.</p></div></article><article><span aria-hidden="true">◷</span><div><h3>Know what’s next</h3><p>Up next shows the time until your activity. Events now behave like classes, without completion checkboxes.</p></div></article><article><span aria-hidden="true">✧</span><div><h3>A tidier app</h3><p>Distinct navigation icons, matching toolbar buttons, a Customize app shortcut, and a more compact Settings page. The calendar no longer repeats the selected day below it.</p></div></article><article><span aria-hidden="true">↗</span><div><h3>Canvas on your phone</h3><p>The Canvas shortcut opens the installed Canvas app using your saved school address.</p></div></article></div></details>
     <details class="v2-update-history"><summary>Update 2.0 — A new look for UniPlan</summary><p>UniPlan was refaced with a fresh design and a new dashboard bringing your full day, upcoming activities, and deadlines together.</p><ul><li>A refreshed calendar and simpler desktop and mobile navigation.</li><li>Completed to-dos kept in a dropdown.</li><li>Each class’s next assignment and imports from To-Do.</li><li>An optional tutorial, with your existing account and planner data.</li></ul></details>
     <button type="button" class="ghost-button" data-v2-tutorial>Take a quick tour</button><button class="primary-button whats-new-done" id="whats-new-done" type="button">Got it</button></div></dialog>

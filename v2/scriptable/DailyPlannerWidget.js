@@ -347,7 +347,7 @@ function readSession() {
 
 function buildPlannerWidget(data, view, cached, preferences = getWidgetPreferences(data)) {
   const widget = new ListWidget();
-  widget.setPadding(12, 12, 10, 12);
+  widget.setPadding(8, 8, 8, 8);
   const appearance = widgetAppearance(data.settings || {}, Device.isUsingDarkAppearance());
   const gradient = new LinearGradient();
   gradient.colors = [new Color(appearance.bg), new Color(appearance.end)];
@@ -356,39 +356,47 @@ function buildPlannerWidget(data, view, cached, preferences = getWidgetPreferenc
 
   const header = widget.addStack();
   header.centerAlignContent();
-  const title = header.addText("UniPlan");
-  title.font = Font.boldSystemFont(12);
+  const title = header.addText(viewTitle(view));
+  title.font = Font.boldSystemFont(11);
+  title.lineLimit = 1;
+  title.minimumScaleFactor = 0.7;
   title.textColor = new Color(appearance.deep);
   header.addSpacer();
   const date = header.addText(shortDate(new Date()));
   date.font = Font.mediumSystemFont(9);
   date.textColor = new Color(appearance.muted);
-  widget.addSpacer(4);
-  const heading = widget.addText(viewTitle(view));
-  heading.font = Font.boldSystemFont(14);
-  heading.textColor = new Color(appearance.ink);
-  heading.lineLimit = 1;
-  heading.minimumScaleFactor = 0.75;
-
   const items = getWidgetItems(data, view, preferences);
-  const familyLimit = config.widgetFamily === "small" ? 2 : config.widgetFamily === "large" ? 8 : 3;
-  const limit = Math.min(preferences.itemLimit, familyLimit);
-  widget.addSpacer(5);
+  const columns = config.widgetFamily === "small" ? 1 : 2;
+  const rows = config.widgetFamily === "large" ? 11 : 4;
+  const familyLimit = columns * rows;
+  const limit = preferences.itemLimit === "auto" ? familyLimit : Math.min(preferences.itemLimit, familyLimit);
+  widget.addSpacer(4);
 
   if (!items.length) {
     const empty = widget.addText("Nothing coming up.");
     empty.font = Font.mediumSystemFont(13);
     empty.textColor = new Color(appearance.muted);
   } else {
-    items.slice(0, limit).forEach((item, index) => {
-      if (index) widget.addSpacer(4);
-      addItemRow(widget, item, appearance);
-    });
+    const content = widget.addStack();
+    content.spacing = 6;
+    const screenWidth = typeof Device.screenSize === "function" ? Math.min(Device.screenSize().width, Device.screenSize().height) : 390;
+    const widgetWidth = ({320:292,375:329,390:338,393:338,402:344,414:360,428:364,430:364,440:372})[screenWidth] || 338;
+    const columnWidth = columns === 1 ? (widgetWidth - 22) / 2 - 16 : (widgetWidth - 22) / 2;
+    for (let columnIndex = 0; columnIndex < columns; columnIndex++) {
+      const column = content.addStack();
+      column.layoutVertically();
+      column.size = new Size(columnWidth, 0);
+      items.slice(columnIndex * rows, Math.min((columnIndex + 1) * rows, limit)).forEach((item, index) => {
+        if (index) column.addSpacer(2);
+        addItemRow(column, item, appearance);
+      });
+    }
   }
 
   widget.addSpacer();
   const footer = widget.addText((cached ? "Offline copy" : "Updated just now") + (items.length > limit ? ` · +${items.length - limit} more` : ""));
-  footer.font = Font.mediumSystemFont(9);
+  footer.font = Font.mediumSystemFont(8);
+  footer.lineLimit = 1;
   footer.textColor = new Color(appearance.muted);
   return widget;
 }
@@ -396,11 +404,12 @@ function buildPlannerWidget(data, view, cached, preferences = getWidgetPreferenc
 function addItemRow(widget, item, appearance) {
   const row = widget.addStack();
   row.centerAlignContent();
-  row.spacing = 6;
-  row.setPadding(4, 6, 4, 6);
+  row.spacing = 4;
+  row.setPadding(1, 3, 1, 3);
+  row.size = new Size(0, 24);
   row.cornerRadius = 8;
   row.backgroundColor = new Color(appearance.surface);
-  if (item.nested) row.addSpacer(14);
+  if (item.nested) row.addSpacer(5);
   if (item.completable) {
     row.url = `${URLScheme.forRunningScript()}?action=complete&collection=${encodeURIComponent(item.collection)}&id=${encodeURIComponent(item.id)}`;
     const check = row.addText("○");
@@ -550,7 +559,7 @@ function getWidgetPreferences(data) {
     startScreen: normalizeStartScreen(saved.startScreen),
     plannerUrl: typeof saved.plannerUrl === "string" ? saved.plannerUrl.trim().replace(/\/$/, "") : "",
     daysAhead: saved.daysAhead === "all" || [1, 3, 7, 14].includes(Number(saved.daysAhead)) ? (saved.daysAhead === "all" ? "all" : Number(saved.daysAhead)) : "all",
-    itemLimit: [3, 5, 8, 10, 12, 14].includes(Number(saved.itemLimit)) ? Number(saved.itemLimit) : 5,
+    itemLimit: saved.itemLimitMode === "manual" && [3, 5, 8, 10, 12, 14].includes(Number(saved.itemLimit)) ? Number(saved.itemLimit) : "auto",
     classes: typeof saved.classes === "boolean" ? saved.classes : true,
     homework: typeof saved.homework === "boolean" ? saved.homework : true,
     events: typeof saved.events === "boolean" ? saved.events : true,

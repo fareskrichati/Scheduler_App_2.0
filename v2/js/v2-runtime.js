@@ -14,7 +14,7 @@ function setupV2() {
   document.querySelector('#open-customize').addEventListener('click',()=>{setActiveTab('settings');const panel=document.querySelector('.customization-dropdown');if(panel){panel.open=true;panel.scrollIntoView({behavior:'smooth',block:'start'});panel.querySelector('summary')?.focus()}});
   document.querySelectorAll('[data-v2-page]').forEach(b=>b.addEventListener('click',()=>setActiveTab(b.dataset.v2Page)));
   document.querySelector('[data-v2-calendar]').addEventListener('click',()=>{state.selectedDate=v2TodayDate;state.visibleMonth=startOfMonth(v2TodayDate);setActiveTab('calendar');render()});
-  document.querySelector('[data-v2-todo]').addEventListener('click',()=>setActiveTab('todo'));
+  document.querySelectorAll('[data-v2-todo]').forEach(button=>button.addEventListener('click',()=>setActiveTab('todo')));
   document.querySelector('[data-v2-canvas]').addEventListener('click',()=>{setActiveTab('settings');const feed=elements.settingsCanvasFeed;for(let p=feed.parentElement;p;p=p.parentElement)if(p.tagName==='DETAILS')p.open=true;feed.scrollIntoView({block:'center',behavior:'smooth'});feed.focus()});
   document.querySelector('#v2-save-import-mode').addEventListener('click',saveV2CanvasPreference);
   document.querySelector('#v2-import-now').addEventListener('click',runV2CanvasNow);
@@ -45,12 +45,40 @@ function renderV2Today(){
  document.querySelector('#v2-agenda-date').textContent=formatLongDate(date);
  const items=getItemsForDate(date),active=items.filter(i=>i.status!=='done'),completed=items.filter(i=>i.status==='done');
  const list=document.querySelector('#v2-day-list'),done=document.querySelector('#v2-day-completed');list.innerHTML='';done.innerHTML='';active.forEach(i=>v2AppendItem(list,i));completed.forEach(i=>v2AppendItem(done,i));if(!active.length)list.innerHTML='<p class="empty-state">Nothing scheduled or due. Add a class, event, or to-do to get started.</p>';if(!completed.length)done.innerHTML='<p class="empty-state">Completed items will stay here.</p>';document.querySelector('#v2-day-completed-count').textContent=`(${completed.length})`;
- const now=new Date(),clock=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;const next=active.find(i=>['class','event'].includes(i.kind)&&(date!==todayString()||i.sortKey>=clock))||active.find(i=>i.displayTime&&(date!==todayString()||i.sortKey>=clock));const up=document.querySelector('#v2-up-next');up.innerHTML=next?`<h2>${escapeHtml(next.title)}</h2><p class="v2-countdown">${escapeHtml(v2TimeUntil(date,next.sortKey))}</p><p>${escapeHtml(next.meta)}</p>`:'<h2>You’re all clear.</h2><p>No more upcoming items for this day.</p>';if(next){const b=document.createElement('button');b.className='small-button';b.textContent='View details ↗';b.addEventListener('click',()=>openCalendarItemDetails(next,date));up.append(b)}
+ const now = new Date();
+ const clock = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+ const upcoming = active.filter(item => date > todayString() || (date === todayString() && (item.sortKey || '23:59') >= clock))
+  .sort((a,b) => (a.sortKey || '23:59').localeCompare(b.sortKey || '23:59'));
+ const up = document.querySelector('#v2-up-next'); up.replaceChildren();
+ upcoming.slice(0, 3).forEach((item, index) => {
+  const row = document.createElement('button'); row.type = 'button'; row.className = 'v2-preview-item';
+  const countdown = v2TimeUntil(date, item.sortKey, now);
+  const timing = ['homework', 'exam'].includes(item.kind) ? countdown.replace('Starts in ', 'Due in ').replace('Starting now', 'Due now') : countdown;
+  row.innerHTML = `<span class="v2-item-type">${index === 0 ? 'Next' : 'Then'} · ${escapeHtml(timing)}</span><strong>${escapeHtml(item.title)}</strong><span class="settings-note">${escapeHtml(item.meta || item.displayTime || 'Any time')}</span>`;
+  row.addEventListener('click', () => openCalendarItemDetails(item, date)); up.append(row);
+ });
+ if (!upcoming.length) up.innerHTML = '<h2>You’re all clear.</h2><p>No more upcoming items for this day.</p>';
+ if (upcoming.length > 3) {
+  const more = document.createElement('button'); more.type = 'button'; more.className = 'small-button';
+  more.textContent = `View ${upcoming.length - 3} more in your full day ↓`;
+  more.addEventListener('click', () => document.querySelector('.v2-full-day').scrollIntoView({behavior:'smooth',block:'start'})); up.append(more);
+ }
  const attention=document.querySelector('#v2-attention');attention.innerHTML='';const todo=getTodoItems().filter(i=>i.status!=='done').sort(compareByDateTime).slice(0,5);todo.forEach(item=>{const converted=getItemsForDate(item.date).find(x=>x.sourceId===item.id&&x.kind===item.kind);if(!converted)return;const row=document.createElement('div');v2AppendItem(row,{...converted,attentionDate:formatShortDate(item.date)},item.date);attention.append(row)});if(!todo.length)attention.innerHTML='<p class="empty-state">All caught up. Completed items are in To-Do.</p>';
- const due = v2NextDueCoursework();
- document.querySelector('#v2-next-exam').innerHTML = due
-  ? `<p class="v2-item-type">${due.kind === 'homework' ? 'Homework' : 'Exam / quiz'} · Next due</p><h3>${escapeHtml(due.title)}</h3><p class="settings-note">${due.course ? escapeHtml(due.course) + ' · ' : ''}${formatShortDate(due.date)}${due.time ? ' · ' + formatTime(due.time) : ''}</p>`
-  : '<p class="settings-note">No upcoming homework, quizzes, or exams.</p>';
+ const deadlines = v2UpcomingCoursework();
+ const coming = document.querySelector('#v2-next-exam'); coming.replaceChildren();
+ deadlines.slice(0, 3).forEach((item, index) => {
+  const row = document.createElement('button'); row.type = 'button'; row.className = 'v2-preview-item';
+  row.innerHTML = `<span class="v2-item-type">${item.kind === 'homework' ? 'Homework' : 'Exam / quiz'}${index === 0 ? ' · Next due' : ''}</span><strong>${escapeHtml(item.title)}</strong><span class="settings-note">${item.course ? escapeHtml(item.course) + ' · ' : ''}${formatShortDate(item.date)}${item.time ? ' · ' + formatTime(item.time) : ''}</span>`;
+  row.addEventListener('click', () => {
+   const detail = getItemsForDate(item.date).find(candidate => candidate.sourceId === item.id && candidate.kind === item.kind);
+   if (detail) openCalendarItemDetails(detail, item.date);
+  }); coming.append(row);
+ });
+ if (!deadlines.length) coming.innerHTML = '<p class="settings-note">No upcoming homework, quizzes, or exams.</p>';
+ if (deadlines.length > 3) {
+  const more = document.createElement('button'); more.type = 'button'; more.className = 'small-button'; more.textContent = 'All upcoming coursework ↗';
+  more.addEventListener('click', () => setActiveTab('todo')); coming.append(more);
+ }
 }
 async function v2CanvasRequest(action){
  const token=await getValidAccessToken();if(!token)throw new Error('Sign in before using Canvas imports.');
@@ -101,11 +129,15 @@ function v2ImportMatches(item,panelKind,today){
 }
 
 function v2NextDueCoursework(now = new Date()) {
+ return v2UpcomingCoursework(now)[0];
+}
+
+function v2UpcomingCoursework(now = new Date()) {
  const today = isoDate(now);
  const clock = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
  return [
   ...state.data.homework.map(item => ({...item, kind: 'homework'})),
   ...state.data.exams.map(item => ({...item, kind: 'exam'})),
  ].filter(item => item.status !== 'done' && (item.date > today || (item.date === today && (!item.time || item.time >= clock))))
-  .sort((a, b) => `${a.date} ${a.time || '23:59'}`.localeCompare(`${b.date} ${b.time || '23:59'}`))[0];
+  .sort((a, b) => `${a.date} ${a.time || '23:59'}`.localeCompare(`${b.date} ${b.time || '23:59'}`));
 }

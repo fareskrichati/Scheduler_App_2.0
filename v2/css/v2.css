@@ -123,3 +123,26 @@ dialog .panel-header .icon-button{flex-shrink:0}
   border: 0; border-top: 1px solid var(--line); border-radius: 0;
   padding: 18px 0 0; margin: 18px 0 0; background: transparent;
 }
+
+/* Summary cards stay in two columns above the full-width daily agenda. */
+@media (min-width: 761px) {
+  .v2-today-columns { align-items: stretch; }
+  .v2-today-columns > div { display: flex; flex-direction: column; }
+  .v2-today-columns :is(.v2-up-next, .v2-next-exam, .v2-attention-card) { flex: 1; }
+}
+
+#panel-today > .v2-full-day { width: 100%; margin-top: 24px; }
+@media (max-width: 760px) { #panel-today > .v2-full-day { margin-top: 19px; } }
+
+/* Compact, readable previews use the extra room in both summary cards. */
+.v2-preview-item {
+  display: grid; gap: 6px; width: 100%; min-width: 0; margin: 0 !important;
+  padding: 10px 0; border: 0; border-bottom: 1px solid var(--line);
+  background: transparent; color: var(--ink); font: inherit; text-align: left;
+}
+.v2-preview-item:first-child { padding-top: 4px; }
+.v2-preview-item:last-child { border-bottom: 0; padding-bottom: 0; }
+.v2-preview-item strong { font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
+.v2-preview-item .settings-note { margin: 0; }
+.v2-preview-item:hover strong { color: var(--accent-deep); }
+#v2-next-exam > .small-button, #v2-up-next > .small-button { margin-top: 14px; }

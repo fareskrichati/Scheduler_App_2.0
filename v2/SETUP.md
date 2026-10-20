@@ -19,3 +19,13 @@ The background worker adds new items only. Planner updates use optimistic concur
 ## Verification
 
 `node --test tests/*.test.js`: archive integrity, current planner tests, data merge, Canvas parsing/deduplication/timezones and endpoint authentication. Browser checks use a separate local fixture server, never actual user records. Real-account authentication and production import services require final live validation.
+
+## Study workspace and Tesla destinations
+
+Study is in the desktop sidebar and mobile More menu. Its embedded workspace uses the current account's class names and saves notes, exam focus, homework questions, responses, and progress in browser localStorage, scoped by account and class name. These materials do not sync to the planner database. Renaming a class creates a new study space; the prior class-name key remains in browser storage. The standalone study-mockup folder remains separate.
+
+Study imports `.txt`/`.md` files up to 1 MB each, or pasted text. Numbered homework questions become a selectable bank; optional `Answer:` lines become a review key. Sets shuffle source questions; they do not generate new AI variations or auto-grade. Plans use local topic and keyword rules. Native PDF, Word, photo/OCR extraction is not included.
+
+Address controls include Send to Tesla. It invokes navigator.share with the address and a Google Maps destination URL; the user selects Tesla from the device share menu. Unsupported or failed shares show a copy-address/map-link dialog. Cancelled shares stay quiet, and the app does not claim that a destination reached the car. Vehicle API credentials are not used. Actual delivery depends on device sharing support and the installed Tesla app.
+
+Validation: `node --test tests/*.test.js`. Build the deployment locally with `node build-deploy.js`; this does not publish the site.

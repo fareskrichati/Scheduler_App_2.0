@@ -26,7 +26,7 @@ function setupV2() {
 function renderV2Date(){document.querySelector('#v2-date').textContent=new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'})}
 function renderV2Sync(){const el=document.querySelector('#v2-sync-status');el.textContent=authState.isAuthenticated?(lastCloudSyncMessage||'Connected to your planner'):'Sign in to sync your planner';document.querySelector('#v2-profile').textContent=getSettings().name||authState.profile?.email||''}
 function renderV2Navigation(){
- const labels={today:'Today',calendar:'Calendar',todo:'To-Do',classes:'Classes',events:'Events',homework:'Homework',exams:'Exams',reminders:'Reminders',settings:'Settings',more:'More'};
+ const labels={study:'Study',today:'Today',calendar:'Calendar',todo:'To-Do',classes:'Classes',events:'Events',homework:'Homework',exams:'Exams',reminders:'Reminders',settings:'Settings',more:'More'};
  document.querySelector('#v2-current-section').textContent=labels[state.activeTab]||'Today';
  document.querySelector('#v2-section-description').textContent={today:'Your classes, plans, and deadlines. One place.',calendar:'Your whole schedule, with everything in view.',todo:'Homework, exams, and reminders. One list.',settings:'Your planner, your preferences.',more:'All your planner tools, close by.'}[state.activeTab]||labels[state.activeTab];
  document.querySelectorAll('.v2-bottom-nav .tab-button').forEach(b=>{const active=b.dataset.tab===state.activeTab||(b.dataset.tab==='more'&&!['today','calendar','todo','classes'].includes(state.activeTab));b.classList.toggle('is-active',active);b.setAttribute('aria-selected',active)});

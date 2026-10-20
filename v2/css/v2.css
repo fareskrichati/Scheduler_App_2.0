@@ -146,3 +146,5 @@ dialog .panel-header .icon-button{flex-shrink:0}
 .v2-preview-item .settings-note { margin: 0; }
 .v2-preview-item:hover strong { color: var(--accent-deep); }
 #v2-next-exam > .small-button, #v2-up-next > .small-button { margin-top: 14px; }
+
+.tesla-share-dialog{border:1px solid var(--line);border-radius:18px;background:var(--surface-strong);color:var(--ink);padding:24px;max-width:min(520px,calc(100vw - 32px))}.tesla-share-dialog::backdrop{background:#162a3b66}.tesla-share-dialog p{font-size:13px;line-height:1.8;color:var(--muted)}.tesla-share-dialog label{display:grid;gap:8px;font-size:12px}.tesla-share-dialog textarea{width:100%;min-height:80px;font:inherit;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}.tesla-share-actions{display:flex;align-items:center;flex-wrap:wrap;gap:15px;margin-top:18px}.tesla-share-actions a{font-size:12px;color:var(--accent-deep)}.location-map-links .tesla-share{align-self:center}#panel-study{min-width:0}

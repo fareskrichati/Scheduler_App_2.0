@@ -9,9 +9,9 @@ const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_DELAY_MS = 1000;
 const FOREVER_REPEAT_YEARS = 5;
 const SUPABASE_TABLE = "planner_profiles";
-const WHATS_NEW_VERSION = "2.5.2";
-const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-2.5.2";
-const PLANNER_TABS = ["today", "more", "calendar", "todo", "classes", "events", "homework", "exams", "reminders", "settings"];
+const WHATS_NEW_VERSION = "3.0";
+const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-3.0";
+const PLANNER_TABS = ["study", "today", "more", "calendar", "todo", "classes", "events", "homework", "exams", "reminders", "settings"];
 
 if (new URLSearchParams(window.location.search).get("scriptable") === "1") {
   document.documentElement.classList.add("scriptable-webview");
@@ -1627,6 +1627,7 @@ async function logout() {
   state.data=seedData();
   localStorage.removeItem(STORAGE_KEY);
   authState.isAuthenticated = false;
+  renderV2Study();
   authState.userId = "";
   pendingFirstLogin = null;
   if (supabaseClient) {
@@ -1885,6 +1886,7 @@ async function loadDataFromSupabase(userId) {
     console.error("Failed to load Supabase planner data", error);
     lastCloudSyncMessage = "Cloud sync could not load. Please try signing in again.";
     authState.isAuthenticated = false;
+  renderV2Study();
     throw new Error(lastCloudSyncMessage);
   }
 
@@ -2159,6 +2161,7 @@ function renderTabs() {
     panel.classList.toggle("is-active", panel.dataset.panel === state.activeTab);
   });
   renderV2Navigation();
+  renderV2Study();
 }
 
 function renderWeekdays() {
@@ -2546,7 +2549,7 @@ function buildLocationMapLinks(location) {
   const address = typeof location === "string" ? location.trim() : "";
   if (!address) return "";
   const query = encodeURIComponent(address);
-  return `<span class="location-map-links" role="group" aria-label="Open location in maps"><a href="https://www.google.com/maps/search/?api=1&amp;query=${escapeHtml(query)}" target="_blank" rel="noopener noreferrer" aria-label="Open ${escapeHtml(address)} in Google Maps">Google Maps ↗</a><a href="https://maps.apple.com/?q=${escapeHtml(query)}" target="_blank" rel="noopener noreferrer" aria-label="Open ${escapeHtml(address)} in Apple Maps">Apple Maps ↗</a></span>`;
+  return `<span class="location-map-links" role="group" aria-label="Open location in maps"><a href="https://www.google.com/maps/search/?api=1&amp;query=${escapeHtml(query)}" target="_blank" rel="noopener noreferrer" aria-label="Open ${escapeHtml(address)} in Google Maps">Google Maps ↗</a><a href="https://maps.apple.com/?q=${escapeHtml(query)}" target="_blank" rel="noopener noreferrer" aria-label="Open ${escapeHtml(address)} in Apple Maps">Apple Maps ↗</a><button type="button" class="small-button tesla-share" data-tesla-address="${escapeHtml(address)}" aria-label="Send ${escapeHtml(address)} to Tesla">Send to Tesla ↗</button></span>`;
 }
 
 function renderDaySummary(target, items) {

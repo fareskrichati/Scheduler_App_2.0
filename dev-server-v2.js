@@ -1,8 +1,8 @@
 /* Local server for the real 2.0 app and the existing Netlify functions. */
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const root=__dirname,port=Number(process.env.PORT||8796);
-const allowedFunctions=new Set(['academic-calendar','homework-photo-import','event-photo-import','canvas-calendar-feed']);
-const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.md':'text/plain; charset=utf-8'};
+const allowedFunctions=new Set(['study-handwriting','academic-calendar','homework-photo-import','event-photo-import','canvas-calendar-feed']);
+const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.bcmap':'application/octet-stream','.pfb':'application/octet-stream','.ttf':'font/ttf','.css':'text/css; charset=utf-8','.png':'image/png','.md':'text/plain; charset=utf-8'};
 http.createServer(async(req,res)=>{try{
  const url=new URL(req.url,'http://localhost');
  if(url.pathname.startsWith('/.netlify/functions/')){const name=url.pathname.split('/').pop();if(!allowedFunctions.has(name)){res.writeHead(404);return res.end()}

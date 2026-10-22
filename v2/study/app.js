@@ -78,7 +78,18 @@ $('course').onchange=()=>{
  hydrate();$('homework-text').value=state.homework.text;$('homework-status').textContent='';kit=analyze();practiceIndex=0;activeTab='plan';render();$('status').textContent='Opened saved study space for '+course+'.';
 };
 document.querySelectorAll('[data-tab]').forEach(b=>{b.onclick=()=>{activeTab=b.dataset.tab;revealed=false;render();};b.onkeydown=e=>{if(['ArrowRight','ArrowLeft','Home','End'].includes(e.key)){e.preventDefault();const buttons=[...document.querySelectorAll('[data-tab]')];let i=buttons.indexOf(b);i=e.key==='Home'?0:e.key==='End'?buttons.length-1:(i+(e.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length;buttons[i].click();buttons[i].focus();}};});
-$('upload').onclick=()=>$('file').click();$('file').onchange=async()=>{const file=$('file').files[0];if(!file)return;if(!/\.(txt|md)$/i.test(file.name)||file.size>1000000){$('status').textContent='Choose a .txt or .md file smaller than 1 MB.';$('file').value='';return;}try{const text=await file.text();state.notes+=(state.notes?'\n\n':'')+text;state.sources.push(file.name);hydrate();save();$('status').textContent='Notes added. Build your plan to include them.';}catch{$('status').textContent='Could not read that file. Try pasting the notes instead.';}$('file').value='';};
+$('read-handwriting').onchange=()=>{$('handwriting-range').hidden=!$('read-handwriting').checked;};
+function importOptions(){return{handwriting:$('read-handwriting').checked,first:$('ocr-first').value,last:$('ocr-last').value,userId:context.userId};}
+let importing=false;
+function setImporting(value){importing=value;['upload','homework-upload','course','reset','read-handwriting','ocr-first','ocr-last'].forEach(id=>$(id).disabled=value);}
+$('upload').onclick=()=>$('file').click();
+$('file').onchange=async()=>{
+ const file=$('file').files[0];if(!file||importing)return;
+ setImporting(true);
+ try{const text=await StudyFiles.read(file,message=>$('status').textContent=message,importOptions());state.notes+=(state.notes?'\n\n':'')+text;state.sources.push(file.name);hydrate();save();$('status').textContent=$('read-handwriting').checked?'Handwriting transcribed. Review and correct the text and equations before building your plan.':'Notes added. Review the extracted text, then build your plan.';}
+ catch(error){$('status').textContent=error.message||'Could not read this file. Try a fresh export.';}
+ finally{setImporting(false);$('file').value='';}
+};
 $('reset').onclick=()=>{
  if(!confirm('Clear notes, homework and progress for '+state.course+' from this browser?'))return;
  const course=state.course;
@@ -140,13 +151,21 @@ $('sample-homework').onclick=()=>{
 };
 $('homework-upload').onclick=()=>$('homework-files').click();
 $('homework-files').onchange=async()=>{
- let added=0;const errors=[];
+ if(importing)return;
+ setImporting(true);let added=0;const errors=[];
+ try{
  for(const file of $('homework-files').files){
-  if(!/\.(txt|md)$/i.test(file.name)||file.size>1000000){errors.push(`${file.name}: use .txt or .md under 1 MB`);continue;}
-  try{const n=addHomework(await file.text(),file.name);added+=n;if(!n)errors.push(`${file.name}: no new numbered questions found`);}catch{errors.push(`${file.name}: could not read file`);}
+  try{
+   const text=await StudyFiles.read(file,message=>$('homework-status').textContent=message,importOptions());
+   const n=addHomework(text,file.name);added+=n;
+   // Keep the extracted text editable, even when question numbering needs correction.
+   state.homework.text+=(state.homework.text?'\n\n':'')+text;$('homework-text').value=state.homework.text;
+   if(!n)errors.push(`${file.name}: no new numbered questions found. Review the extracted text and number each question before extracting again.`);
+  }catch(error){errors.push(`${file.name}: ${error.message||'could not read file'}`);}
  }
- state.homework.run=null;activeTab='homework';save();render();$('homework-status').textContent=`${added} questions added. ${errors.join('. ')}`;$('homework-files').value='';
+ state.homework.run=null;activeTab='homework';save();render();$('homework-status').textContent=`${added} questions added. ${$('read-handwriting').checked?'Review the recognized text and equations for errors. ':''}${errors.join(' ')}`;
+ }finally{setImporting(false);$('homework-files').value='';}
 };
 hydrate();kit=analyze();render();
 
-new ResizeObserver(()=>window.parent.postMessage({type:'uniplan-study-height',height:document.documentElement.scrollHeight},location.origin)).observe(document.body);
+new ResizeObserver(()=>window.parent.postMessage({type:'uniplan-study-height',height:Math.ceil(document.body.getBoundingClientRect().height)},location.origin)).observe(document.body);

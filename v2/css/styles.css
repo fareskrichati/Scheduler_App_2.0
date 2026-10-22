@@ -1378,7 +1378,7 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-day-number {
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 760px), (max-width: 1366px) and (any-pointer: coarse) {
   html {
     font-size: 13px;
   }
@@ -1604,7 +1604,7 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-day-number {
 .canvas-guide li + li { margin-top: 8px; }
 .todo-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
-@media (max-width: 760px) {
+@media (max-width: 760px), (max-width: 1366px) and (any-pointer: coarse) {
   .auth-panel, .field, .field-row, .entry-form, .subsection, .item-card,
   .settings-summary-row, .preference-box, .form-actions { min-width: 0; max-width: 100%; }
   .field input, .field select, .field textarea { width: 100%; max-width: 100%; }
@@ -1664,7 +1664,7 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-day-number {
   place-items: center;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 760px), (max-width: 1366px) and (any-pointer: coarse) {
   .topbar-shortcuts .canvas-shortcut-button,
   .topbar-shortcuts .mobile-quick-add-button,
   .topbar-shortcuts .settings-button {
@@ -1877,7 +1877,7 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-day-number {
   .update-comparison-grid { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 760px), (max-width: 1366px) and (any-pointer: coarse) {
   .calendar-header {
     display: grid;
     grid-template-columns: minmax(0, 1fr);

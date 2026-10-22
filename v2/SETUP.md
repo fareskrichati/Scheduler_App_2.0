@@ -24,8 +24,20 @@ The background worker adds new items only. Planner updates use optimistic concur
 
 Study is in the desktop sidebar and mobile More menu. Its embedded workspace uses the current account's class names and saves notes, exam focus, homework questions, responses, and progress in browser localStorage, scoped by account and class name. These materials do not sync to the planner database. Renaming a class creates a new study space; the prior class-name key remains in browser storage. The standalone study-mockup folder remains separate.
 
-Study imports `.txt`/`.md` files up to 1 MB each, or pasted text. Numbered homework questions become a selectable bank; optional `Answer:` lines become a review key. Sets shuffle source questions; they do not generate new AI variations or auto-grade. Plans use local topic and keyword rules. Native PDF, Word, photo/OCR extraction is not included.
+Study imports `.pdf`/`.txt`/`.md` files up to 20 MB each, or pasted text. PDF.js 6.4.299 is bundled locally with worker, CMaps, and standard font data. Text PDFs are extracted in the browser (up to 150 pages / 600,000 characters); scanned PDFs without a text layer require OCR first. Numbered homework questions become a selectable bank; optional `Answer:` lines become a review key. Sets shuffle source questions; they do not generate new AI variations or auto-grade. Plans use local topic and keyword rules. Word and photo/OCR extraction is not included.
 
 Address controls include Send to Tesla. It invokes navigator.share with the address and a Google Maps destination URL; the user selects Tesla from the device share menu. Unsupported or failed shares show a copy-address/map-link dialog. Cancelled shares stay quiet, and the app does not claim that a destination reached the car. Vehicle API credentials are not used. Actual delivery depends on device sharing support and the installed Tesla app.
 
 Validation: `node --test tests/*.test.js`. Build the deployment locally with `node build-deploy.js`; this does not publish the site.
+
+The tutorial is a non-modal 17-feature guide, with visible target outlines, real-control interaction feedback, jump navigation, and an optional Next action. Study uses a single page scroll and a content-sized iframe; input fonts stay at 16px on phones to prevent focus zoom.
+
+## Handwriting recognition in Study
+
+Enable **Read handwriting with AI** before uploading a Goodnotes/scanned PDF or a JPG/PNG/WebP photo. This is opt-in for each open Study session; the choice is not persisted. PDF pages in the selected range (at most 10 per file) render to JPEGs up to 1800px on the long side and are transcribed one page at a time. Standard text-PDF reading stays local. Handwriting images are sent to OpenAI through `/.netlify/functions/study-handwriting`; the function sets `store:false` and does not log or save images. Review recognized text and `[unclear]` markers, especially equations, before studying from it. No automatic solutions are generated.
+
+Hosting must provide `OPENAI_API_KEY`, `SUPABASE_URL`, and `SUPABASE_PUBLISHABLE_KEY` (or `SUPABASE_ANON_KEY`). `OPENAI_STUDY_OCR_MODEL` optionally overrides the default `gpt-5.4-mini`. The function checks the access token against Supabase Auth before contacting OpenAI. The parent app handles session refresh and the request; the iframe never receives access tokens. A local fixture cannot perform real recognition. Deploy the Netlify function with these variables to activate live transcription.
+
+## iPad layout
+
+Touch devices through 1366 CSS pixels use the iPhone layout, including bottom navigation, single-column panels, mobile calendar behavior, and compact Study controls. This covers iPad portrait and landscape, including Split View. Fine-pointer desktop/laptop screens retain the desktop layout.

@@ -20,7 +20,7 @@ function setupV2() {
   document.querySelector('#v2-import-now').addEventListener('click',runV2CanvasNow);
   document.querySelectorAll('[name="v2-canvas-mode"]').forEach(r=>r.addEventListener('change',()=>{document.querySelector('#v2-canvas-status').textContent='Choose Save import preference to apply this change.'}));
   setInterval(()=>{const old=document.querySelector('#v2-date').textContent;renderV2Date();if(old!==document.querySelector('#v2-date').textContent){v2TodayDate=todayString();renderV2Today()}renderV2Today();renderV2Sync()},30000);
-  matchMedia("(max-width: 760px)").addEventListener("change",()=>renderCalendar());
+  matchMedia("(max-width: 760px), (max-width: 1366px) and (any-pointer: coarse)").addEventListener("change",()=>renderCalendar());
   renderV2Date();
 }
 function renderV2Date(){document.querySelector('#v2-date').textContent=new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'})}
@@ -95,23 +95,7 @@ async function saveV2CanvasPreference(){
 }
 async function runV2CanvasNow(){if(v2CanvasBusy)return;v2CanvasBusy=true;const b=document.querySelector('#v2-import-now'),status=document.querySelector('#v2-canvas-status');b.disabled=true;status.textContent='Checking Canvas…';try{if(cloudSaveTimer){clearTimeout(cloudSaveTimer);cloudSaveTimer=null;await saveDataToSupabase()}const result=await v2CanvasRequest('sync');await refreshCloudData();await loadV2CanvasPreference();status.textContent=`Canvas checked. ${result.added||0} new items added. Existing items were kept.`}catch(error){status.textContent=error.message}finally{b.disabled=false;v2CanvasBusy=false}}
 
-function setupV2Tutorial(){
- const steps=[
-  ['Your planner has a new look','UniPlan 2.0 keeps your existing classes, tasks, and account. This optional tour shows you where everything lives.','today'],
-  ['Your whole day','Today brings classes, events, and deadlines together. Select a day above the agenda; finished tasks stay under Completed.','today'],
-  ['Your familiar calendar','Switch between Month, Week, and Day. Select an item for details, or hold a day to add something.','calendar'],
-  ['All your to-dos','Every pending homework item, exam, and reminder appears here by due date. Open Import from Canvas to check and review imports. Completed items stay below the list.','todo'],
-  ['Classes and what is due next','Each class shows its next unfinished assignment, including overdue work. Add new opens the forms for classes, tasks, and events.','classes'],
-  ['Make it yours','Settings includes your appearance, Canvas feed, and sync preferences. You can reopen this tutorial here whenever you need it.','settings']
- ];
- const dialog=document.createElement('dialog');dialog.className='whats-new-dialog';dialog.setAttribute('aria-label','UniPlan tutorial');dialog.innerHTML='<div class="whats-new-card"><p id="v2-tour-progress" class="panel-label"></p><h2 id="v2-tour-title"></h2><p id="v2-tour-copy"></p><div class="v2-tour-actions"><button type="button" class="ghost-button" id="v2-tour-close">Close tutorial</button><button type="button" class="ghost-button" id="v2-tour-back">Back</button><button type="button" class="primary-button" id="v2-tour-next">Next</button></div></div>';document.body.append(dialog);
- let current=0;
- const show=()=>{const step=steps[current];setActiveTab(step[2]);document.querySelector('#v2-tour-progress').textContent=`Step ${current+1} of ${steps.length}`;document.querySelector('#v2-tour-title').textContent=step[0];document.querySelector('#v2-tour-copy').textContent=step[1];document.querySelector('#v2-tour-back').disabled=current===0;document.querySelector('#v2-tour-next').textContent=current===steps.length-1?'Finish':'Next';};
- document.querySelectorAll('[data-v2-tutorial]').forEach(b=>b.addEventListener('click',()=>{if(elements.whatsNewDialog.open)elements.whatsNewDone.click();current=0;show();dialog.showModal()}));
- document.querySelector('#v2-tour-close').onclick=()=>dialog.close();
- document.querySelector('#v2-tour-back').onclick=()=>{if(current>0){current--;show()}};
- document.querySelector('#v2-tour-next').onclick=()=>{if(current===steps.length-1)dialog.close();else{current++;show()}};
-}
+function setupV2Tutorial(){ setupInteractiveTour(); }
 function v2NextAssignment(classTitle){
  return getNextVisibleOccurrences(state.data.homework).filter(item=>item.status!=='done'&&item.course?.trim().toLowerCase()===classTitle.trim().toLowerCase()).sort(compareByDateTime)[0];
 }

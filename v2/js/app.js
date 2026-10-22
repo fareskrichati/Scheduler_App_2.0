@@ -658,7 +658,7 @@ function setupSettingsAccordions() {
 }
 
 function setupDesktopAddAccordions() {
-  if (document.body.classList.contains("mobile-preview") || window.matchMedia("(max-width: 760px)").matches) return;
+  if (document.body.classList.contains("mobile-preview") || window.matchMedia("(max-width: 760px), (max-width: 1366px) and (any-pointer: coarse)").matches) return;
   const labels = { "class-form": "Add a class", "event-form": "Add an event", "homework-form": "Add homework", "exam-form": "Add an exam", "reminder-form": "Add a reminder" };
   Object.entries(labels).forEach(([formId, label]) => {
     const form = document.querySelector(`#${formId}`);
@@ -1081,7 +1081,7 @@ function saveDetectedEvents() {
 }
 
 function setupMobileSectionPopup(section, panel, label) {
-  if (!document.body.classList.contains("mobile-preview") && !window.matchMedia("(max-width: 760px)").matches) return;
+  if (!document.body.classList.contains("mobile-preview") && !window.matchMedia("(max-width: 760px), (max-width: 1366px) and (any-pointer: coarse)").matches) return;
   const dialog = document.createElement("dialog"); dialog.className = "mobile-form-dialog";
   const card = document.createElement("div"); card.className = "mobile-form-dialog-card";
   const header = document.createElement("div"); header.className = "mobile-form-dialog-header"; header.innerHTML = `<strong>${label}</strong>`;
@@ -1154,7 +1154,7 @@ async function checkAcademicCalendarBackend() {
 }
 
 function setupMobileImporterPopup(importer, classPanel) {
-  if (!document.body.classList.contains("mobile-preview") && !window.matchMedia("(max-width: 760px)").matches) return;
+  if (!document.body.classList.contains("mobile-preview") && !window.matchMedia("(max-width: 760px), (max-width: 1366px) and (any-pointer: coarse)").matches) return;
   const dialog = document.createElement("dialog");
   dialog.className = "mobile-form-dialog schedule-import-dialog";
   const card = document.createElement("div");
@@ -2192,7 +2192,7 @@ function renderCalendar() {
   const monthDate = new Date(`${state.visibleMonth}T00:00:00`);
   const anchor = new Date(`${state.selectedDate}T00:00:00`);
   const view = state.calendarView || "month";
-  const isMobileCalendar = window.matchMedia("(max-width: 760px)").matches;
+  const isMobileCalendar = window.matchMedia("(max-width: 760px), (max-width: 1366px) and (any-pointer: coarse)").matches;
   elements.calendarViewButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.calendarView === view);
   });
@@ -4796,7 +4796,7 @@ function openCanvasShortcut() {
     elements.settingsStatus.textContent = "Add your school name and Canvas link, then save settings.";
     return;
   }
-  if (window.matchMedia('(max-width: 760px)').matches) {
+  if (window.matchMedia('(max-width: 760px), (max-width: 1366px) and (any-pointer: coarse)').matches) {
     // Canvas documents this URL scheme for opening its mobile app.
     window.location.href = shortcut.url.replace(/^https:\/\//, 'canvas-courses://');
     return;

@@ -6,6 +6,7 @@
   const nav = shell.querySelector('.tab-row');
   const iconPaths = { today:'<circle cx="10" cy="10" r="4"/><path d="M10 1v2m0 14v2M1 10h2m14 0h2M4 4l1 1m10 10 1 1M4 16l1-1M15 5l1-1"/>', calendar:'<rect x="3" y="3" width="14" height="14" rx="2"/><path d="M3 8h14M7 1v4m6-4v4"/>', todo:'<path d="m2 5 2 2 3-4m3 2h8M2 13l2 2 3-4m3 2h8"/>',classes:'<path d="M10 5C7 3 4 3 2 4v12c3-1 5-1 8 1 3-2 5-2 8-1V4c-2-1-5-1-8 1Zm0 0v12"/>',more:'<circle cx="4" cy="10" r="1"/><circle cx="10" cy="10" r="1"/><circle cx="16" cy="10" r="1"/>' };
   Object.assign(iconPaths,{
+   study:'<path d="M5 2h12v16H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm-2 14a2 2 0 0 1 2-2h12M8 2v7l2-1.5L12 9V2"/>',
    events:'<rect x="2" y="4" width="16" height="14" rx="2"/><path d="M6 2v4m8-4v4M2 9h16m-12 4h3m3 0h2"/>',
    homework:'<path d="M4 2h8l4 4v12H4zM12 2v5h4M7 11h6m-6 3h4"/>',
    exams:'<path d="M6 4H3v14h14V4h-3M7 2h6v4H7zM6 10l2 2 5-3m-7 6h7"/>',

@@ -1,6 +1,7 @@
 /* A non-modal guided tour: the highlighted app controls remain usable. */
 function setupInteractiveTour(){
  const steps=[
+  {title:'Meet your pet helper',page:'settings',target:'.pet-settings',copy:'I’m your Scheduler Helper! Choose a cat, dog, fox, or robot here. Outside the tour, tap your floating pet to ask about your day, add plans through chat, or choose Mark done to finish a to-do. You can change or hide your pet anytime in Settings.'},
   {title:'Your day at a glance',page:'today',target:'#v2-week-strip',copy:'Try selecting a day in the week strip. Your agenda and upcoming work update below.'},
   {title:'Calendar views',page:'calendar',target:'.calendar-view-switch',copy:'Try Month, Week, or Day. Select a calendar item for details; hold a date to add something.'},
   {title:'Tasks and completed work',page:'todo',target:'#panel-todo',copy:'Open a task to review it, or mark finished work complete. The Completed section keeps your history.'},
@@ -40,8 +41,8 @@ function setupInteractiveTour(){
   target.addEventListener('click',tried);target.addEventListener('input',tried);target.addEventListener('change',tried);
   cleanup=()=>{target.classList.remove('v2-tour-highlight');target.removeEventListener('click',tried);target.removeEventListener('input',tried);target.removeEventListener('change',tried);};
  }
- function show(){clear();const step=steps[current];setActiveTab(step.page);get('v2-tour-progress').textContent=`FEATURE ${current+1} / ${steps.length}`;get('v2-tour-title').textContent=step.title;get('v2-tour-copy').textContent=step.copy;jump.value=current;get('v2-tour-back').disabled=current===0;get('v2-tour-next').textContent=current===steps.length-1?'Finish':'Next';timer=setTimeout(()=>highlight(),80);}
- function close(){clear();panel.hidden=true;document.body.classList.remove('v2-tour-running');setActiveTab(originalPage);}
+ function show(){window.UniPlanPet?.tour(true);clear();const step=steps[current];setActiveTab(step.page);get('v2-tour-progress').textContent=`FEATURE ${current+1} / ${steps.length}`;get('v2-tour-title').textContent=step.title;get('v2-tour-copy').textContent=step.copy;window.UniPlanPet?.decorateTour(panel);jump.value=current;get('v2-tour-back').disabled=current===0;get('v2-tour-next').textContent=current===steps.length-1?'Finish':'Next';timer=setTimeout(()=>highlight(),80);}
+ function close(){window.UniPlanPet?.tour(false);clear();panel.hidden=true;document.body.classList.remove('v2-tour-running');setActiveTab(originalPage);}
  document.querySelectorAll('[data-v2-tutorial]').forEach(button=>button.addEventListener('click',()=>{if(elements.whatsNewDialog.open)elements.whatsNewDone.click();originalPage=state.activeTab;current=0;panel.hidden=false;document.body.classList.add('v2-tour-running');show();get('v2-tour-jump').focus();}));
  get('v2-tour-close').onclick=close;get('v2-tour-back').onclick=()=>{if(current>0){current--;show();}};get('v2-tour-next').onclick=()=>{if(current===steps.length-1)close();else{current++;show();}};get('v2-tour-try').onclick=()=>{clear();setActiveTab(steps[current].page);highlight();};jump.onchange=()=>{current=Number(jump.value);show();};
  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!panel.hidden)close();});

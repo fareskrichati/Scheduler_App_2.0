@@ -9,8 +9,8 @@ const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_DELAY_MS = 1000;
 const FOREVER_REPEAT_YEARS = 5;
 const SUPABASE_TABLE = "planner_profiles";
-const WHATS_NEW_VERSION = "3.0";
-const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-3.0";
+const WHATS_NEW_VERSION = "3.5";
+const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-3.5";
 const PLANNER_TABS = ["study", "today", "more", "calendar", "todo", "classes", "events", "homework", "exams", "reminders", "settings"];
 
 if (new URLSearchParams(window.location.search).get("scriptable") === "1") {
@@ -1658,6 +1658,7 @@ function setAuthMode(mode, options = {}) {
 }
 
 function updateAuthView() {
+  window.UniPlanPet?.refresh();
   document.body.classList.toggle("is-authenticated", authState.isAuthenticated);
 
   if (authState.isAuthenticated) {
@@ -1774,6 +1775,7 @@ async function loginWithSupabase(email, password) {
 }
 
 async function signUpWithSupabase(fullName, phone, canvasSetup) {
+  const selectedPet = window.UniPlanPet.signupChoice();
   elements.setupStatus.textContent = "Creating account...";
 
   const { data, error } = await supabaseClient.auth.signUp({
@@ -1783,6 +1785,7 @@ async function signUpWithSupabase(fullName, phone, canvasSetup) {
       data: {
         name: fullName,
         phone,
+        pet: selectedPet,
         canvasShortcut: { school: canvasSetup.school, url: canvasSetup.url },
       },
     },
@@ -1794,6 +1797,7 @@ async function signUpWithSupabase(fullName, phone, canvasSetup) {
   }
 
   localStorage.setItem(`uniplan-canvas-setup:${data.user.id}`, JSON.stringify(canvasSetup));
+  state.data.settings.pet = selectedPet;
   state.data.settings.canvasShortcut = { school: canvasSetup.school, url: canvasSetup.url };
   state.data.settings.canvasFeedUrl = canvasSetup.feed;
   authState.profile = {
@@ -1838,6 +1842,7 @@ async function applySupabaseUser(user) {
     state.data = cloudData;
   } else {
     state.data = seedData();
+    state.data.settings.pet = window.UniPlanPet.normalize(user.user_metadata?.pet);
     syncSettingsFromAuthProfile();
     const shortcut = user.user_metadata?.canvasShortcut;
     if (shortcut) state.data.settings.canvasShortcut = { school: typeof shortcut.school === "string" ? shortcut.school : "", url: normalizeCanvasShortcutUrl(shortcut.url) };
@@ -2087,6 +2092,7 @@ function clearLegacyLocalLogin() {
 }
 
 function render() {
+  window.UniPlanPet?.refresh();
   renderV2Today();
   renderTabs();
   renderHeaderStats();
@@ -2139,6 +2145,8 @@ function renderTodoList() {
   items.forEach((item) => {
     const row = document.createElement("article");
     row.className = `todo-item${item.status === "done" ? " is-complete" : ""}`;
+    row.dataset.plannerSourceId = item.id;
+    row.dataset.plannerKind = item.kind;
     applyItemColor(row, item.color);
     row.innerHTML = `<button class="todo-check" type="button" aria-label="${item.status === "done" ? "Mark pending" : "Mark done"}">${item.status === "done" ? "✓" : ""}</button><div class="todo-copy"><div class="todo-title-line"><strong>${escapeHtml(item.title)}</strong>${item.priority ? '<span class="priority-label">Priority</span>' : ""}</div><span>${escapeHtml(item.label)} · ${formatShortDate(item.date)}${item.time ? ` · ${formatTime(item.time)}` : ""}</span></div>`;
     row.querySelector(".todo-check").addEventListener("click", () => {
@@ -2259,6 +2267,8 @@ function renderCalendar() {
       marker.className = `calendar-marker marker-${item.kind}${item.status === "done" ? " is-complete" : ""}`;
       const monthTime = item.displayTime ? `<span class="calendar-marker-time">${escapeHtml(item.displayTime)}</span>` : "";
       marker.innerHTML = `<span class="calendar-marker-row">${canComplete ? `<button class="calendar-marker-check" type="button" aria-label="${item.status === "done" ? "Mark pending" : "Mark done"}: ${escapeHtml(item.title)}">${item.status === "done" ? "✓" : ""}</button>` : ""}<button class="calendar-item-open" type="button" aria-label="View details: ${escapeHtml(item.title)}"><span class="calendar-marker-title">${escapeHtml(item.title)}</span>${monthTime}</button></span>`;
+      marker.dataset.plannerSourceId = item.sourceId;
+      marker.dataset.plannerKind = item.kind;
       marker.title = `${item.title}${item.displayTime ? ` · ${item.displayTime}` : ""}`;
       applyItemColor(marker, item.color);
       marker.querySelector(".calendar-item-open").addEventListener("click", (event) => {
@@ -4451,6 +4461,7 @@ function persistAndRender() {
 }
 
 function saveData() {
+  window.UniPlanPet?.saved();
   saveDataLocally();
   scheduleCloudSave();
 }
@@ -4541,6 +4552,7 @@ function normalizeSettings(settings) {
 
   return {
     ...settings,
+    pet: window.UniPlanPet.normalize(settings.pet),
     customization: PlannerCustomization.normalize(settings.customization),
     theme: ["classic", "christmas", "halloween", "valentine", "spring", "autumn", "ocean", "lavender", "sunset"].includes(settings.theme) ? settings.theme : defaults.theme,
     name: typeof settings.name === "string" ? settings.name : defaults.name,
@@ -4573,6 +4585,7 @@ function normalizeSettings(settings) {
 function getDefaultSettings() {
   return {
     theme: "classic",
+    pet: { species: "cat", hidden: false, tourOffered: false },
     customization: PlannerCustomization.defaults(),
     name: "",
     email: "",

@@ -2,7 +2,9 @@ const crypto=require('node:crypto');
 const s=require('./lib/connector-shared');
 exports.handler=async event=>{
   try {
-    const c=s.config(),route=event.queryStringParameters?.route;
+    const c=s.config();
+    const path=event.path || '';
+    const route=path.startsWith('/connector/')?path.slice('/connector/'.length):path==='/.well-known/oauth-authorization-server'?'metadata':path==='/.well-known/oauth-protected-resource'||path==='/.well-known/oauth-protected-resource/mcp'?'resource':event.queryStringParameters?.route;
     const method=event.httpMethod;
     if(route==='metadata'&&method==='GET') return s.json(200,{issuer:c.origin,authorization_endpoint:c.origin+'/connector/authorize',token_endpoint:c.origin+'/connector/token',registration_endpoint:c.origin+'/connector/register',revocation_endpoint:c.origin+'/connector/revoke',response_types_supported:['code'],grant_types_supported:['authorization_code','refresh_token'],code_challenge_methods_supported:['S256'],token_endpoint_auth_methods_supported:['none','client_secret_basic','client_secret_post'],scopes_supported:s.SCOPES});
     if(route==='resource'&&method==='GET') return s.json(200,{resource:c.resource,authorization_servers:[c.origin],scopes_supported:s.SCOPES,bearer_methods_supported:['header'],resource_name:'UniPlan'});

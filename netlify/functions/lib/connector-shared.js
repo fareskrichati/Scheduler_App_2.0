@@ -40,6 +40,7 @@ async function db(table, query={}, method='GET', value, c=config()) {
   if(!response.ok) {
     const error=await response.json().catch(()=>({}));
     if(error.code==='42P01'||error.code==='PGRST205') throw fail(503,'Connector database setup is required. Run supabase-connector.sql.');
+    if(response.status===401 || response.status===403) throw fail(503,'Planner server credentials were rejected. Check the Supabase service key and project URL in Netlify.');
     throw fail(503,'Planner storage is temporarily unavailable. Please retry.');
   }
   return response.status===204?[]:response.json();

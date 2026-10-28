@@ -104,4 +104,9 @@ function buildPage({ source, target, extraCss, includeRedirect }) {
 }
 
 // Publish 2.0 as the main app and retain the frozen 1.5.1 archive.
+// Include the connector's backend and discovery routes in the downloadable build.
+fs.cpSync(resolvePath('netlify/functions/lib'), resolvePath('deploy/netlify/functions/lib'), {recursive:true});
+for (const name of ['connector-auth.js', 'planner-mcp.js']) fs.copyFileSync(resolvePath('netlify/functions/'+name), resolvePath('deploy/netlify/functions/'+name));
+fs.copyFileSync(resolvePath('netlify/connector-redirects'), resolvePath('deploy/_redirects'));
+fs.copyFileSync(resolvePath('netlify/connector-headers'), resolvePath('deploy/_headers'));
 require('./build-v2').buildV2();

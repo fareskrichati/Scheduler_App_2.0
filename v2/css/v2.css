@@ -150,3 +150,52 @@ dialog .panel-header .icon-button{flex-shrink:0}
 .tesla-share-dialog{border:1px solid var(--line);border-radius:18px;background:var(--surface-strong);color:var(--ink);padding:24px;max-width:min(520px,calc(100vw - 32px))}.tesla-share-dialog::backdrop{background:#162a3b66}.tesla-share-dialog p{font-size:13px;line-height:1.8;color:var(--muted)}.tesla-share-dialog label{display:grid;gap:8px;font-size:12px}.tesla-share-dialog textarea{width:100%;min-height:80px;font:inherit;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}.tesla-share-actions{display:flex;align-items:center;flex-wrap:wrap;gap:15px;margin-top:18px}.tesla-share-actions a{font-size:12px;color:var(--accent-deep)}.location-map-links .tesla-share{align-self:center}#panel-study{min-width:0}
 #panel-study,#study-workspace{width:100%;max-width:100%;min-width:0}#study-workspace{overflow:hidden}.tab-shell,.dashboard,.tab-panels{min-width:0}@media (max-width: 760px), (max-width: 1366px) and (any-pointer: coarse){.v2-main:has(#panel-study.is-active){padding-left:10px;padding-right:10px}.v2-main:has(#panel-study.is-active) .v2-heading{margin-bottom:16px}}
 .v2-tour-panel{position:fixed;right:22px;bottom:22px;z-index:60;width:350px;max-width:calc(100vw - 24px);padding:18px;border-radius:16px;border:1px solid var(--accent);background:var(--surface-strong);color:var(--ink);box-shadow:0 12px 44px #142c3b33}.v2-tour-panel h2{font-size:18px;margin:12px 0 8px}.v2-tour-panel p{font-size:12px;line-height:1.65;margin:8px 0;color:var(--muted)}.v2-tour-panel select{width:100%;min-width:0;font:inherit;font-size:12px;background:var(--surface);color:var(--ink);padding:8px;border:1px solid var(--line);border-radius:8px}.v2-tour-top{display:flex;align-items:center;justify-content:space-between}.v2-tour-top button{background:none;border:0;color:var(--ink);cursor:pointer;font-size:12px}.v2-tour-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:12px}.v2-tour-highlight{outline:3px solid #4586b6!important;outline-offset:4px!important;scroll-margin-top:35px;scroll-margin-bottom:270px}.v2-tour-status{color:var(--accent-deep)!important}.v2-tour-panel[hidden]{display:none}body.v2-tour-running{padding-bottom:250px}@media (max-width: 760px), (max-width: 1366px) and (any-pointer: coarse){.v2-tour-panel{right:10px;left:10px;bottom:85px;width:auto;max-width:none;padding:12px}.v2-tour-panel h2{font-size:16px;margin:9px 0 5px}.v2-tour-panel p{font-size:11px;margin:6px 0}.v2-tour-panel select{font-size:16px}.v2-tour-actions{margin-top:8px}.v2-tour-panel .panel-label{font-size:9px}}
+
+/* Mobile month overview: compact weeks, every entry visible, full details on tap. */
+@media (max-width: 760px), (max-width: 1366px) and (any-pointer: coarse) {
+  #panel-calendar .calendar-header { gap: 8px; margin-bottom: 10px; }
+  #panel-calendar .calendar-header h3 { font-size: 20px; }
+  #panel-calendar .calendar-header .panel-label { display: none; }
+  #panel-calendar .calendar-view-switch { margin-bottom: 10px; }
+  #panel-calendar .calendar-weekdays { padding: 6px 0; font-size: 10px; }
+  :root body .calendar-grid[data-view="month"].is-compact-month {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-auto-rows: minmax(100px, auto);
+    gap: 0;
+  }
+  :root body .calendar-grid[data-view="month"].is-compact-month .calendar-day {
+    box-sizing: border-box; height: auto; min-height: 100px; min-width: 0;
+    padding: 28px 2px 5px; overflow: visible;
+    border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  }
+  :root body .calendar-grid[data-view="month"].is-compact-month .calendar-day:nth-child(7n) { border-right: 0; }
+  :root body .calendar-grid[data-view="month"].is-compact-month .calendar-day-number {
+    top: 3px; width: 22px; height: 22px; font-size: 11px;
+  }
+  :root body .calendar-grid[data-view="month"].is-compact-month .calendar-markers {
+    display: grid; gap: 2px; min-width: 0;
+  }
+  :root body .calendar-grid[data-view="month"].is-compact-month .calendar-marker {
+    height: 17px; min-height: 0; box-sizing: border-box;
+    padding: 1px 2px !important; border-radius: 3px; overflow: hidden;
+  }
+  :root body .calendar-grid[data-view="month"].is-compact-month .calendar-marker-row { display: block; }
+  :root body .calendar-grid[data-view="month"].is-compact-month .calendar-item-open {
+    display: block; width: 100%; min-width: 0; min-height: 0; margin: 0; padding: 0;
+    background: transparent; border: 0; text-align: left;
+  }
+  :root body .calendar-grid[data-view="month"].is-compact-month .calendar-marker-title {
+    display: block; font-size: 9px !important; line-height: 13px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal;
+  }
+  :root body .calendar-grid[data-view="month"].is-compact-month .calendar-marker-time,
+  :root body .calendar-grid[data-view="month"].is-compact-month .calendar-marker-check,
+  :root body .calendar-grid[data-view="month"].is-compact-month .calendar-marker::before { display: none; }
+
+}
+
+/* Keep Study visible while its workspace is being updated. */
+body .study-under-construction:disabled{cursor:not-allowed;opacity:1;color:var(--ink-muted,#52627a)}
+.study-construction-name{position:relative;display:inline-block;isolation:isolate}
+body .study-under-construction .study-construction-tape{position:absolute;left:50%;top:50%;width:66px;height:10px;box-sizing:border-box;transform:translate(-50%,-50%) rotate(-14deg);border-top:2px solid transparent;border-bottom:2px solid transparent;border-image:repeating-linear-gradient(135deg,#ffd429 0 5px,#161616 5px 9px) 2;background:#ffd429;padding:0;text-align:center;white-space:nowrap;font-size:5px;font-weight:900;line-height:6px;letter-spacing:-.1px;color:#111;pointer-events:none;z-index:1;box-shadow:0 1px 2px #0003}
+body .study-under-construction .study-construction-tape-second{transform:translate(-50%,-50%) rotate(14deg);z-index:2}

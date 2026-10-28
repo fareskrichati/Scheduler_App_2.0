@@ -9,8 +9,8 @@ const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_DELAY_MS = 1000;
 const FOREVER_REPEAT_YEARS = 5;
 const SUPABASE_TABLE = "planner_profiles";
-const WHATS_NEW_VERSION = "3.5.1";
-const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-3.5.1";
+const WHATS_NEW_VERSION = "3.5.2";
+const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-3.5.2";
 const PLANNER_TABS = ["study", "today", "more", "calendar", "todo", "classes", "events", "homework", "exams", "reminders", "settings"];
 
 if (new URLSearchParams(window.location.search).get("scriptable") === "1") {
@@ -405,6 +405,7 @@ function bindEvents() {
     navigateCalendar(1);
   });
   setupCalendarSwipe();
+  window.matchMedia("(max-width: 760px), (max-width: 1366px) and (any-pointer: coarse)").addEventListener?.("change", () => renderCalendar());
   // Keep vertical touch scrolling native; view buttons handle switching.
 
   elements.calendarViewButtons.forEach((button) => {
@@ -649,7 +650,6 @@ function setupSettingsAccordions() {
     const heading = section.querySelector(".subsection-header .panel-label, .subsection-header h3")?.textContent?.trim() || `Settings group ${index + 1}`;
     const details = document.createElement("details");
     details.className = "settings-accordion";
-    if (index === 0) details.open = true;
     const summary = document.createElement("summary");
     summary.textContent = heading;
     section.parentElement.insertBefore(details, section);
@@ -1658,6 +1658,7 @@ function setAuthMode(mode, options = {}) {
 }
 
 function updateAuthView() {
+  window.UniPlanConnector?.refresh();
   window.UniPlanPet?.refresh();
   document.body.classList.toggle("is-authenticated", authState.isAuthenticated);
 
@@ -2092,6 +2093,7 @@ function clearLegacyLocalLogin() {
 }
 
 function render() {
+  window.UniPlanConnector?.refresh();
   window.UniPlanPet?.refresh();
   renderV2Today();
   renderTabs();
@@ -2159,6 +2161,7 @@ function renderTodoList() {
 }
 
 function renderTabs() {
+  if (state.activeTab === "study") state.activeTab = "today";
   elements.tabButtons.forEach((button) => {
     const isActive = button.dataset.tab === state.activeTab;
     button.classList.toggle("is-active", isActive);
@@ -2206,6 +2209,8 @@ function renderCalendar() {
   });
   const viewSwitch = elements.calendarViewSwitch;
   if (viewSwitch) viewSwitch.dataset.activeIndex = String(["month", "week", "day"].indexOf(view));
+  const compactMonth = isMobileCalendar && view === "month";
+  elements.calendarGrid.classList.toggle("is-compact-month", compactMonth);
   elements.calendarGrid.dataset.view = view;
   elements.calendarWeekdays.hidden = view === "day";
   elements.calendarGrid.innerHTML = "";
@@ -2214,7 +2219,12 @@ function renderCalendar() {
   let cellCount = 42;
   if (view === "month") {
     elements.calendarMonthLabel.textContent = monthDate.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-    firstDay.setDate(firstDay.getDate() - (firstDay.getDay() - weekStart + 7) % 7);
+    const leadingDays = (firstDay.getDay() - weekStart + 7) % 7;
+    firstDay.setDate(firstDay.getDate() - leadingDays);
+    if (compactMonth) {
+      const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
+      cellCount = Math.ceil((leadingDays + daysInMonth) / 7) * 7;
+    }
   } else if (view === "week") {
     firstDay = new Date(anchor);
     firstDay.setDate(firstDay.getDate() - (firstDay.getDay() - weekStart + 7) % 7);
@@ -2263,7 +2273,7 @@ function renderCalendar() {
 
     items.forEach((item) => {
       const marker = document.createElement("div");
-      const canComplete = ["homework", "exam", "reminder"].includes(item.kind);
+      const canComplete = !compactMonth && ["homework", "exam", "reminder"].includes(item.kind);
       marker.className = `calendar-marker marker-${item.kind}${item.status === "done" ? " is-complete" : ""}`;
       const monthTime = item.displayTime ? `<span class="calendar-marker-time">${escapeHtml(item.displayTime)}</span>` : "";
       marker.innerHTML = `<span class="calendar-marker-row">${canComplete ? `<button class="calendar-marker-check" type="button" aria-label="${item.status === "done" ? "Mark pending" : "Mark done"}: ${escapeHtml(item.title)}">${item.status === "done" ? "✓" : ""}</button>` : ""}<button class="calendar-item-open" type="button" aria-label="View details: ${escapeHtml(item.title)}"><span class="calendar-marker-title">${escapeHtml(item.title)}</span>${monthTime}</button></span>`;
@@ -3721,6 +3731,7 @@ function getCollectionDeleteTarget(collection, id) {
 }
 
 function setActiveTab(tabId) {
+  if (tabId === "study") return;
   state.activeTab = tabId;
   renderTabs();
 }

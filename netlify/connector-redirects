@@ -1,0 +1,6 @@
+/mcp /.netlify/functions/planner-mcp 200!
+/.well-known/oauth-authorization-server /.netlify/functions/connector-auth?route=metadata 200!
+/.well-known/oauth-protected-resource /.netlify/functions/connector-auth?route=resource 200!
+/.well-known/oauth-protected-resource/mcp /.netlify/functions/connector-auth?route=resource 200!
+/connector/authorize /v2/connector.html 200!
+/connector/:route /.netlify/functions/connector-auth?route=:route 200!

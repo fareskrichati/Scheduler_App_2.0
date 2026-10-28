@@ -294,11 +294,17 @@
     launcher=button('',()=>show(panel.hidden),root);launcher.className='pet-launcher pet-greeting';launcher.setAttribute('aria-label','Open pet schedule assistant');launcher.setAttribute('aria-controls','pet-chat');launcher.setAttribute('aria-expanded','false');root.prepend(panel);document.body.append(root);
     panel.addEventListener('keydown',e=>{if(e.key==='Escape'){show(false);launcher.focus();}});
     const settings=document.createElement('section');settings.className='pet-settings';settings.innerHTML='<h3>Scheduler Helper</h3><p>Your pet companion for schedule questions and guided tours.</p>';
-    settings.append(picker('settings-pet','cat'));
+    const petPicker=picker('settings-pet','cat');
+    document.querySelector('#app-customization .customization-dropdown-body')?.append(petPicker);
     const label=document.createElement('label');const hidden=document.createElement('input');hidden.type='checkbox';hidden.id='pet-hidden';label.append(hidden,document.createTextNode(' Hide the floating pet'));settings.append(label);
-    settings.addEventListener('change',()=>{const current=getSettings().pet;state.data.settings.pet={...current,species:settings.querySelector('input[name="settings-pet"]:checked').value,hidden:hidden.checked};saveData();refresh();});
+    const savePet=()=>{const current=getSettings().pet;state.data.settings.pet={...current,species:document.querySelector('input[name="settings-pet"]:checked').value,hidden:hidden.checked};saveData();refresh();};
+    settings.addEventListener('change',savePet);petPicker.addEventListener('change',savePet);
     button('Take a pet-led tour',()=>document.querySelector('[data-v2-tutorial]')?.click(),settings);
-    document.querySelector('#panel-settings')?.append(settings);
+    const chatSettings=document.createElement('details');chatSettings.className='settings-accordion';chatSettings.id='chat-settings';
+    const chatSummary=document.createElement('summary');chatSummary.textContent='Chat settings';chatSettings.append(chatSummary,settings);
+    const weekly=document.querySelector('.weekly-reminder-settings');
+    const weeklyGroup=weekly?.closest('details.settings-accordion') || weekly;
+    if(weeklyGroup)weeklyGroup.before(chatSettings);else document.querySelector('#panel-settings')?.append(chatSettings);
     refresh();
   }
   function submit(text) { if(!text.trim()||!authState.isAuthenticated)return;say(text,[],true);const context=pending;pending=null;answer(context?.intent==='availability'?'am I free '+text+(/today|tomorrow|\d{4}-\d{2}-\d{2}/i.test(text)?'':' '+context.date):text); }

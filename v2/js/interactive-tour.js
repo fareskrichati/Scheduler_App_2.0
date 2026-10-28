@@ -1,7 +1,7 @@
 /* A non-modal guided tour: the highlighted app controls remain usable. */
 function setupInteractiveTour(){
  const steps=[
-  {title:'Meet your pet helper',page:'settings',target:'.pet-settings',copy:'I’m your Scheduler Helper! Choose a cat, dog, fox, or robot here. Outside the tour, tap your floating pet to ask about your day, add plans through chat, or choose Mark done to finish a to-do. You can change or hide your pet anytime in Settings.'},
+  {title:'Meet your pet helper',page:'settings',target:'.pet-settings',copy:'I’m your Scheduler Helper! Choose a cat, dog, fox, or robot in App Customization. Outside the tour, tap your floating pet to ask about your day, add plans through chat, or choose Mark done to finish a to-do. You can change or hide your pet anytime in Settings.'},
   {title:'Your day at a glance',page:'today',target:'#v2-week-strip',copy:'Try selecting a day in the week strip. Your agenda and upcoming work update below.'},
   {title:'Calendar views',page:'calendar',target:'.calendar-view-switch',copy:'Try Month, Week, or Day. Select a calendar item for details; hold a date to add something.'},
   {title:'Tasks and completed work',page:'todo',target:'#panel-todo',copy:'Open a task to review it, or mark finished work complete. The Completed section keeps your history.'},
@@ -16,10 +16,13 @@ function setupInteractiveTour(){
   {title:'Practice and mock exams',page:'study',target:'.tabs',frame:true,copy:'Try the study-kit tabs: equations, key notes, recall cards, and Homework & exams. In Homework & exams, select questions and build a practice set or mock exam.'},
   {title:'Send a destination to Tesla',page:'classes',target:'[data-tesla-address]',copy:'Classes with a location have Send to Tesla beside the map links. On your phone, tap it and choose Tesla in the share menu. Do this only when you want to share the destination.'},
   {title:'Connect Canvas',page:'settings',target:'#settings-canvas-feed',copy:'Add your private Canvas calendar feed and choose manual review or automatic imports. No connection is needed to explore the rest of the app.'},
+  {title:'Connect your AI app',page:'settings',target:'#connected-ai-apps',copy:'You can connect ChatGPT or Claude to read your schedule and help update your planner from that AI app. Open Connected AI apps for setup and permissions. Connections require a deployed connector and an AI account that supports custom connectors. Your pet helper is still available here.'},
   {title:'Widgets',page:'settings',target:'.widget-settings',copy:'Preview your planner widget, customize its appearance, and download the Scriptable widget for your iPhone.'},
   {title:'Appearance and preferences',page:'settings',target:'.customization-dropdown',copy:'Open appearance options to explore themes, colors, and layout. Settings also contains account, sync, notification, and delivery preferences.'},
   {title:'Quick add, anytime',page:'today',target:'#quick-add',copy:'Use + to add a class, task, exam, event, or reminder from anywhere. You can reopen this tour from Settings or What’s new.'}
  ];
+ // Study is temporarily closed while improvements are underway.
+ for(let i=steps.length-1;i>=0;i--)if(steps[i].page==='study')steps.splice(i,1);
  const panel=document.createElement('section');panel.className='v2-tour-panel';panel.hidden=true;panel.setAttribute('role','region');panel.setAttribute('aria-label','Interactive UniPlan tutorial');
  panel.innerHTML='<div class="v2-tour-top"><span class="panel-label" id="v2-tour-progress"></span><button type="button" id="v2-tour-close">Close ×</button></div><label class="sr-only" for="v2-tour-jump">Jump to a tutorial feature</label><select id="v2-tour-jump"></select><h2 id="v2-tour-title"></h2><p id="v2-tour-copy"></p><p class="v2-tour-status" id="v2-tour-status" role="status"></p><div class="v2-tour-actions"><button type="button" class="ghost-button" id="v2-tour-try">Show control</button><button type="button" class="ghost-button" id="v2-tour-back">Back</button><button type="button" class="primary-button" id="v2-tour-next">Next</button></div>';
  document.body.append(panel);

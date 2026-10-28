@@ -7,6 +7,7 @@
   let root, panel, log, launcher, owner = null, touring = false, pending = null, guidedEdit = false, draft = null, completionPicker = null;
   const svg = kind => {
     const color = {cat:'#b6a1e6',dog:'#d7aa77',fox:'#ed985d',robot:'#83c9c4'}[kind] || '#b6a1e6';
+    if(kind==='cat') return `<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><path d="M21 45L25 15L42 30Q50 27 58 30L75 15L79 45Q88 80 66 88Q50 95 34 88Q12 80 21 45" fill="${color}"/><path d="M28 34l1-10 8 9m26 0 8-9 1 10" fill="#efbdd8"/><path d="M42 32l3 9m13-9-3 9" stroke="#8970bc" stroke-width="3" stroke-linecap="round"/><g fill="#253749"><ellipse cx="36" cy="55" rx="4" ry="6"/><ellipse cx="64" cy="55" rx="4" ry="6"/></g><path d="M46 66h8l-4 5z" fill="#bc7398"/><path d="M50 71v4m0 0q-5 6-10 0m10 0q5 6 10 0M30 67l-16-3m16 10-16 3m56-10 16-3m-16 10 16 3" fill="none" stroke="#253749" stroke-width="2" stroke-linecap="round"/></svg>`;
     const ears = kind === 'robot' ? '<path d="M50 22V10m-5 0h10" stroke="#405065" stroke-width="4"/><rect x="16" y="39" width="68" height="47" rx="15"/>' : kind === 'dog' ? '<ellipse cx="22" cy="48" rx="13" ry="24"/><ellipse cx="78" cy="48" rx="13" ry="24"/>' : '<path d="M22 43L18 12L44 31M56 31L82 12L78 43" stroke="#405065" stroke-width="3"/>';
     return `<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><g fill="${color}">${ears}<ellipse cx="50" cy="60" rx="33" ry="30"/></g><ellipse cx="50" cy="71" rx="21" ry="14" fill="#fff" opacity=".75"/><g fill="#253749"><circle cx="37" cy="54" r="4"/><circle cx="63" cy="54" r="4"/><path d="M46 66h8l-4 5z"/></g><path d="M42 76q8 7 16 0" fill="none" stroke="#253749" stroke-width="2.5" stroke-linecap="round"/></svg>`;
   };
@@ -41,10 +42,14 @@
     actions.forEach(a => button(a.label, () => { if (!authState.isAuthenticated) return; a.run(); }, row));
     log.append(row); log.scrollTop = log.scrollHeight;
     launcher?.classList.remove('pet-greeting');
-    if (!user) { launcher?.classList.remove('pet-answering'); void launcher?.offsetWidth; launcher?.classList.add('pet-answering'); }
+    if (!user && launcher) {
+      launcher.classList.remove('pet-answering', 'pet-asking', 'pet-celebration');
+      void launcher.offsetWidth;
+      launcher.classList.add(text.includes('?') ? 'pet-asking' : 'pet-answering');
+    }
     while (log.children.length > 60) log.firstChild.remove();
   }
-  function show(open) { if (!panel || touring) return; panel.hidden = !open; launcher.setAttribute('aria-expanded',String(open)); if (open) panel.querySelector('input').focus(); }
+  function show(open) { if (!panel || touring) return; panel.hidden = !open; launcher.setAttribute('aria-expanded',String(open)); if (open && !window.matchMedia?.('(max-width: 760px), (any-pointer: coarse)').matches) panel.querySelector('.pet-input input').focus({preventScroll:true}); }
   const today = () => isoDate(new Date());
   function dateFrom(text) {
     const explicit = text.match(/\b\d{4}-\d{2}-\d{2}\b/);
@@ -108,6 +113,7 @@
     else steps.push({key:'time',question:d.kind==='homework'?'What time is it due? Say “skip” if no time is listed.':'What time? Say “skip” if it has no set time.',optional:true});
     if (d.kind==='homework'||d.kind==='exam') steps.push({key:'course',question:'Which class is it for? Choose one below or type its name.'});
     if (d.kind==='class'||d.kind==='event') steps.push({key:'location',question:'Where is it? Type a location or say “skip”.',optional:true});
+    steps.push({key:'color',question:'Which color would you like? Pick a color below or enter a hex color.',optional:true});
     steps.push({key:'notes',question:'Any notes to include? Say “skip” if there are none.',optional:true});
     return steps;
   }
@@ -133,7 +139,14 @@
       actions.push(...courses.slice(0,12).map(label=>({label,run:()=>{if(draft===d)receiveDraft(label);}})));
     }
     say(step.question,actions);
-    panel.querySelector('input').focus({preventScroll:true});
+    if(step.key==='color') {
+      const row=log.children[log.children.length-1];
+      const input=document.createElement('input'); input.type='color';
+      input.value=colorForSelectedClass(d.fields.course||(d.kind==='class'?d.fields.title:''),'#7eaed6');
+      input.setAttribute('aria-label','Item color'); row.append(input);
+      button('Use this color',()=>{if(draft===d)receiveDraft(input.value);},row);
+    }
+    // Keep mobile keyboards closed until the user taps the chat input.
   }
   function cancelDraft() { draft=null;document.querySelectorAll('.pet-prompts button').forEach(button => {button.disabled=false;}); say('Canceled. Your planner has not changed.'); }
   function receiveDraft(raw) {
@@ -149,6 +162,9 @@
     const step=draft.step;
     let value=text;
     if(step.optional && /^(skip|none|no|nope)$/i.test(text)) value='';
+    else if (step.key==='color') {
+      if(!/^#[0-9a-f]{6}$/i.test(text)){say('Choose a color using the selector, or enter a hex color such as #7eaed6.');return;}
+    }
     else if (step.key==='date') {
       if(!/^(today|tomorrow|\d{4}-\d{2}-\d{2})$/i.test(text)) {say('Please use today, tomorrow, or YYYY-MM-DD so I get the right date.');return;}
       value=dateFrom(text.toLowerCase());
@@ -170,7 +186,7 @@
     const collection=collectionFor(kind);
     const duplicate=collection.find(i=>i.title.toLowerCase()===f.title.toLowerCase()&&i.date===f.date&&(!i.type||i.type===kind)&&(i.start||i.time||'')===(f.start||f.time||'')&&(i.course||'')===(f.course||''));
     if(duplicate){draft=null;document.querySelectorAll('.pet-prompts button').forEach(button => {button.disabled=false;});say('That item is already in your planner.',[],false,[{...duplicate,kind}]);return;}
-    const color=colorForSelectedClass(f.course||(kind==='class'?f.title:''),'#7eaed6');
+    const color=f.color||colorForSelectedClass(f.course||(kind==='class'?f.title:''),'#7eaed6');
     const record={id:crypto.randomUUID(),title:f.title,date:f.date,color,notes:f.notes||''};
     if(kind==='class'||kind==='event') Object.assign(record,{type:kind,start:f.start,end:f.end,location:f.location||''});
     else Object.assign(record,{time:f.time||'',status:'pending',completedAt:'',priority:false,...(f.course?{course:f.course}:{})});
@@ -179,7 +195,7 @@
     collection.push(record);
     persistAndRender();
     launcher.classList.add('pet-celebration');
-    say(`Added ${record.title}.`,[],false,[{...record,kind}]);
+    say(`Added ${record.title}.`,[{label:'Edit or repeat '+kind,run:()=>edit(kind,record.id)}],false,[{...record,kind}]);
   }
   function markDonePicker() {
     const items=getTodoItems().filter(i=>i.status!=='done').sort(compareByDateTime);
@@ -273,7 +289,7 @@
     const header=document.createElement('div');header.className='pet-chat-header';header.innerHTML='<strong>Scheduler Helper</strong>';
     button('Close',()=>{show(false);launcher.focus();},header);panel.append(header);
     log=document.createElement('div');log.className='pet-log';log.setAttribute('role','log');log.setAttribute('aria-live','polite');panel.append(log);
-    const prompts=document.createElement('div');prompts.className='pet-prompts';['What do I have today?','Next class','Assignments due this week','Upcoming exams','Mark done','Add event','Edit event','Tour'].forEach(prompt=>button(prompt,()=>submit(prompt),prompts));panel.append(prompts);
+    const prompts=document.createElement('div');prompts.className='pet-prompts';[['Today','What do I have today?'],['Next class','Next class'],['Due this week','Assignments due this week'],['Exams','Upcoming exams'],['Mark done','Mark done'],['Add event','Add event'],['Edit event','Edit event'],['Tour','Tour']].forEach(([label,prompt])=>{const command=button(label,()=>submit(prompt),prompts);command.title=prompt;command.setAttribute('aria-label',prompt);});panel.append(prompts);
     const form=document.createElement('form');form.className='pet-input';const input=document.createElement('input');input.placeholder='Ask about your schedule…';input.setAttribute('aria-label','Question for your pet');input.maxLength=500;form.append(input);const send=document.createElement('button');send.type='submit';send.textContent='Ask';form.append(send);form.onsubmit=e=>{e.preventDefault();submit(input.value);input.value='';};panel.append(form);
     launcher=button('',()=>show(panel.hidden),root);launcher.className='pet-launcher pet-greeting';launcher.setAttribute('aria-label','Open pet schedule assistant');launcher.setAttribute('aria-controls','pet-chat');launcher.setAttribute('aria-expanded','false');root.prepend(panel);document.body.append(root);
     panel.addEventListener('keydown',e=>{if(e.key==='Escape'){show(false);launcher.focus();}});

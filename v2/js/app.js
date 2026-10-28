@@ -9,8 +9,8 @@ const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_DELAY_MS = 1000;
 const FOREVER_REPEAT_YEARS = 5;
 const SUPABASE_TABLE = "planner_profiles";
-const WHATS_NEW_VERSION = "3.5";
-const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-3.5";
+const WHATS_NEW_VERSION = "3.5.1";
+const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-3.5.1";
 const PLANNER_TABS = ["study", "today", "more", "calendar", "todo", "classes", "events", "homework", "exams", "reminders", "settings"];
 
 if (new URLSearchParams(window.location.search).get("scriptable") === "1") {
@@ -3123,13 +3123,16 @@ function saveClassItem() {
     return;
   }
 
+  const repeatedItems = elements.classRepeat.checked
+    ? buildRepeatedScheduleItems(item, "class", editingSeriesId) : null;
+  if (elements.classRepeat.checked && !repeatedItems) return;
+
   if (editingSeriesId) {
     state.data.schedule = state.data.schedule.filter(
       (entry) => !(entry.type === "class" && entry.seriesId === editingSeriesId),
     );
 
     if (elements.classRepeat.checked) {
-      const repeatedItems = buildRepeatedScheduleItems(item, "class", editingSeriesId);
       if (!repeatedItems) {
         return;
       }
@@ -3141,12 +3144,12 @@ function saveClassItem() {
         id,
       });
     }
-  } else if (!elements.classId.value && elements.classRepeat.checked) {
-    const repeatedItems = buildRepeatedScheduleItems(item, "class");
+  } else if (elements.classRepeat.checked) {
     if (!repeatedItems) {
       return;
     }
 
+    state.data.schedule = state.data.schedule.filter((entry) => entry.id !== id);
     state.data.schedule.push(...repeatedItems);
   } else {
     upsertItem(state.data.schedule, item);
@@ -3191,13 +3194,16 @@ function saveEventItem() {
     return;
   }
 
+  const repeatedItems = elements.eventRepeat.checked
+    ? buildRepeatedScheduleItems(item, "event", editingSeriesId) : null;
+  if (elements.eventRepeat.checked && !repeatedItems) return;
+
   if (editingSeriesId) {
     state.data.schedule = state.data.schedule.filter(
       (entry) => !(entry.type === "event" && entry.seriesId === editingSeriesId),
     );
 
     if (elements.eventRepeat.checked) {
-      const repeatedItems = buildRepeatedScheduleItems(item, "event", editingSeriesId);
       if (!repeatedItems) {
         return;
       }
@@ -3209,12 +3215,12 @@ function saveEventItem() {
         id,
       });
     }
-  } else if (!elements.eventId.value && elements.eventRepeat.checked) {
-    const repeatedItems = buildRepeatedScheduleItems(item, "event");
+  } else if (elements.eventRepeat.checked) {
     if (!repeatedItems) {
       return;
     }
 
+    state.data.schedule = state.data.schedule.filter((entry) => entry.id !== id);
     state.data.schedule.push(...repeatedItems);
   } else {
     upsertItem(state.data.schedule, item);
@@ -3252,11 +3258,14 @@ function saveHomework() {
     return;
   }
 
+  const repeatedItems = elements.homeworkRepeat.checked
+    ? buildRepeatedCollectionItems(item, "homework", editingSeriesId) : null;
+  if (elements.homeworkRepeat.checked && !repeatedItems) return;
+
   if (editingSeriesId) {
     state.data.homework = state.data.homework.filter((entry) => entry.seriesId !== editingSeriesId);
 
     if (elements.homeworkRepeat.checked) {
-      const repeatedItems = buildRepeatedCollectionItems(item, "homework", editingSeriesId);
       if (!repeatedItems) {
         return;
       }
@@ -3268,12 +3277,12 @@ function saveHomework() {
         id,
       });
     }
-  } else if (!elements.homeworkId.value && elements.homeworkRepeat.checked) {
-    const repeatedItems = buildRepeatedCollectionItems(item, "homework");
+  } else if (elements.homeworkRepeat.checked) {
     if (!repeatedItems) {
       return;
     }
 
+    state.data.homework = state.data.homework.filter((entry) => entry.id !== id);
     state.data.homework.push(...repeatedItems);
   } else {
     upsertItem(state.data.homework, item);
@@ -3335,11 +3344,14 @@ function saveReminder() {
     return;
   }
 
+  const repeatedItems = elements.reminderRepeat.checked
+    ? buildRepeatedCollectionItems(item, "reminder", editingSeriesId) : null;
+  if (elements.reminderRepeat.checked && !repeatedItems) return;
+
   if (editingSeriesId) {
     state.data.reminders = state.data.reminders.filter((entry) => entry.seriesId !== editingSeriesId);
 
     if (elements.reminderRepeat.checked) {
-      const repeatedItems = buildRepeatedCollectionItems(item, "reminder", editingSeriesId);
       if (!repeatedItems) {
         return;
       }
@@ -3351,12 +3363,12 @@ function saveReminder() {
         id,
       });
     }
-  } else if (!elements.reminderId.value && elements.reminderRepeat.checked) {
-    const repeatedItems = buildRepeatedCollectionItems(item, "reminder");
+  } else if (elements.reminderRepeat.checked) {
     if (!repeatedItems) {
       return;
     }
 
+    state.data.reminders = state.data.reminders.filter((entry) => entry.id !== id);
     state.data.reminders.push(...repeatedItems);
   } else {
     upsertItem(state.data.reminders, item);

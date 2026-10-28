@@ -36,7 +36,7 @@ function body(event) {
   catch{throw fail(400,'Invalid request body.','invalid_request');}
 }
 async function db(table, query={}, method='GET', value, c=config()) {
-  const response=await fetch(`${c.url}/rest/v1/${table}?${new URLSearchParams(query)}`,{method,headers:{apikey:c.key,Authorization:`Bearer ${c.key}`,'Content-Type':'application/json',Prefer:'return=representation'},...(value===undefined?{}:{body:JSON.stringify(value)}),signal:AbortSignal.timeout(12000)});
+  const response=await fetch(`${c.url}/rest/v1/${table}?${new URLSearchParams(query)}`,{method,headers:{apikey:c.key,...(c.key.startsWith('sb_secret_')?{}:{Authorization:`Bearer ${c.key}`}),'Content-Type':'application/json',Prefer:'return=representation'},...(value===undefined?{}:{body:JSON.stringify(value)}),signal:AbortSignal.timeout(12000)});
   if(!response.ok) {
     const error=await response.json().catch(()=>({}));
     if(error.code==='42P01'||error.code==='PGRST205') throw fail(503,'Connector database setup is required. Run supabase-connector.sql.');

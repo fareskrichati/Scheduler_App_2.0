@@ -60,3 +60,22 @@ test('calendar pages expose the draggable three-view control', () => {
   assert.match(source, /setupCalendarViewDrag\(\)/);
   assert.match(source, /prefillForms\(true\)/);
 });
+
+for (const file of ['app.js', 'js/app.js', 'v2/js/app.js']) {
+  test(`${file}: event deletion supports an occurrence and a series`, () => {
+    const code = fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+    const start = code.indexOf('function deleteEventItem(');
+    const end = code.indexOf('function toggleEventStatus(', start);
+    const state = { data: { schedule: [
+      {id:'a',type:'event',seriesId:'s'},
+      {id:'b',type:'event',seriesId:'s'},
+      {id:'c',type:'class',seriesId:'s'},
+    ] } };
+    const context = vm.createContext({state,persistAndRender(){},resetEventForm(){}});
+    vm.runInContext(code.slice(start,end),context);
+    context.deleteEventItem('a');
+    assert.deepEqual(state.data.schedule.map(i=>i.id),['b','c']);
+    context.deleteEventItem('b','series');
+    assert.deepEqual(state.data.schedule.map(i=>i.id),['c']);
+  });
+}

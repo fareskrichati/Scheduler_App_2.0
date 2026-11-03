@@ -49,12 +49,51 @@
     }
     while (log.children.length > 60) log.firstChild.remove();
   }
+  function greeting(word) {
+    const name = [authState.profile?.name, getSettings().name]
+      .find(value => typeof value === 'string' && value.trim());
+    return `${word}${name ? ' ' + name.trim() : ''}!`;
+  }
   function show(open) { if (!panel || touring) return; panel.hidden = !open; launcher.setAttribute('aria-expanded',String(open)); if (open && !window.matchMedia?.('(max-width: 760px), (any-pointer: coarse)').matches) panel.querySelector('.pet-input input').focus({preventScroll:true}); }
   const today = () => isoDate(new Date());
   function dateFrom(text) {
+    text = text.toLowerCase();
+    const valid = value => { const d = new Date(value+'T12:00:00'); return !Number.isNaN(d.getTime()) && isoDate(d) === value ? value : null; };
     const explicit = text.match(/\b\d{4}-\d{2}-\d{2}\b/);
-    if (explicit) { const d = new Date(explicit[0]+'T12:00:00'); return !Number.isNaN(d.getTime()) && isoDate(d) === explicit[0] ? explicit[0] : null; }
-    return /\btomorrow\b/.test(text) ? offsetDate(today(),1) : today();
+    if (explicit) return valid(explicit[0]);
+    const base = today();
+    const relative = text.match(/\b(?:in\s+)?(\d+|one|two|three|four|five|six|seven|eight|nine|ten|a|an)\s+(days?|weeks?)\s*(?:from now|from today)?\b/);
+    if (relative) {
+      const words = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,a:1,an:1};
+      const count = words[relative[1]] || Number(relative[1]);
+      if (count > 366) return null;
+      return offsetDate(base,count*(relative[2].startsWith('week')?7:1));
+    }
+    const months = 'january february march april may june july august september october november december'.split(' ');
+    const monthPattern = months.map(m=>m+'|'+m.slice(0,3)).join('|');
+    const named = text.match(new RegExp('\\b('+monthPattern+')\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(\\d{4}))?\\b'));
+    const reversed = !named && text.match(new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?('+monthPattern+')(?:,?\\s+(\\d{4}))?\\b'));
+    if (named || reversed) {
+      const match = named || reversed;
+      const monthName = named ? match[1] : match[2];
+      const month = months.findIndex(m=>m===monthName||m.slice(0,3)===monthName)+1;
+      const day = Number(named ? match[2] : match[1]);
+      let year = Number(match[3] || base.slice(0,4));
+      const build = () => `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      if (!valid(build())) return null;
+      if (!match[3] && build()<base) year++;
+      return valid(build());
+    }
+    const weekday = text.match(/\b(next\s+|this\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
+    if (weekday) {
+      const target = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'].indexOf(weekday[2]);
+      let days = (target-new Date(base+'T12:00:00').getDay()+7)%7;
+      if (!days && weekday[1]?.trim()==='next') days=7;
+      return offsetDate(base,days);
+    }
+    if (/\bnext week\b/.test(text)) return offsetDate(base,7);
+    if (/\byesterday\b/.test(text)) return offsetDate(base,-1);
+    return /\btomorrow\b/.test(text) ? offsetDate(base,1) : base;
   }
   function timeFrom(text) {
     const match = text.match(/\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i) || text.match(/\b(?:at\s+)?(\d{1,2}):(\d{2})\b/);
@@ -65,7 +104,7 @@
     return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
   }
   function dayItems(date) { return getItemsForDate(date).filter(i => i.status !== 'done' && (i.kind !== 'class' || isActiveClassDate(date))); }
-  function readableDate(date) { return new Date(date+'T12:00:00').toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'}); }
+  function readableDate(date) { return new Date(date+'T12:00:00').toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
   function navigateItem(item) {
     show(false);
     if (['homework','reminder','exam'].includes(item.kind)) {
@@ -108,7 +147,7 @@
     askDraft();
   }
   function draftSteps(d) {
-    const steps = [{key:'title',question:'What should I call it?'},{key:'date',question:'What date? Say today, tomorrow, or a date like 2026-10-26.'}];
+    const steps = [{key:'title',question:'What should I call it?'},{key:'date',question:'What date? Say today, November 15th, in 3 weeks, or a date like 2026-10-26.'}];
     if (d.kind==='class'||d.kind==='event') steps.push({key:'start',question:'What time does it start? For example, 5:30 PM.'},{key:'end',question:'What time does it end?'});
     else steps.push({key:'time',question:d.kind==='homework'?'What time is it due? Say “skip” if no time is listed.':'What time? Say “skip” if it has no set time.',optional:true});
     if (d.kind==='homework'||d.kind==='exam') steps.push({key:'course',question:'Which class is it for? Choose one below or type its name.'});
@@ -166,7 +205,7 @@
       if(!/^#[0-9a-f]{6}$/i.test(text)){say('Choose a color using the selector, or enter a hex color such as #7eaed6.');return;}
     }
     else if (step.key==='date') {
-      if(!/^(today|tomorrow|\d{4}-\d{2}-\d{2})$/i.test(text)) {say('Please use today, tomorrow, or YYYY-MM-DD so I get the right date.');return;}
+      if(!/today|tomorrow|yesterday|\d{4}-\d{2}-\d{2}|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b|\b(?:day|week)s?\b|monday|tuesday|wednesday|thursday|friday|saturday|sunday/i.test(text)) {say('Please use today, tomorrow, or YYYY-MM-DD so I get the right date.');return;}
       value=dateFrom(text.toLowerCase());
       if(!value){say('That date does not exist. Please try another date.');return;}
       if(draft.kind==='class'&&!isActiveClassDate(value)){say('That date falls outside your school term or during a break. Which class date should I use?');return;}
@@ -229,7 +268,6 @@
     const text=raw.toLowerCase().trim();
     if(/\b(mark done|mark.*complete|complete.*to.?do|finished.*task)\b/.test(text)){markDonePicker();return;}
     const date=dateFrom(text);
-    if (/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|yesterday|next week)\b/.test(text) && !/\d{4}-\d{2}-\d{2}/.test(text)) {say('Please include the date as YYYY-MM-DD, or say today or tomorrow, so I use the right day.');return;}
     if(!date){say('Please use a valid date, such as 2026-10-26.');return;}
     if (/\b(tour|tutorial|show me around)\b/.test(text)) { show(false); document.querySelector('[data-v2-tutorial]')?.click(); return; }
     if (/\b(canvas|import|school schedule)\b/.test(text)) {
@@ -262,7 +300,8 @@
       say(next?'Your next class':'No upcoming scheduled classes are saved.',[],false,next?[{...next,kind:'class',displayTime:formatTime(next.start)+(next.end?' – '+formatTime(next.end):'')}]:[]);return;
     }
     if(/\b(exam|exams|test|tests)\b/.test(text)) {
-      const items=state.data.exams.filter(i=>i.status!=='done'&&i.date>=today()).sort(compareByDateTime);
+      const dated = date!==today() || /\btoday\b|\d{4}-\d{2}-\d{2}/.test(text);
+      const items=state.data.exams.filter(i=>i.status!=='done'&&(dated?i.date===date:i.date>=today())).sort(compareByDateTime);
       say(items.length?'Upcoming exams':'No upcoming exams are saved.', [], false, items.slice(0,20).map(i=>({...i,kind:'exam'})));return;
     }
     if(/\breminders?\b/.test(text)) {
@@ -272,15 +311,15 @@
     }
     if(/\b(assignment|assignments|homework|due|deadlines)\b/.test(text)) {
       const start=today(),day=new Date(start+'T12:00:00').getDay(),end=offsetDate(start,(7-day)%7);
-      const items=/\bweek\b/.test(text)?range(start,end,'homework'):dayItems(date).filter(i=>i.kind==='homework');
+      const items=/\bthis week\b/.test(text)?range(start,end,'homework'):dayItems(date).filter(i=>i.kind==='homework');
       const overdue=state.data.homework.filter(i=>i.status!=='done'&&i.date<start);
-      say((items.length?`Assignments · ${/\bweek\b/.test(text)?'This week':readableDate(date)}`:'No pending assignments in that period.')+(overdue.length?`\n${overdue.length} overdue assignment(s) to review.`:''),overdue.length?[{label:'Review To-Do ↗',run:()=>navigateItem({kind:'homework'})}]:[],false,items);return;
+      say((items.length?`Assignments · ${/\bthis week\b/.test(text)?'This week':readableDate(date)}`:'No pending assignments in that period.')+(overdue.length?`\n${overdue.length} overdue assignment(s) to review.`:''),overdue.length?[{label:'Review To-Do ↗',run:()=>navigateItem({kind:'homework'})}]:[],false,items);return;
     }
     if(/\b(today|tomorrow|schedule|agenda|going on|what.*have)\b/.test(text)||/\d{4}-\d{2}-\d{2}/.test(text)) {
       const items=dayItems(date);const label=date===today()?'Today':date===offsetDate(today(),1)?'Tomorrow':'Your day';say(items.length?`${label} · ${readableDate(date)}`:`Nothing scheduled for ${readableDate(date)}.`,[{label:'Open month view ↗',run:()=>navigateItem({kind:'event',date})}],false,items.map(i=>({...i,date:undefined, navigationDate:date})));return;
     }
-    if (/^(hi|hello|hey|thanks|thank you)[!. ]*$/.test(text)) {say('Hello! I’m Scheduler Helper. Ask about your day, next class, assignments, or an event you want to add.');return;}
-    say('I can help with schedule questions and guided edits. Try “What do I have today?”, “Am I free at 3 PM?”, “Assignments due this week”, or “Add event”.');
+    if (/^(hi|hello|hey|thanks|thank you)[!. ]*$/.test(text)) {say(greeting('Hello')+' I’m Scheduler Helper. Ask about your day, next class, assignments, or an event you want to add.');return;}
+    say('I can help with schedule questions and guided edits. Try “What do I have November 15th?”, “What do I have in 3 weeks?”, “Am I free at 3 PM?”, “Assignments due this week”, or “Add event”.');
   }
   function mount() {
     const signup=document.querySelector('#profile-setup-form'); signup?.insertBefore(picker('signup-pet','cat'),signup.querySelector('button[type="submit"]'));
@@ -312,7 +351,7 @@
     if(!root)return;
     document.querySelectorAll('.pet-prompts button').forEach(button => {button.disabled=Boolean(draft);});
     const next=authState.isAuthenticated?authState.userId||authState.profile?.email||'local':null;
-    if(next!==owner){owner=next;if(touring){document.querySelector('#v2-tour-close')?.click();touring=false;}log.replaceChildren();pending=null;draft=null;completionPicker=null;guidedEdit=false;panel.hidden=true;launcher.setAttribute('aria-expanded','false');if(next)say('Hi! I’m your Scheduler Helper. I can help you plan your day, keep track of deadlines, and update your schedule.');}
+    if(next!==owner){owner=next;if(touring){document.querySelector('#v2-tour-close')?.click();touring=false;}log.replaceChildren();pending=null;draft=null;completionPicker=null;guidedEdit=false;panel.hidden=true;launcher.setAttribute('aria-expanded','false');if(next)say(greeting('Hi')+' I’m your Scheduler Helper. I can help you plan your day, keep track of deadlines, and update your schedule.');}
     const pet=normalize(state.data.settings?.pet);
     root.hidden=!next||pet.hidden||touring;
     launcher.innerHTML=svg(pet.species);launcher.title=pet.species+' schedule helper';

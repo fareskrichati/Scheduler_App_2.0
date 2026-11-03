@@ -9,8 +9,8 @@ const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_DELAY_MS = 1000;
 const FOREVER_REPEAT_YEARS = 5;
 const SUPABASE_TABLE = "planner_profiles";
-const WHATS_NEW_VERSION = "3.5.2";
-const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-3.5.2";
+const WHATS_NEW_VERSION = "3.5.3";
+const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-3.5.3";
 const PLANNER_TABS = ["study", "today", "more", "calendar", "todo", "classes", "events", "homework", "exams", "reminders", "settings"];
 
 if (new URLSearchParams(window.location.search).get("scriptable") === "1") {
@@ -2353,7 +2353,18 @@ function openCalendarItemDetails(item, date) {
         : state.data[{ homework: "homework", exam: "exams", reminder: "reminders" }[item.kind]];
       const record = collection?.find((entry) => entry.id === item.sourceId);
       remove.className = "small-button";
-      remove.textContent = record?.seriesId ? "Delete series" : "Delete";
+      remove.textContent = record?.seriesId && item.kind === "event" ? "Delete this event" : "Delete";
+      if (record?.seriesId && item.kind === "event") {
+        const removeSeries = document.createElement("button");
+        removeSeries.type = "button";
+        removeSeries.className = "small-button";
+        removeSeries.textContent = "Delete series";
+        removeSeries.addEventListener("click", () => {
+          deleteEventItem(item.sourceId, "series");
+          dialog.close();
+        });
+        actions.appendChild(removeSeries);
+      }
       remove.addEventListener("click", () => dialog.close());
       actions.appendChild(remove);
     }
@@ -2777,7 +2788,7 @@ function buildDayDeleteButton(item) {
 
   if (item.kind === "class" || item.kind === "event") {
     button.addEventListener("click", () => {
-      if (item.sourceType === "event") {
+      if (item.kind === "event") {
         deleteEventItem(item.sourceId);
       } else {
         deleteClassItem(item.sourceId);
@@ -3667,18 +3678,18 @@ function deleteClassItem(id) {
   resetClassForm();
 }
 
-function deleteEventItem(id) {
-  deleteScheduleEntryOrSeries(id, "event");
+function deleteEventItem(id, scope = "occurrence") {
+  deleteScheduleEntryOrSeries(id, "event", scope);
   persistAndRender();
   resetEventForm();
 }
 
-function deleteScheduleEntryOrSeries(id, type) {
+function deleteScheduleEntryOrSeries(id, type, scope = "series") {
   const match = state.data.schedule.find((item) => item.type === type && (item.id === id || item.seriesId === id));
   const seriesId = match?.seriesId || (state.data.schedule.some((item) => item.type === type && item.seriesId === id) ? id : "");
   state.data.schedule = state.data.schedule.filter((item) => {
     if (item.type !== type) return true;
-    return seriesId ? item.seriesId !== seriesId : item.id !== id;
+    return seriesId && (scope === "series" || id === seriesId) ? item.seriesId !== seriesId : item.id !== id;
   });
 }
 

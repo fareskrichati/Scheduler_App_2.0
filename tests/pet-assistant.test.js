@@ -20,7 +20,7 @@ test('pets default safely and all four are bundled SVGs',()=>{const f=fixture();
 test('day answers exclude completed tasks and classes on school breaks',()=>{const f=fixture();f.ctx.breakDate=f.today;f.state.data.schedule.push({date:f.today,title:'Break class',type:'class',start:'10:00',end:'11:00'},{date:f.today,title:'Lunch',type:'event',start:'12:00',end:'13:00'});f.state.data.homework.push({date:f.today,title:'Finished',status:'done'},{date:f.today,title:'Reading',status:'pending'});f.pet.answer('What do I have today?');assert.match(f.messages(),/Lunch/);assert.match(f.messages(),/Reading/);assert.doesNotMatch(f.messages(),/Break class|Finished/)});
 test('tomorrow and valid explicit dates handle month and year boundaries',()=>{const f=fixture();assert.equal(f.pet.dateFrom('tomorrow'),f.offset(f.today,1));assert.equal(f.offset('2026-12-31',1),'2027-01-01');assert.equal(f.pet.dateFrom('2026-02-30'),null);f.pet.answer('my schedule 2026-02-30');assert.match(f.messages(),/valid date/)});
 test('availability checks half-open event times and ignores homework deadlines',()=>{const f=fixture();f.state.data.schedule.push({type:'event',date:f.today,title:'Meeting',start:'15:00',end:'16:00'});f.state.data.homework.push({date:f.today,title:'Deadline',time:'16:00'});f.pet.answer('Am I free at 3 pm?');assert.match(f.messages(),/Meeting/);f.pet.answer('Am I free at 4 pm?');assert.match(f.messages(),/no timed classes or events/);assert.match(f.messages(),/Assignment deadlines do not reserve/)});
-test('ambiguous time and unsupported relative dates ask for clarification',()=>{const f=fixture();f.pet.answer('am I free at 3');assert.match(f.messages(),/AM or PM/);f.pet.answer('my schedule Friday');assert.match(f.messages(),/YYYY-MM-DD/);assert.equal(f.pet.timeFrom('13 pm'),null);assert.equal(f.pet.timeFrom('12 am'),'00:00');assert.equal(f.pet.timeFrom('12 pm'),'12:00')});
+test('ambiguous times ask for clarification and weekday schedules resolve',()=>{const f=fixture();f.pet.answer('am I free at 3');assert.match(f.messages(),/AM or PM/);f.pet.answer('my schedule Friday');assert.match(f.messages(),/Friday/);assert.equal(f.pet.timeFrom('13 pm'),null);assert.equal(f.pet.timeFrom('12 am'),'00:00');assert.equal(f.pet.timeFrom('12 pm'),'12:00')});
 test('weekly homework includes overdue notice and excludes completed work',()=>{const f=fixture();f.state.data.homework.push({date:f.today,title:'Pending'},{date:f.today,title:'Done',status:'done'},{date:f.offset(f.today,-1),title:'Old'});f.pet.answer('assignments due this week');assert.match(f.messages(),/Pending/);assert.doesNotMatch(f.messages(),/Done/);assert.match(f.messages(),/1 overdue/)});
 test('next class and upcoming exams use actual saved dates',()=>{const f=fixture();f.state.data.schedule.push({type:'class',date:f.offset(f.today,1),title:'Algebra',start:'09:00'});f.state.data.exams.push({date:f.offset(f.today,2),title:'Midterm'},{date:f.today,title:'Finished test',status:'done'});f.pet.answer('next class');assert.match(f.messages(),/Algebra/);f.pet.answer('upcoming exams');assert.match(f.messages(),/Midterm/);assert.doesNotMatch(f.messages(),/Finished test/)});
 test('guided event creation asks questions and saves only after confirmation',()=>{const f=fixture();f.pet.answer('Add event "Study group" tomorrow at 3 pm');assert.equal(f.state.data.schedule.length,0);assert.match(f.messages(),/What time does it end/);f.pet.answer('4 pm');f.pet.answer('Library');f.pet.answer('#123abc');f.pet.answer('skip');assert.match(f.messages(),/Ready to add/);assert.equal(f.state.data.schedule.length,0);f.action('Save event');const item=f.state.data.schedule[0];assert.equal(item.color,'#123abc');f.action('Edit or repeat event');assert.ok(f.calls.includes('edit:'+item.id));assert.equal(item.title,'Study group');assert.equal(item.start,'15:00');assert.equal(item.end,'16:00');assert.equal(item.date,f.offset(f.today,1));assert.ok(f.calls.includes('persist'))});
@@ -59,3 +59,46 @@ test('mark done dropdown completes only the chosen pending record and supports u
 
 test('opening the pet on mobile does not focus an input or open the keyboard',()=>{const f=fixture();f.ctx.window.matchMedia=()=>({matches:true});const launcher=f.nodes.find(n=>n.className==='pet-launcher pet-greeting');launcher.events.click();assert.equal(f.nodes.find(n=>n.className==='pet-chat').hidden,false);assert.equal(f.calls.filter(c=>c?.focus).length,0)});
 test('the inline color picker applies a custom homework color',()=>{const f=fixture();f.pet.answer('add homework');f.pet.answer('Read');f.pet.answer('tomorrow');f.pet.answer('skip');f.pet.answer('Algebra');const picker=f.nodes.findLast(n=>n.type==='color');assert.ok(picker);picker.value='#fe1234';f.action('Use this color');f.pet.answer('skip');f.pet.answer('save');assert.equal(f.state.data.homework[0].color,'#fe1234')});
+
+test('named dates resolve upcoming occurrences and explicit years',()=>{
+ const f=fixture();let year=Number(f.today.slice(0,4));
+ if(`${year}-11-15`<f.today)year++;
+ assert.equal(f.pet.dateFrom('what do I have november 15th?'),`${year}-11-15`);
+ assert.equal(f.pet.dateFrom('Nov 15, 2027'),'2027-11-15');
+ assert.equal(f.pet.dateFrom('15th of November 2027'),'2027-11-15');
+ assert.equal(f.pet.dateFrom('February 30th'),null);
+ assert.equal(f.pet.dateFrom('April 31 2027'),null);
+});
+test('relative date answers use the requested day rather than today',()=>{
+ const f=fixture(),date=f.offset(f.today,21);
+ assert.equal(f.pet.dateFrom('in 3 weeks'),date);
+ assert.equal(f.pet.dateFrom('in three weeks'),date);
+ assert.equal(f.pet.dateFrom('2 days from now'),f.offset(f.today,2));
+ f.state.data.schedule.push({id:'later',type:'event',title:'Future lunch',date,start:'12:00',end:'13:00'},{id:'now',type:'event',title:'Today only',date:f.today,start:'12:00',end:'13:00'});
+ f.pet.answer('What do I have in 3 weeks?');
+ assert.match(f.messages(),/Future lunch/);assert.doesNotMatch(f.messages(),/Today only/);
+});
+test('named date answers and homework questions use the requested date',()=>{
+ const f=fixture(),date=f.pet.dateFrom('November 15th');
+ f.state.data.reminders.push({id:'r',title:'November reminder',date});
+ f.pet.answer('What do I have November 15th?');assert.match(f.messages(),/November reminder/);
+ f.state.data.homework.push({id:'h',title:'Future homework',date:f.offset(f.today,21)});
+ f.pet.answer('What homework is due in 3 weeks?');assert.match(f.messages(),/Future homework/);
+});
+
+test('helper greets the current user by their saved profile name',()=>{
+ const f=fixture();
+ f.ctx.authState.profile={name:'  Fares  '};
+ f.ctx.authState.userId='named-user';f.pet.refresh();
+ assert.match(f.messages(),/Hi Fares!/);
+ f.pet.answer('hello');assert.match(f.messages(),/Hello Fares!/);
+ f.ctx.authState.profile={name:'Maya'};f.ctx.authState.userId='other-user';f.pet.refresh();
+ assert.match(f.messages(),/Hi Maya!/);assert.doesNotMatch(f.messages(),/Fares/);
+});
+test('helper uses settings name as fallback and greets naturally without a name',()=>{
+ const f=fixture();f.state.data.settings.name='Sam';
+ f.pet.answer('hi');assert.match(f.messages(),/Hello Sam!/);
+ f.state.data.settings.name='  ';f.ctx.authState.userId='unnamed';f.pet.refresh();
+ assert.match(f.messages(),/Hi! I’m/);f.pet.answer('hello');assert.match(f.messages(),/Hello! I’m/);
+ assert.doesNotMatch(f.messages(),/undefined|null/);
+});

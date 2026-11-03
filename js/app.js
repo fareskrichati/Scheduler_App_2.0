@@ -2688,7 +2688,7 @@ function buildDayDeleteButton(item) {
 
   if (item.kind === "class") {
     button.addEventListener("click", () => {
-      if (item.sourceType === "event") {
+      if (item.kind === "event") {
         deleteEventItem(item.sourceId);
       } else {
         deleteClassItem(item.sourceId);
@@ -3534,18 +3534,18 @@ function deleteClassItem(id) {
   resetClassForm();
 }
 
-function deleteEventItem(id) {
-  deleteScheduleEntryOrSeries(id, "event");
+function deleteEventItem(id, scope = "occurrence") {
+  deleteScheduleEntryOrSeries(id, "event", scope);
   persistAndRender();
   resetEventForm();
 }
 
-function deleteScheduleEntryOrSeries(id, type) {
+function deleteScheduleEntryOrSeries(id, type, scope = "series") {
   const match = state.data.schedule.find((item) => item.type === type && (item.id === id || item.seriesId === id));
   const seriesId = match?.seriesId || (state.data.schedule.some((item) => item.type === type && item.seriesId === id) ? id : "");
   state.data.schedule = state.data.schedule.filter((item) => {
     if (item.type !== type) return true;
-    return seriesId ? item.seriesId !== seriesId : item.id !== id;
+    return seriesId && (scope === "series" || id === seriesId) ? item.seriesId !== seriesId : item.id !== id;
   });
 }
 

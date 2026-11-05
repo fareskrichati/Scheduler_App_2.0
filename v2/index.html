@@ -49,7 +49,18 @@
           </label>
 
           <button class="primary-button" type="submit" id="login-submit">Continue</button>
+          <button class="small-button" type="button" id="forgot-password">Forgot password?</button>
           <p class="auth-status" id="login-status" role="status"></p>
+        </form>
+
+        <form class="auth-form" id="password-recovery-form" hidden>
+          <p id="recovery-help">Enter your email and we’ll send you a password reset link.</p>
+          <label class="field" id="recovery-email-field"><span>Email</span><input id="recovery-email" type="email" autocomplete="email" maxlength="120" required /></label>
+          <label class="field" id="recovery-password-field" hidden><span>New password</span><input id="recovery-password" type="password" autocomplete="new-password" minlength="6" maxlength="80" /></label>
+          <label class="field" id="recovery-confirm-field" hidden><span>Confirm new password</span><input id="recovery-confirm" type="password" autocomplete="new-password" minlength="6" maxlength="80" /></label>
+          <button class="primary-button" id="recovery-submit" type="submit">Send reset link</button>
+          <button class="small-button" id="recovery-back" type="button">Back to log in</button>
+          <p class="auth-status" id="recovery-status" role="status"></p>
         </form>
 
         <form class="auth-form" id="profile-setup-form" hidden>

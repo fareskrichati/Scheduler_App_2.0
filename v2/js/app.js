@@ -43,6 +43,17 @@ const supabaseClient = createSupabaseClient();
 clearLegacyLocalLogin();
 const savedAuthProfile = null;
 let authMode = "login";
+let passwordRecoveryMode = new URLSearchParams(window.location.search).get("password-reset") === "1" || new URLSearchParams(window.location.hash.slice(1)).get("type") === "recovery" ? "reset" : "";
+let recoverySessionReady = false;
+if (supabaseClient?.auth.onAuthStateChange) {
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (event === "PASSWORD_RECOVERY") {
+      passwordRecoveryMode = "reset";
+      recoverySessionReady = Boolean(session?.user);
+      updateAuthView();
+    }
+  });
+}
 
 const state = {
   activeTab: getInitialTab(),
@@ -332,6 +343,20 @@ async function initialize() {
 }
 
 function bindEvents() {
+  document.querySelector("#forgot-password").addEventListener("click", () => {
+    passwordRecoveryMode = "email";
+    document.querySelector("#recovery-email").value = elements.loginEmail.value;
+    document.querySelector("#recovery-status").textContent = "";
+    updateAuthView();
+  });
+  document.querySelector("#recovery-back").addEventListener("click", async () => {
+    if (passwordRecoveryMode === "reset") await supabaseClient?.auth.signOut();
+    passwordRecoveryMode = "";
+    recoverySessionReady = false;
+    history.replaceState(null, "", window.location.pathname);
+    setAuthMode("login");
+  });
+  document.querySelector("#password-recovery-form").addEventListener("submit", handlePasswordRecovery);
   elements.loginForm.addEventListener("submit", (event) => {
     event.preventDefault();
     handleLoginSubmit();
@@ -1533,6 +1558,44 @@ function setMobileAddFormState(tabId, isOpen) {
   toggle.textContent = `Add ${labels[tabId]}`;
 }
 
+async function handlePasswordRecovery(event) {
+  event.preventDefault();
+  const status = document.querySelector("#recovery-status");
+  const button = document.querySelector("#recovery-submit");
+  if (!supabaseClient) { status.textContent = "Password reset is unavailable. Please try again later."; return; }
+  button.disabled = true;
+  try {
+    if (passwordRecoveryMode === "reset") {
+      if (!recoverySessionReady) throw new Error("This reset link is invalid or expired. Go back to log in and request a new link.");
+      const password = document.querySelector("#recovery-password").value;
+      if (password.trim().length < 6) throw new Error("Password needs at least 6 characters.");
+      if (password !== document.querySelector("#recovery-confirm").value) throw new Error("Passwords do not match.");
+      const { error } = await supabaseClient.auth.updateUser({ password });
+      if (error) throw error;
+      await supabaseClient.auth.signOut();
+      passwordRecoveryMode = "";
+      recoverySessionReady = false;
+      document.querySelector("#password-recovery-form").reset();
+      elements.loginPassword.value = "";
+      history.replaceState(null, "", window.location.pathname);
+      setAuthMode("login");
+      elements.loginStatus.textContent = "Password updated. Log in with your new password.";
+    } else {
+      const email = document.querySelector("#recovery-email").value.trim();
+      if (!isValidEmail(email)) throw new Error("Enter a valid email address.");
+      const redirect = new URL(window.location.pathname, window.location.origin);
+      redirect.searchParams.set("password-reset", "1");
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: redirect.href });
+      if (error) throw error;
+      status.textContent = "If an account exists for this email, you’ll receive a reset link. Check your inbox and spam folder.";
+    }
+  } catch (error) {
+    status.textContent = error.message || "Could not reset your password. Please try again.";
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function handleLoginSubmit() {
   const email = elements.loginEmail.value.trim().toLowerCase();
   const password = elements.loginPassword.value;
@@ -1644,6 +1707,7 @@ function setAuthMode(mode, options = {}) {
     return;
   }
 
+  passwordRecoveryMode = "";
   authMode = mode;
   pendingFirstLogin = null;
   elements.loginForm.hidden = false;
@@ -1660,7 +1724,26 @@ function setAuthMode(mode, options = {}) {
 function updateAuthView() {
   window.UniPlanConnector?.refresh();
   window.UniPlanPet?.refresh();
-  document.body.classList.toggle("is-authenticated", authState.isAuthenticated);
+  document.body.classList.toggle("is-authenticated", authState.isAuthenticated && !passwordRecoveryMode);
+  document.querySelector("#password-recovery-form").hidden = !passwordRecoveryMode;
+  document.querySelector(".auth-mode-switch").hidden = Boolean(passwordRecoveryMode);
+  document.querySelector("#forgot-password").hidden = authMode !== "login";
+  if (passwordRecoveryMode) {
+    const resetting = passwordRecoveryMode === "reset";
+    elements.loginForm.hidden = true;
+    elements.profileSetupForm.hidden = true;
+    elements.authTitle.textContent = resetting ? "Choose a new password" : "Reset your password";
+    document.querySelector("#recovery-help").textContent = resetting ? "Enter and confirm your new password." : "Enter your email and we’ll send you a password reset link.";
+    document.querySelector("#recovery-email-field").hidden = resetting;
+    document.querySelector("#recovery-email").disabled = resetting;
+    for (const id of ["password", "confirm"]) {
+      document.querySelector(`#recovery-${id}-field`).hidden = !resetting;
+      document.querySelector(`#recovery-${id}`).disabled = !resetting;
+      document.querySelector(`#recovery-${id}`).required = resetting;
+    }
+    document.querySelector("#recovery-submit").textContent = resetting ? "Save new password" : "Send reset link";
+    return;
+  }
 
   if (authState.isAuthenticated) {
     window.setTimeout(() => showWhatsNew(), 150);
@@ -1742,6 +1825,11 @@ async function restoreSupabaseSession() {
     return;
   }
 
+  if (passwordRecoveryMode === "reset") {
+    recoverySessionReady = true;
+    updateAuthView();
+    return;
+  }
   await applySupabaseUser(data.session.user);
 }
 

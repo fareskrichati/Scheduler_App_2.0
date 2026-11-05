@@ -9,8 +9,8 @@ const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_DELAY_MS = 1000;
 const FOREVER_REPEAT_YEARS = 5;
 const SUPABASE_TABLE = "planner_profiles";
-const WHATS_NEW_VERSION = "3.5.3";
-const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-3.5.3";
+const WHATS_NEW_VERSION = "3.5.4";
+const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-3.5.4";
 const PLANNER_TABS = ["study", "today", "more", "calendar", "todo", "classes", "events", "homework", "exams", "reminders", "settings"];
 
 if (new URLSearchParams(window.location.search).get("scriptable") === "1") {
@@ -2202,6 +2202,7 @@ function render() {
 
 function getTodoItems() {
   return [
+    ...state.data.schedule.filter(item=>item.studySessionId).map(item=>({...item,time:item.start,color:getStoredItemColor("schedule",item),kind:"study",label:item.course?"Study · "+item.course:"Study"})),
     ...getNextVisibleOccurrences(state.data.homework).map((item) => ({ ...item, color: getStoredItemColor("homework", item), kind: "homework", label: item.course || "Homework" })),
     ...state.data.exams.map((item) => ({ ...item, color: getStoredItemColor("exams", item), kind: "exam", label: item.course || "Exam" })),
     ...getNextVisibleOccurrences(state.data.reminders).map((item) => ({ ...item, color: getStoredItemColor("reminders", item), kind: "reminder", label: "Reminder" })),
@@ -2218,7 +2219,7 @@ function renderTodoList() {
   elements.todoTypeFilter.value = todoTypeFilter;
 
   const items = allItems
-    .filter((item) => todoTypeFilter === "all" || item.kind === todoTypeFilter || (todoTypeFilter === "academic" && ["homework", "exam"].includes(item.kind)))
+    .filter((item) => todoTypeFilter === "all" || item.kind === todoTypeFilter || (todoTypeFilter === "academic" && ["homework", "exam", "study"].includes(item.kind)))
     .filter((item) => selectedCourse === "all" || item.course === selectedCourse)
     .sort((a, b) => (todoSort === "date" ? 0 : Number(b.kind === todoSort) - Number(a.kind === todoSort)) || compareByDateTime(a, b));
 
@@ -2242,6 +2243,7 @@ function renderTodoList() {
     row.querySelector(".todo-check").addEventListener("click", () => {
       if (item.kind === "homework") toggleHomeworkStatus(item.id);
       else if (item.kind === "exam") toggleExamStatus(item.id);
+      else if (item.kind === "study") toggleStudySessionStatus(item.id);
       else toggleReminderStatus(item.id);
     });
     (item.status === "done" ? completedList : elements.todoList).appendChild(row);
@@ -2249,7 +2251,6 @@ function renderTodoList() {
 }
 
 function renderTabs() {
-  if (state.activeTab === "study") state.activeTab = "today";
   elements.tabButtons.forEach((button) => {
     const isActive = button.dataset.tab === state.activeTab;
     button.classList.toggle("is-active", isActive);
@@ -2361,7 +2362,7 @@ function renderCalendar() {
 
     items.forEach((item) => {
       const marker = document.createElement("div");
-      const canComplete = !compactMonth && ["homework", "exam", "reminder"].includes(item.kind);
+      const canComplete = Boolean(item.studySessionId) || (!compactMonth && ["homework", "exam", "reminder"].includes(item.kind));
       marker.className = `calendar-marker marker-${item.kind}${item.status === "done" ? " is-complete" : ""}`;
       const monthTime = item.displayTime ? `<span class="calendar-marker-time">${escapeHtml(item.displayTime)}</span>` : "";
       marker.innerHTML = `<span class="calendar-marker-row">${canComplete ? `<button class="calendar-marker-check" type="button" aria-label="${item.status === "done" ? "Mark pending" : "Mark done"}: ${escapeHtml(item.title)}">${item.status === "done" ? "✓" : ""}</button>` : ""}<button class="calendar-item-open" type="button" aria-label="View details: ${escapeHtml(item.title)}"><span class="calendar-marker-title">${escapeHtml(item.title)}</span>${monthTime}</button></span>`;
@@ -2378,6 +2379,7 @@ function renderCalendar() {
         if (item.kind === "homework") toggleHomeworkStatus(item.sourceId);
         else if (item.kind === "exam") toggleExamStatus(item.sourceId);
         else if (item.kind === "reminder") toggleReminderStatus(item.sourceId);
+        else if (item.studySessionId) toggleStudySessionStatus(item.sourceId);
 
       });
       markers.appendChild(marker);
@@ -2434,6 +2436,7 @@ function openCalendarItemDetails(item, date) {
     const actions = document.createElement("div");
     actions.className = "calendar-item-actions";
     actions.appendChild(edit);
+    if(item.studySessionId){const complete=buildDayStatusButton(item);complete.addEventListener("click",()=>dialog.close());actions.appendChild(complete);}
     const remove = buildDayDeleteButton(item);
     if (remove) {
       const collection = item.kind === "class" || item.kind === "event"
@@ -2833,6 +2836,11 @@ function buildDaySchedulePdfHtml(date, items) {
 }
 
 function buildDayStatusButton(item) {
+  if(item.studySessionId){
+    const button=document.createElement('button');button.type='button';button.className='small-button day-status-button';
+    button.textContent=item.status==='done'?'Mark pending':'Mark done';
+    button.addEventListener('click',()=>toggleStudySessionStatus(item.sourceId));return button;
+  }
   const button = document.createElement("button");
   button.type = "button";
   button.className = "small-button day-status-button";
@@ -2953,6 +2961,7 @@ function renderExamList() {
       meta: (item) =>
         `${item.course} • ${formatShortDate(item.date)}${item.time ? ` at ${formatTime(item.time)}` : ""}`,
       notes: (item) => item.notes,
+      onStudy: openStudyPlanForExam,
       onEdit: editExam,
       onDelete: deleteExam,
       onToggleStatus: toggleExamStatus,
@@ -3177,6 +3186,15 @@ function renderCollection({ target, items, emptyMessage, config }) {
     }
     applyItemColor(card, item.effectiveColor || item.color);
     card.classList.toggle("is-complete", config.category !== "Event" && item.status === "done");
+
+    if (config.onStudy && item.status !== "done" && item.date >= todayString()) {
+      const studyButton = document.createElement("button");
+      studyButton.type = "button";
+      studyButton.className = "small-button study-plan-button";
+      studyButton.textContent = "Create a study plan";
+      studyButton.addEventListener("click", () => config.onStudy(item.id));
+      editButton.before(studyButton);
+    }
 
     const actionKey = item.actionKey || item.id;
     editButton.addEventListener("click", () => config.onEdit(actionKey));
@@ -3781,6 +3799,12 @@ function deleteScheduleEntryOrSeries(id, type, scope = "series") {
   });
 }
 
+function toggleStudySessionStatus(id) {
+  const item=state.data.schedule.find(entry=>entry.id===id&&entry.studySessionId);
+  if(!item)return;
+  setItemStatus(item,item.status==='done'?'pending':'done');persistAndRender();
+}
+
 function toggleEventStatus(id) {
   const matches = state.data.schedule.filter(
     (entry) => entry.type === "event" && (entry.id === id || entry.seriesId === id),
@@ -3830,7 +3854,6 @@ function getCollectionDeleteTarget(collection, id) {
 }
 
 function setActiveTab(tabId) {
-  if (tabId === "study") return;
   state.activeTab = tabId;
   renderTabs();
 }
@@ -5099,14 +5122,15 @@ function getItemsForDate(date) {
     .map((item) => ({
       sourceId: item.id,
       sourceType: item.type,
+      studySessionId: item.studySessionId,
       location: item.location,
       kind: item.type === "event" ? "event" : "class",
-      label: item.type === "class" ? "Class" : "Scheduled event",
+      label: item.studySessionId ? "Study" : item.type === "class" ? "Class" : "Scheduled event",
       title: item.title,
       meta: `${formatTime(item.start)} - ${formatTime(item.end)}${item.location ? ` • ${item.location}` : ""}`,
       notes: item.notes,
       color: getStoredItemColor("schedule", item),
-      status: "pending",
+      status: item.studySessionId ? item.status || "pending" : "pending",
       displayTime: item.start ? `${formatTime(item.start)}${item.end ? ` – ${formatTime(item.end)}` : ""}` : "",
       sortKey: item.start,
     }));
@@ -5166,7 +5190,7 @@ function setItemStatus(item, status) {
 function pruneExpiredCompletedItems() {
   const now = Date.now();
   state.data.schedule = state.data.schedule.filter((item) =>
-    item.type === "event" ? !isExpiredCompletedItem(item, now) : true,
+    item.type === "event" && !item.studySessionId ? !isExpiredCompletedItem(item, now) : true,
   );
 }
 
@@ -5185,7 +5209,7 @@ function scheduleCompletionSweep() {
   }
 
   const now = Date.now();
-  const nextExpiryAt = state.data.schedule.filter((item) => item.type === "event")
+  const nextExpiryAt = state.data.schedule.filter((item) => item.type === "event" && !item.studySessionId)
     .filter((item) => item.status === "done" && item.completedAt)
     .map((item) => Number(item.completedAt) + DONE_DISAPPEAR_DELAY_MS)
     .filter((timestamp) => Number.isFinite(timestamp) && timestamp > now)

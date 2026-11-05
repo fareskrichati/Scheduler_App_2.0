@@ -11,7 +11,7 @@
       name="description"
       content="UniPlan helps you track homework, class schedules, daily plans, and reminders in one calendar."
     />
-    <title>UniPlan 3.5.3 | Student Planner</title>
+    <title>UniPlan 3.5.4 | Student Planner</title>
     <link rel="stylesheet" href="css/styles.css" />
     <link rel="stylesheet" href="css/mobile.css" media="(max-width: 760px), (max-width: 1366px) and (any-pointer: coarse)" />
     <link rel="stylesheet" href="css/customization.css" />
@@ -202,7 +202,7 @@
                 <div class="panel-header">
                   <div>
                     <p class="panel-label">Coming up</p>
-                    <h3>Homework, exams & reminders</h3>
+                    <h3>Homework, exams, study & reminders</h3>
                   </div>
                   <span class="todo-count" id="todo-count">0 left</span>
                 </div>
@@ -1103,7 +1103,7 @@
 
                     <div class="subsection whats-new-setting">
                       <div class="subsection-header"><p class="panel-label">Latest updates</p></div>
-                      <p class="settings-note">Read update 3.5.3 and previous release notes.</p>
+                      <p class="settings-note">Read update 3.5.4 and previous release notes.</p>
                       <button class="ghost-button" id="settings-whats-new" type="button">View what’s new</button>
                     </div>
 
@@ -1149,12 +1149,20 @@
       </main>
     </div>
 
-    <dialog class="whats-new-dialog" id="whats-new-dialog" aria-labelledby="whats-new-title"><div class="whats-new-card"><div class="whats-new-header"><div><p class="panel-label">Latest update</p><h2 id="whats-new-title">What’s new in update 3.5.3</h2><p>More helpful pet answers and flexible event deletion.</p></div><button class="icon-button" id="whats-new-close" type="button" aria-label="Close what’s new">×</button></div>
+    <dialog class="whats-new-dialog" id="whats-new-dialog" aria-labelledby="whats-new-title"><div class="whats-new-card"><div class="whats-new-header"><div><p class="panel-label">Latest update</p><h2 id="whats-new-title">What’s new in update 3.5.4</h2><p>Study plans for every class, calendar scheduling, and a clearer day view.</p></div><button class="icon-button" id="whats-new-close" type="button" aria-label="Close what’s new">×</button></div>
+    <div class="whats-new-list">
+      <article><span aria-hidden="true">✧</span><div><h3>A study planner for every class</h3><p>Study pulls in your saved exams and quizzes by class. Use Create a study plan on an exam card to open its class and date, then choose your study times.</p></div></article>
+      <article><span aria-hidden="true">◷</span><div><h3>Study time on your calendar</h3><p>Find open slots in the middle of the day or after a time you choose. Study plans and individual sessions become calendar events. Sessions that cannot fit stay marked as unscheduled, ready to try another time.</p></div></article>
+      <article><span aria-hidden="true">✓</span><div><h3>Check off study sessions anywhere</h3><p>Study sessions now appear in To-Do. Mark them done in Study, To-Do, or the calendar, with progress kept in sync.</p></div></article>
+      <article><span aria-hidden="true">▤</span><div><h3>A vertical day view</h3><p>Day view stacks your plans in time order in a single, readable column. Your exam and quiz study plans stay separate, with editable sessions and progress notes.</p></div></article>
+    </div>
+    <details class="v2-update-history"><summary>Update 3.5.3 — Pet answers and event deletion</summary>
     <div class="whats-new-list">
       <article><span aria-hidden="true">✦</span><div><h3>Ask your pet about a date</h3><p>Ask “What do I have November 15th?” or “What do I have in 3 weeks?” Your helper checks that date and shows your plans.</p></div></article>
       <article><span aria-hidden="true">◉</span><div><h3>A personal hello</h3><p>Your helper greets you using the name saved in your profile.</p></div></article>
       <article><span aria-hidden="true">↻</span><div><h3>Delete one event or a series</h3><p>Open a repeating event to delete just that occurrence or its entire series. Connected AI apps with planner write access can also delete items and series when requested.</p></div></article>
     </div>
+    </details>
     <details class="v2-update-history"><summary>Update 3.5.2 — Calendar, settings, and AI connector</summary>
     <div class="whats-new-list">
       <article><span aria-hidden="true">▦</span><div><h3>A compact mobile calendar</h3><p>Month view shows every item in smaller colored rows without a “more” button. Keep marking finished work in To-Do.</p></div></article>
@@ -1251,6 +1259,7 @@
     <script src="js/data-merge.js"></script>
     <script src="js/interactive-tour.js"></script>
     <script src="js/v2-runtime.js"></script>
+    <script src="js/study-scheduler.js"></script>
     <script src="js/study-integration.js"></script>
     <script src="js/tesla-share.js"></script>
     <script src="js/pet-assistant.js"></script>

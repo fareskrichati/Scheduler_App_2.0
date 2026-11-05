@@ -17,7 +17,7 @@ for (const [kind, name] of [['event', 'renderEventList'], ['class', 'renderClass
       compareByDateTime: (a,b) => a.date.localeCompare(b.date), getStoredItemColor: () => '#fff',
       isTimedItemPast: () => true, isScheduleGroupPast: () => true,
       renderCollection: value => { rendered = value.items; },
-      editClassItem() {}, editEventItem() {}, editExam() {}, deleteClassItem() {}, deleteEventItem() {}, deleteExam() {}, toggleExamStatus() {},
+      editClassItem() {}, editEventItem() {}, editExam() {}, deleteClassItem() {}, deleteEventItem() {}, deleteExam() {}, toggleExamStatus() {}, openStudyPlanForExam() {},
     });
     vm.runInContext(extract(name), context);
     context[name]();

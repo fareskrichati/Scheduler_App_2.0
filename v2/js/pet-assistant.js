@@ -131,7 +131,7 @@
   }
 
   function range(start,end,kind) { const out=[]; for(let d=start;d<=end;d=offsetDate(d,1)) out.push(...dayItems(d).filter(i=>!kind||i.kind===kind).map(i=>({...i,date:d}))); return out; }
-  const collectionFor = kind => state.data[kind==='class'||kind==='event'?'schedule':kind==='homework'?'homework':tabs[kind]];
+  const collectionFor = kind => state.data[kind==='class'||kind==='event'||kind==='study'?'schedule':kind==='homework'?'homework':tabs[kind]];
   function beginAdd(kind, text) {
     completionPicker?.remove(); completionPicker=null;
     pending = null;

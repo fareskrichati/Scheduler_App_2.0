@@ -28,7 +28,7 @@ function renderV2Sync(){const el=document.querySelector('#v2-sync-status');el.te
 function renderV2Navigation(){
  const labels={study:'Study',today:'Today',calendar:'Calendar',todo:'To-Do',classes:'Classes',events:'Events',homework:'Homework',exams:'Exams',reminders:'Reminders',settings:'Settings',more:'More'};
  document.querySelector('#v2-current-section').textContent=labels[state.activeTab]||'Today';
- document.querySelector('#v2-section-description').textContent={today:'Your classes, plans, and deadlines. One place.',calendar:'Your whole schedule, with everything in view.',todo:'Homework, exams, and reminders. One list.',settings:'Your planner, your preferences.',more:'All your planner tools, close by.'}[state.activeTab]||labels[state.activeTab];
+ document.querySelector('#v2-section-description').textContent={study:'Class by class. Session by session. Your progress, in view.',today:'Your classes, plans, and deadlines. One place.',calendar:'Your whole schedule, with everything in view.',todo:'Homework, exams, study sessions, and reminders. One list.',settings:'Your planner, your preferences.',more:'All your planner tools, close by.'}[state.activeTab]||labels[state.activeTab];
  document.querySelectorAll('.v2-bottom-nav .tab-button').forEach(b=>{const active=b.dataset.tab===state.activeTab||(b.dataset.tab==='more'&&!['today','calendar','todo','classes'].includes(state.activeTab));b.classList.toggle('is-active',active);b.setAttribute('aria-selected',active)});
  renderV2Date();
 }

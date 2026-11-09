@@ -46,15 +46,14 @@ function renderV2Today(){
  const items=getItemsForDate(date),active=items.filter(i=>i.status!=='done'),completed=items.filter(i=>i.status==='done');
  const list=document.querySelector('#v2-day-list'),done=document.querySelector('#v2-day-completed');list.innerHTML='';done.innerHTML='';active.forEach(i=>v2AppendItem(list,i));completed.forEach(i=>v2AppendItem(done,i));if(!active.length)list.innerHTML='<p class="empty-state">Nothing scheduled or due. Add a class, event, or to-do to get started.</p>';if(!completed.length)done.innerHTML='<p class="empty-state">Completed items will stay here.</p>';document.querySelector('#v2-day-completed-count').textContent=`(${completed.length})`;
  const now = new Date();
- const clock = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
- const upcoming = active.filter(item => date > todayString() || (date === todayString() && (item.sortKey || '23:59') >= clock))
+ const upcoming = active.filter(item => v2IsUpcoming(item, date, now))
   .sort((a,b) => (a.sortKey || '23:59').localeCompare(b.sortKey || '23:59'));
  const up = document.querySelector('#v2-up-next'); up.replaceChildren();
  upcoming.slice(0, 3).forEach((item, index) => {
   const row = document.createElement('button'); row.type = 'button'; row.className = 'v2-preview-item';
-  const countdown = v2TimeUntil(date, item.sortKey, now);
+  const countdown = v2TimeUntil(date, item.sortKey, now, item.endTime);
   const timing = ['homework', 'exam'].includes(item.kind) ? countdown.replace('Starts in ', 'Due in ').replace('Starting now', 'Due now') : countdown;
-  row.innerHTML = `<span class="v2-item-type">${index === 0 ? 'Next' : 'Then'} · ${escapeHtml(timing)}</span><strong>${escapeHtml(item.title)}</strong><span class="settings-note">${escapeHtml(item.meta || item.displayTime || 'Any time')}</span>`;
+  row.innerHTML = `<span class="v2-item-type">${v2IsOngoing(item, date, now) ? 'Now' : index === 0 ? 'Next' : 'Then'} · ${escapeHtml(timing)}</span><strong>${escapeHtml(item.title)}</strong><span class="settings-note">${escapeHtml(item.meta || item.displayTime || 'Any time')}</span>`;
   row.addEventListener('click', () => openCalendarItemDetails(item, date)); up.append(row);
  });
  if (!upcoming.length) up.innerHTML = '<h2>You’re all clear.</h2><p>No more upcoming items for this day.</p>';
@@ -100,12 +99,24 @@ function v2NextAssignment(classTitle){
  return getNextVisibleOccurrences(state.data.homework).filter(item=>item.status!=='done'&&item.course?.trim().toLowerCase()===classTitle.trim().toLowerCase()).sort(compareByDateTime)[0];
 }
 
-function v2TimeUntil(date,time,now=new Date()){
+function v2TimeUntil(date,time,now=new Date(),endTime){
  if(!/^\d{2}:\d{2}$/.test(time||''))return 'Coming up';
- const minutes=Math.max(0,Math.ceil((new Date(`${date}T${time}:00`)-now)/60000));
+ const ongoing=v2IsOngoing({sortKey:time,endTime},date,now);
+ const minutes=Math.max(0,Math.ceil((new Date(`${date}T${ongoing?endTime:time}:00`)-now)/60000));
  if(!minutes)return 'Starting now';
  const days=Math.floor(minutes/1440),hours=Math.floor(minutes%1440/60),mins=minutes%60;
- return 'Starts in '+[days?`${days}d`:'',hours?`${hours}h`:'',mins?`${mins}m`:''].filter(Boolean).join(' ');
+ return (ongoing?'Ends in ':'Starts in ')+[days?`${days}d`:'',hours?`${hours}h`:'',mins?`${mins}m`:''].filter(Boolean).join(' ');
+}
+
+function v2IsOngoing(item,date,now=new Date()){
+ return Boolean(item.endTime && new Date(`${date}T${item.sortKey}:00`) <= now && new Date(`${date}T${item.endTime}:00`) > now);
+}
+function v2IsUpcoming(item,date,now=new Date()){
+ const today=isoDate(now),clock=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+ if(item.endTime && new Date(`${date}T${item.sortKey}:00`) <= now){
+  return v2IsOngoing(item,date,now);
+ }
+ return date > today || (date === today && (item.sortKey || '23:59') >= clock);
 }
 
 function v2ImportMatches(item,panelKind,today){

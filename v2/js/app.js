@@ -5133,6 +5133,7 @@ function getItemsForDate(date) {
       status: item.studySessionId ? item.status || "pending" : "pending",
       displayTime: item.start ? `${formatTime(item.start)}${item.end ? ` – ${formatTime(item.end)}` : ""}` : "",
       sortKey: item.start,
+      endTime: item.end,
     }));
 
   const reminders = state.data.reminders

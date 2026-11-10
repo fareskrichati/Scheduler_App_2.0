@@ -1,6 +1,7 @@
 /* Local, deterministic planner helper. No model, network calls, or persistent chat. */
 (() => {
   const tourInvitations = new Set();
+  let openFromWidget = /(?:^|[?&])pet=open(?:&|$)/.test(window.location?.search || '');
   const species = ['cat', 'dog', 'fox', 'robot'];
   const tabs = {class:'classes',event:'events',homework:'homework',exam:'exams',reminder:'reminders'};
   const normalize = value => ({species: species.includes(value?.species) ? value.species : 'cat', hidden: value?.hidden === true, tourOffered: value?.tourOffered === true});
@@ -357,6 +358,7 @@
     launcher.innerHTML=svg(pet.species);launcher.title=pet.species+' schedule helper';
     const radio=document.querySelector(`input[name="settings-pet"][value="${pet.species}"]`);if(radio)radio.checked=true;
     const hidden=document.getElementById('pet-hidden');if(hidden)hidden.checked=pet.hidden;
+    if(next && openFromWidget && !touring){openFromWidget=false;root.hidden=false;show(true);const url=new URL(window.location.href);url.searchParams.delete('pet');window.history.replaceState(window.history.state,'',url);}
     if(next&&!pet.tourOffered&&!tourInvitations.has(next)){tourInvitations.add(next);state.data.settings.pet={...pet,tourOffered:true};saveData();say('Ready to get settled in? I’ll show you where everything is.',[{label:'Show me around',run:()=>document.querySelector('[data-v2-tutorial]')?.click()},{label:'Maybe later',run:()=>show(false)}]);if(!pet.hidden)show(true);}
   }
   window.UniPlanPet={saved(){if(guidedEdit && launcher){guidedEdit=false;launcher.classList.remove('pet-answering');launcher.classList.add('pet-celebration');say('Saved! Your planner is updated.');}},normalize,svg,answer,dateFrom,timeFrom,dayItems,range,refresh,signupChoice:()=>normalize({species:document.querySelector('input[name="signup-pet"]:checked')?.value}),tour(active){touring=active;if(panel)panel.hidden=true;launcher?.setAttribute('aria-expanded','false');if(!active&&launcher)launcher.classList.add('pet-celebration');refresh();},decorateTour(tourPanel){let avatar=tourPanel.querySelector('.pet-tour-avatar');if(!avatar){avatar=document.createElement('div');avatar.className='pet-tour-avatar';tourPanel.prepend(avatar);}avatar.innerHTML=svg(normalize(state.data.settings?.pet).species);avatar.setAttribute('aria-label','Your pet is guiding the tour');}};

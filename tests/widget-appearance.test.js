@@ -39,6 +39,24 @@ test('Scriptable builds all sizes and preserves completion actions with cached t
   assert.ok(JSON.stringify(w).includes('Offline copy'));
   const many = {homework:Array.from({length:30},(_,i)=>({id:String(i),title:'Work '+i,date:new Date().toISOString().slice(0,10),status:'pending'}))};
   const filled = JSON.stringify(env.buildPlannerWidget(many,'homework',false));
-  assert.equal((filled.match(/action=complete/g)||[]).length / 2, {small:4,medium:8,large:22}[family]);
+  assert.equal((filled.match(/action=complete/g)||[]).length / 2, {small:2,medium:4,large:6}[family]);
  }
+});
+
+test('widget countdown shows hours and minutes, days, and due wording', () => {
+ const env = vm.createContext({Date});
+ vm.runInContext(script.replace('await main();',''), env);
+ const now = new Date('2026-11-10T10:00:00');
+ assert.equal(env.widgetCountdown({date:'2026-11-10',time:'12:30',collection:'schedule'}, now), 'Starts in 2h 30m');
+ assert.equal(env.widgetCountdown({date:'2026-11-11',time:'10:00',collection:'homework'}, now), 'Due in 1d');
+ assert.equal(env.widgetCountdown({date:'2026-11-10',time:'10:00',collection:'exams'}, now), 'Due now');
+ assert.equal(env.widgetCountdown({date:'2026-11-10',time:''}, now), 'Coming up');
+});
+
+test('Today events and classes have no completion checkbox', () => {
+ const app = fs.readFileSync('v2/js/app.js','utf8');
+ const env = vm.createContext({document:{createElement:()=>({addEventListener(){}})}});
+ vm.runInContext(app.slice(app.indexOf('function buildDayStatusButton('),app.indexOf('function buildDayDeleteButton(')),env);
+ assert.equal(env.buildDayStatusButton({kind:'event',sourceId:'event-1',status:'pending'}),null);
+ assert.equal(env.buildDayStatusButton({kind:'class',sourceId:'class-1'}),null);
 });

@@ -4736,7 +4736,7 @@ function getDefaultSettings() {
     email: "",
     phone: "",
     widgetPreferences: {
-      defaultView: "today",
+      defaultView: "all",
       startScreen: "calendar",
       plannerUrl: "",
       daysAhead: "all",

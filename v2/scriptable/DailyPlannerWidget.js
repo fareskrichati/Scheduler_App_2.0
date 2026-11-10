@@ -126,9 +126,9 @@ async function main() {
     return;
   }
 
-  if (args.queryParameters && args.queryParameters.action === "open-app") {
+  if (args.queryParameters && ["open-app", "open-pet"].includes(args.queryParameters.action)) {
     try {
-      await openFullPlanner();
+      await openFullPlanner(args.queryParameters.action === "open-pet");
     } catch (error) {
       await showSetupMenu(error);
     }
@@ -234,7 +234,7 @@ async function configureAppUrl() {
   return url;
 }
 
-async function openFullPlanner() {
+async function openFullPlanner(openPet = false) {
   const result = await loadPlannerData();
   saveCache(result.data);
   const preferences = getWidgetPreferences(result.data);
@@ -246,7 +246,7 @@ async function openFullPlanner() {
     throw new Error("Open the script and set your planner website URL first.");
   }
   const separator = url.includes("?") ? "&" : "?";
-  const plannerUrl = `${url}${separator}tab=${encodeURIComponent(preferences.startScreen)}&scriptable=1`;
+  const plannerUrl = `${url}${separator}tab=${encodeURIComponent(preferences.startScreen)}&scriptable=1${openPet === true ? "&pet=open" : ""}`;
   await WebView.loadURL(plannerUrl, null, true);
 }
 
@@ -356,18 +356,22 @@ function buildPlannerWidget(data, view, cached, preferences = getWidgetPreferenc
 
   const header = widget.addStack();
   header.centerAlignContent();
-  const title = header.addText(viewTitle(view));
+  const title = header.addText(new Date().toLocaleDateString("en-US", {weekday:"long"}));
   title.font = Font.boldSystemFont(11);
   title.lineLimit = 1;
   title.minimumScaleFactor = 0.7;
   title.textColor = new Color(appearance.deep);
   header.addSpacer();
+  const pet = header.addText(({cat:"🐱",dog:"🐶",fox:"🦊",robot:"🤖"})[data.settings?.pet?.species] || "🐱");
+  pet.font = Font.systemFont(22);
+  pet.url = `${URLScheme.forRunningScript()}?action=open-pet`;
+  header.addSpacer(5);
   const date = header.addText(shortDate(new Date()));
   date.font = Font.mediumSystemFont(9);
   date.textColor = new Color(appearance.muted);
-  const items = getWidgetItems(data, view, preferences);
-  const columns = config.widgetFamily === "small" ? 1 : 2;
-  const rows = config.widgetFamily === "large" ? 11 : 4;
+  const items = getWidgetItems(data, view, preferences).sort((a,b) => Number(widgetCountdown(b).startsWith('Ends in')) - Number(widgetCountdown(a).startsWith('Ends in')));
+  const columns = 1;
+  const rows = config.widgetFamily === "large" ? 6 : config.widgetFamily === "medium" ? 4 : 2;
   const familyLimit = columns * rows;
   const limit = preferences.itemLimit === "auto" ? familyLimit : Math.min(preferences.itemLimit, familyLimit);
   widget.addSpacer(4);
@@ -378,19 +382,12 @@ function buildPlannerWidget(data, view, cached, preferences = getWidgetPreferenc
     empty.textColor = new Color(appearance.muted);
   } else {
     const content = widget.addStack();
-    content.spacing = 6;
-    const screenWidth = typeof Device.screenSize === "function" ? Math.min(Device.screenSize().width, Device.screenSize().height) : 390;
-    const widgetWidth = ({320:292,375:329,390:338,393:338,402:344,414:360,428:364,430:364,440:372})[screenWidth] || 338;
-    const columnWidth = columns === 1 ? (widgetWidth - 22) / 2 - 16 : (widgetWidth - 22) / 2;
-    for (let columnIndex = 0; columnIndex < columns; columnIndex++) {
-      const column = content.addStack();
-      column.layoutVertically();
-      column.size = new Size(columnWidth, 0);
-      items.slice(columnIndex * rows, Math.min((columnIndex + 1) * rows, limit)).forEach((item, index) => {
-        if (index) column.addSpacer(2);
-        addItemRow(column, item, appearance);
-      });
-    }
+    content.spacing = 0;
+    content.layoutVertically();
+    items.slice(0,limit).forEach((item,index) => {
+      if(index) content.addSpacer(2);
+      addItemRow(content,item,appearance,index === 0);
+    });
   }
 
   widget.addSpacer();
@@ -401,14 +398,26 @@ function buildPlannerWidget(data, view, cached, preferences = getWidgetPreferenc
   return widget;
 }
 
-function addItemRow(widget, item, appearance) {
+function widgetCountdown(item, now = new Date()) {
+  if (!/^\d{2}:\d{2}$/.test(item.time || '')) return 'Coming up';
+  const minutes = Math.max(0, Math.ceil((new Date(`${item.date}T${item.time}:00`) - now) / 60000));
+  const due = ['homework', 'exams'].includes(item.collection);
+  if(item.end && new Date(`${item.date}T${item.time}:00`) <= now && new Date(`${item.date}T${item.end}:00`) > now) {
+    const left = Math.ceil((new Date(`${item.date}T${item.end}:00`) - now) / 60000);
+    return `Ends in ${Math.floor(left / 60) ? Math.floor(left / 60)+'h ' : ''}${left % 60}m`;
+  }
+  if (!minutes) return due ? 'Due now' : 'Starting now';
+  const days = Math.floor(minutes / 1440), hours = Math.floor(minutes % 1440 / 60), mins = minutes % 60;
+  return (due ? 'Due in ' : 'Starts in ') + [days ? `${days}d` : '', hours ? `${hours}h` : '', mins ? `${mins}m` : ''].filter(Boolean).join(' ');
+}
+
+function addItemRow(widget, item, appearance, featured = false) {
   const row = widget.addStack();
   row.centerAlignContent();
   row.spacing = 4;
-  row.setPadding(1, 3, 1, 3);
-  row.size = new Size(0, 24);
-  row.cornerRadius = 8;
-  row.backgroundColor = new Color(appearance.surface);
+  row.setPadding(1, 0, 1, 0);
+  row.size = new Size(0, featured ? 42 : 23);
+  row.cornerRadius = 12;
   if (item.nested) row.addSpacer(5);
   if (item.completable) {
     row.url = `${URLScheme.forRunningScript()}?action=complete&collection=${encodeURIComponent(item.collection)}&id=${encodeURIComponent(item.id)}`;
@@ -423,13 +432,17 @@ function addItemRow(widget, item, appearance) {
   }
   const text = row.addStack();
   text.layoutVertically();
+  const timing = text.addText((widgetCountdown(item).startsWith("Ends in") ? "Now · " : featured ? "Next · " : "Then · ") + widgetCountdown(item));
+  timing.font = Font.mediumSystemFont(7);
+  timing.textColor = new Color(appearance.deep);
+  timing.lineLimit = 1;
   const name = text.addText(item.title);
-  name.font = Font.semiboldSystemFont(10);
-  name.textColor = new Color(appearance.cardInk);
-  name.lineLimit = 1;
+  name.font = Font.semiboldSystemFont(featured ? 18 : 10);
+  name.textColor = new Color(appearance.ink);
+  name.lineLimit = featured ? 2 : 1;
   const meta = text.addText(item.meta);
   meta.font = Font.mediumSystemFont(8);
-  meta.textColor = new Color(appearance.cardMuted);
+  meta.textColor = new Color(appearance.muted);
   meta.lineLimit = 1;
 }
 
@@ -453,7 +466,7 @@ function getWidgetItems(data, view, preferences = getWidgetPreferences(data)) {
     if (item.type === "class" && !preferences.classes) return;
     if (item.type === "event" && !preferences.events) return;
     if (item.status === "done") return;
-    items.push({ title: item.title, date: item.date, time: item.start || "", color: item.color || "#3F76C5", meta: `${dateLabel(item.date, today)} ${formatTime(item.start)}${item.location ? ` - ${item.location}` : ""}`.trim(), id: item.id, collection: "schedule", completable: item.type === "event", courseKey: widgetCourseKey(item.title), sortKey: `${item.date} ${item.start || ""}|0` });
+    items.push({ title: item.title, date: item.date, time: item.start || "", end: item.end || "", color: item.color || "#3F76C5", meta: `${dateLabel(item.date, today)} ${formatTime(item.start)}${item.location ? ` - ${item.location}` : ""}`.trim(), id: item.id, collection: "schedule", completable: false, courseKey: widgetCourseKey(item.title), sortKey: `${item.date} ${item.start || ""}|0` });
   });
 
   if (view === "classes" && preferences.homework) {
@@ -488,7 +501,7 @@ function getWidgetItems(data, view, preferences = getWidgetPreferences(data)) {
     items.push({ title: item.title, date: item.date, time: item.time || "23:57", color: item.color || "#9ABBD6", meta: `${dateLabel(item.date, today)} Reminder${item.time ? ` - ${formatTime(item.time)}` : ""}`, id: item.id, collection: "reminders", completable: true });
   });
 
-  return items.sort((a, b) => (a.sortKey || `${a.date} ${a.time}`).localeCompare(b.sortKey || `${b.date} ${b.time}`));
+  return items.filter(item => view !== "all" || !item.time || new Date(`${item.date}T${item.end || item.time}`) >= new Date()).sort((a, b) => (a.sortKey || `${a.date} ${a.time}`).localeCompare(b.sortKey || `${b.date} ${b.time}`));
 }
 
 function nextWidgetOccurrences(collection, today) {
@@ -509,7 +522,7 @@ function widgetCourseKey(value) {
 }
 
 async function completeWidgetItem(collection, id) {
-  const allowed = ["schedule", "homework", "exams", "reminders"];
+  const allowed = ["homework", "exams", "reminders"];
   if (!allowed.includes(collection) || !id) throw new Error("Invalid planner item.");
   const result = await loadPlannerData();
   const items = Array.isArray(result.data[collection]) ? result.data[collection] : [];
@@ -579,7 +592,7 @@ function normalizeView(value, fallback = "today") {
 }
 
 function viewTitle(view) {
-  return { all: "Everything upcoming", today: "Today's planner", classes: "Classes", homework: "Homework", reminders: "Reminders", exams: "Exams & quizzes", events: "Events", tasks: "To-Do list" }[view];
+  return { all: "Up next", today: "Today's planner", classes: "Classes", homework: "Homework", reminders: "Reminders", exams: "Exams & quizzes", events: "Events", tasks: "To-Do list" }[view];
 }
 
 function isoDate(date) {

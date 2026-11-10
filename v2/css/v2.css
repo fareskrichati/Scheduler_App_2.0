@@ -201,3 +201,8 @@ body .study-under-construction .study-construction-tape{position:absolute;left:5
 body .study-under-construction .study-construction-tape-second{transform:translate(-50%,-50%) rotate(14deg);z-index:2}
 
 .calendar-grid[data-view="day"] .calendar-marker{padding:10px 12px;min-height:54px}.calendar-grid[data-view="day"] .calendar-marker-title{font-size:14px!important;white-space:normal;overflow-wrap:anywhere}.calendar-grid[data-view="day"] .calendar-marker-time{font-size:12px!important}.calendar-grid[data-view="day"] .calendar-marker-check{width:24px;height:24px;min-width:24px;flex-basis:24px}
+
+/* Emphasize the current activity above the following items. */
+#v2-up-next .v2-preview-item:first-child strong { font-size: clamp(26px,3vw,36px); line-height: 1.2; }
+#v2-up-next .v2-preview-item:first-child { padding-bottom: 22px; }
+#v2-up-next .v2-preview-item:not(:first-child) strong { font-size: 16px; }

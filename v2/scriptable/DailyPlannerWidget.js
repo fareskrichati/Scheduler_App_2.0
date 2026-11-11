@@ -349,64 +349,145 @@ function buildPlannerWidget(data, view, cached, preferences = getWidgetPreferenc
   const widget = new ListWidget();
   widget.setPadding(10, 12, 10, 12);
   const appearance = widgetAppearance(data.settings || {}, Device.isUsingDarkAppearance());
+  // Keep the theme palette shared with the browser preview.
   const gradient = new LinearGradient();
   gradient.colors = [new Color(appearance.bg), new Color(appearance.end)];
   gradient.locations = [0, 1];
   widget.backgroundGradient = gradient;
+  const now = new Date();
+  const today = isoDate(now);
+  const small = config.widgetFamily === "small";
+  const capacity = small ? 1 : config.widgetFamily === "large" ? 6 : 2;
+  const limit = preferences.itemLimit === "auto" ? capacity : Math.min(preferences.itemLimit, capacity);
+  const items = getWidgetItems(data, view, preferences);
+  const dueToday = items.filter(item => item.completable && item.date === today);
+  const headline = items.find(item => widgetCountdown(item, now).startsWith("Ends in")) ||
+    items.find(item => item.collection === "schedule") || items[0];
 
   const header = widget.addStack();
-  header.centerAlignContent();
-  const title = header.addText(new Date().toLocaleDateString("en-US", {weekday:"long"}));
-  title.font = Font.boldSystemFont(11);
-  title.lineLimit = 1;
-  title.minimumScaleFactor = 0.7;
-  title.textColor = new Color(appearance.deep);
+  addWidgetText(header, "UniPlan", 13, appearance.deep, true);
   header.addSpacer();
-  const pet = header.addText(({cat:"🐱",dog:"🐶",fox:"🦊",robot:"🤖"})[data.settings?.pet?.species] || "🐱");
-  pet.font = Font.systemFont(18);
-  pet.url = `${URLScheme.forRunningScript()}?action=open-pet`;
-  header.addSpacer(5);
-  const date = header.addText(shortDate(new Date()));
-  date.font = Font.mediumSystemFont(9);
-  date.textColor = new Color(appearance.muted);
-  const items = getWidgetItems(data, view, preferences).sort((a,b) => Number(widgetCountdown(b).startsWith('Ends in')) - Number(widgetCountdown(a).startsWith('Ends in')));
-  const familyLimit = config.widgetFamily === "large" ? 6 : config.widgetFamily === "medium" ? 4 : 2;
-  const limit = preferences.itemLimit === "auto" ? familyLimit : Math.min(preferences.itemLimit, familyLimit);
-  widget.addSpacer(4);
+  addWidgetText(header, agendaDay(today), 8, appearance.muted);
 
-  if (!items.length) {
-    const empty = widget.addText("Nothing coming up.");
-    empty.font = Font.mediumSystemFont(13);
-    empty.textColor = new Color(appearance.muted);
+  widget.addSpacer(4);
+  const summary = widget.addStack();
+  summary.centerAlignContent();
+  const classes = (data.schedule || []).filter(item => item.type === "class" && item.date === today).length;
+  const due = getWidgetItems(data, "today", preferences).filter(item => item.completable).length;
+  addWidgetText(summary, `${classes} ${classes === 1 ? "class" : "classes"} · ${due} ${due === 1 ? "task" : "tasks"} due today`, 8, appearance.muted);
+  summary.addSpacer();
+  const badge = summary.addStack();
+  badge.cornerRadius = 8;
+  badge.backgroundColor = new Color("#a997df", .22);
+  badge.setPadding(1, 4, 1, 4);
+  badge.url = `${URLScheme.forRunningScript()}?action=open-pet`;
+  const species = data.settings?.pet?.species || "cat";
+  if (species === "cat" && typeof DrawContext !== "undefined") {
+    const pet = badge.addImage(drawWidgetCat());
+    pet.imageSize = new Size(19, 19);
+    pet.url = badge.url;
   } else {
-    const content = widget.addStack();
-    content.layoutVertically();
-    content.spacing = 3;
-    addItemRow(content, items[0], appearance, true);
-    const remaining = items.slice(1, limit);
-    if (config.widgetFamily === "medium") {
-      for (let i = 0; i < remaining.length; i += 2) {
-        const pair = content.addStack();
-        pair.spacing = 8;
-        const width = typeof Device.screenSize === "function" ? Math.min(Device.screenSize().width, Device.screenSize().height) : 390;
-        const slot = Math.floor((width * .83 - 32) / 2);
-        remaining.slice(i, i + 2).forEach(item => {
-          const cell = pair.addStack();
-          cell.size = new Size(slot, 0);
-          addItemRow(cell, item, appearance);
-        });
-      }
-    } else {
-      remaining.forEach(item => addItemRow(content, item, appearance));
-    }
+    const pet = addWidgetText(badge, ({cat:"🐱", dog:"🐶", fox:"🦊", robot:"🤖"})[species] || "🐱", 14, appearance.ink);
+    pet.url = badge.url;
+  }
+
+  widget.addSpacer(5);
+  const panel = widget.addStack();
+  panel.layoutVertically();
+  panel.setPadding(5, 7, 5, 7);
+  panel.cornerRadius = 10;
+  panel.backgroundColor = new Color(appearance.accent, .22);
+  if (headline) {
+    const timing = widgetCountdown(headline, now);
+    addWidgetText(panel, timing.startsWith("Ends in") ? "NOW · " + timing : "UP NEXT · " + agendaTime(headline), 8, appearance.deep, true);
+    addWidgetText(panel, headline.title, 14, appearance.ink, true);
+    addWidgetText(panel, headline.featureMeta || agendaDetails(headline), 8, appearance.muted);
+  } else {
+    addWidgetText(panel, "Nothing coming up", 13, appearance.ink, true);
+  }
+
+  const agenda = (small ? dueToday.length ? dueToday : items.filter(item => item !== headline) : items).slice(0, limit);
+  const groups = new Map();
+  for (const item of agenda) {
+    const label = small && dueToday.length ? "DUE TODAY" : item.date === today ? "TODAY" :
+      (item.date === offsetIsoDate(today, 1) ? "TOMORROW · " : "") + agendaDay(item.date);
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(item);
+  }
+  for (const [label, group] of groups) {
+    widget.addSpacer(4);
+    const heading = widget.addStack();
+    addWidgetText(heading, label, 8, appearance.muted, true);
+    heading.addSpacer();
+    addWidgetText(heading, `${group.length} ${group.length === 1 ? "item" : "items"}`, 7, appearance.muted);
+    for (const item of group) addItemRow(widget, item, appearance);
   }
 
   widget.addSpacer();
-  const footer = widget.addText((cached ? "Offline copy" : "Updated just now") + (items.length > limit ? ` · +${items.length - limit} more` : ""));
-  footer.font = Font.mediumSystemFont(8);
-  footer.lineLimit = 1;
-  footer.textColor = new Color(appearance.muted);
+  addWidgetText(widget, cached ? "✦ Offline copy" : "✦ Your schedule", 7, appearance.muted);
   return widget;
+}
+
+function drawWidgetCat() {
+  const canvas = new DrawContext();
+  canvas.size = new Size(64, 64);
+  canvas.opaque = false;
+  canvas.respectScreenScale = true;
+  const fill = (points, color) => {
+    const path = new Path();
+    path.addLines(points.map(([x, y]) => new Point(x, y)));
+    path.closeSubpath();
+    canvas.addPath(path);
+    canvas.setFillColor(new Color(color));
+    canvas.fillPath();
+  };
+  canvas.setFillColor(new Color("#b6a1e6"));
+  canvas.fillEllipse(new Rect(12, 17, 40, 40));
+  fill([[13, 34], [15, 7], [30, 22], [34, 22], [49, 7], [51, 34]], "#b6a1e6");
+  fill([[18, 21], [18, 13], [25, 21]], "#efbdd8");
+  fill([[39, 21], [46, 13], [46, 21]], "#efbdd8");
+  canvas.setFillColor(new Color("#253749"));
+  canvas.fillEllipse(new Rect(21, 30, 5, 8));
+  canvas.fillEllipse(new Rect(38, 30, 5, 8));
+  fill([[28, 41], [36, 41], [32, 46]], "#bc7398");
+  const whiskers = new Path();
+  for (const [x1, y1, x2, y2] of [[6, 39, 19, 42], [6, 48, 19, 46], [45, 42, 58, 39], [45, 46, 58, 48]]) {
+    whiskers.move(new Point(x1, y1));
+    whiskers.addLine(new Point(x2, y2));
+  }
+  canvas.addPath(whiskers);
+  canvas.setStrokeColor(new Color("#253749"));
+  canvas.setLineWidth(1.3);
+  canvas.strokePath();
+  return canvas.getImage();
+}
+
+function addWidgetText(stack, value, size, color, emphasized = false) {
+  const text = stack.addText(value);
+  text.font = emphasized ? Font.mediumSystemFont(size) : Font.systemFont(size);
+  text.textColor = new Color(color);
+  text.lineLimit = 1;
+  text.minimumScaleFactor = .75;
+  return text;
+}
+
+function agendaDay(date) {
+  return new Date(date + "T12:00").toLocaleDateString("en-US", {weekday:"short", month:"short", day:"numeric"}).toUpperCase();
+}
+
+function agendaTime(item) {
+  return item.displayTime ? formatTime(item.displayTime) : "Anytime";
+}
+
+function agendaDetails(item) {
+  return [item.detail, item.kind].filter(Boolean).join(" · ");
+}
+
+function activityDuration(start, end) {
+  if (!start || !end) return "";
+  const minutes = time => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
+  const length = minutes(end) - minutes(start);
+  return length > 0 ? length + " minutes" : "";
 }
 
 function widgetCountdown(item, now = new Date()) {
@@ -422,40 +503,27 @@ function widgetCountdown(item, now = new Date()) {
   return (due ? 'Due in ' : 'Starts in ') + [days ? `${days}d` : '', hours ? `${hours}h` : '', mins ? `${mins}m` : ''].filter(Boolean).join(' ');
 }
 
-function addItemRow(widget, item, appearance, featured = false) {
+function addItemRow(widget, item, appearance) {
   const row = widget.addStack();
   row.centerAlignContent();
   row.spacing = 4;
-  row.setPadding(0, 0, 0, 0);
-  row.cornerRadius = 12;
-  if (item.nested) row.addSpacer(5);
+  const time = row.addStack();
+  time.size = new Size(34, 0);
+  addWidgetText(time, agendaTime(item), 7, appearance.muted);
+  const marker = row.addStack();
+  marker.size = new Size(2, 14);
+  marker.cornerRadius = 1;
+  marker.backgroundColor = new Color(/^#?[0-9a-f]{6}$/i.test(item.color || "") ? item.color : appearance.accent);
+  const copy = row.addStack();
+  copy.layoutVertically();
+  addWidgetText(copy, item.title, 11, appearance.ink, true);
+  addWidgetText(copy, agendaDetails(item), 7, appearance.muted);
+  row.addSpacer();
   if (item.completable) {
     row.url = `${URLScheme.forRunningScript()}?action=complete&collection=${encodeURIComponent(item.collection)}&id=${encodeURIComponent(item.id)}`;
-    const check = row.addText("○");
-    check.font = Font.semiboldSystemFont(14);
-    check.textColor = new Color(item.color.replace("#", "") || "7EAED6");
+    const check = addWidgetText(row, "○", 12, appearance.muted);
     check.url = row.url;
-  } else {
-    const dot = row.addText("│");
-    dot.font = Font.boldSystemFont(13);
-    dot.textColor = new Color(item.color.replace("#", "") || "7EAED6");
   }
-  const text = row.addStack();
-  text.layoutVertically();
-  const timing = text.addText((widgetCountdown(item).startsWith("Ends in") ? "Now · " : featured ? "Next · " : "Then · ") + widgetCountdown(item));
-  timing.font = Font.mediumSystemFont(7);
-  timing.textColor = new Color(appearance.deep);
-  timing.lineLimit = 1;
-  const name = text.addText(item.title);
-  name.font = Font.semiboldSystemFont(featured ? 15 : 10);
-  name.textColor = new Color(appearance.ink);
-  name.lineLimit = 1;
-  name.minimumScaleFactor = 0.75;
-  if (!featured) return;
-  const meta = text.addText(item.meta);
-  meta.font = Font.mediumSystemFont(8);
-  meta.textColor = new Color(appearance.muted);
-  meta.lineLimit = 1;
 }
 
 function getWidgetItems(data, view, preferences = getWidgetPreferences(data)) {
@@ -478,7 +546,7 @@ function getWidgetItems(data, view, preferences = getWidgetPreferences(data)) {
     if (item.type === "class" && !preferences.classes) return;
     if (item.type === "event" && !preferences.events) return;
     if (item.status === "done") return;
-    items.push({ title: item.title, date: item.date, time: item.start || "", end: item.end || "", color: item.color || "#3F76C5", meta: `${dateLabel(item.date, today)} ${formatTime(item.start)}${item.location ? ` - ${item.location}` : ""}`.trim(), id: item.id, collection: "schedule", completable: false, courseKey: widgetCourseKey(item.title), sortKey: `${item.date} ${item.start || ""}|0` });
+    items.push({ title: item.title, date: item.date, time: item.start || "", end: item.end || "", displayTime: item.start, detail: item.location, kind: item.type === "class" ? "Class" : "Event", featureMeta: [item.location, activityDuration(item.start, item.end)].filter(Boolean).join(" · "), color: item.color || "#3F76C5", meta: `${dateLabel(item.date, today)} ${formatTime(item.start)}${item.location ? ` - ${item.location}` : ""}`.trim(), id: item.id, collection: "schedule", completable: false, courseKey: widgetCourseKey(item.title), sortKey: `${item.date} ${item.start || ""}|0` });
   });
 
   if (view === "classes" && preferences.homework) {
@@ -490,27 +558,27 @@ function getWidgetItems(data, view, preferences = getWidgetPreferences(data)) {
       if (!courseName) return;
       const parent = classItems.find((classItem) => classItem.courseKey === homeworkKey || classItem.title.toLowerCase().includes(courseName) || courseName.includes(classItem.title.toLowerCase()));
       if (!parent) return;
-      items.push({ title: item.title, date: parent.date, time: parent.time, color: parent.color, meta: `Due ${dateLabel(item.date, today)}${item.time ? ` - ${formatTime(item.time)}` : ""}`, id: item.id, collection: "homework", completable: true, nested: true, sortKey: `${parent.sortKey}|1|${item.date} ${item.time || "23:59"}` });
+      items.push({ title: item.title, date: parent.date, time: parent.time, displayTime: item.time, detail: item.course, kind: "Homework", color: parent.color, meta: `Due ${dateLabel(item.date, today)}${item.time ? ` - ${formatTime(item.time)}` : ""}`, id: item.id, collection: "homework", completable: true, nested: true, sortKey: `${parent.sortKey}|1|${item.date} ${item.time || "23:59"}` });
     });
   }
 
   if (["all", "today", "homework", "tasks"].includes(view)) {
     homework.forEach((item) => {
       if (!preferences.homework || item.status === "done" || item.date < today || item.date > lastDate || (view === "today" && item.date !== today)) return;
-      items.push({ title: item.title, date: item.date, time: item.time || "23:59", color: item.color || "#7EAED6", meta: `${dateLabel(item.date, today)} ${item.course || "Homework"}${item.time ? ` - ${formatTime(item.time)}` : ""}`.trim(), id: item.id, collection: "homework", completable: true });
+      items.push({ title: item.title, date: item.date, time: item.time || "23:59", displayTime: item.time, detail: item.course, kind: "Homework", color: item.color || "#7EAED6", meta: `${dateLabel(item.date, today)} ${item.course || "Homework"}${item.time ? ` - ${formatTime(item.time)}` : ""}`.trim(), id: item.id, collection: "homework", completable: true });
     });
   }
 
   if (["all", "today", "events", "exams", "tasks"].includes(view)) {
     exams.forEach((item) => {
       if (!preferences.exams || item.status === "done" || item.date < today || item.date > lastDate || (view === "today" && item.date !== today)) return;
-      items.push({ title: item.title, date: item.date, time: item.time || "23:58", color: item.color || "#6D9FD0", meta: `${dateLabel(item.date, today)} ${item.course || "Exam"}`.trim(), id: item.id, collection: "exams", completable: true });
+      items.push({ title: item.title, date: item.date, time: item.time || "23:58", displayTime: item.time, detail: item.course, kind: "Exam", color: item.color || "#6D9FD0", meta: `${dateLabel(item.date, today)} ${item.course || "Exam"}`.trim(), id: item.id, collection: "exams", completable: true });
     });
   }
 
   if (["all", "today", "events", "reminders", "tasks"].includes(view)) reminders.forEach((item) => {
     if (!preferences.reminders || item.status === "done" || item.date < today || item.date > lastDate || (view === "today" && item.date !== today)) return;
-    items.push({ title: item.title, date: item.date, time: item.time || "23:57", color: item.color || "#9ABBD6", meta: `${dateLabel(item.date, today)} Reminder${item.time ? ` - ${formatTime(item.time)}` : ""}`, id: item.id, collection: "reminders", completable: true });
+    items.push({ title: item.title, date: item.date, time: item.time || "23:57", displayTime: item.time, detail: item.course, kind: "Reminder", color: item.color || "#9ABBD6", meta: `${dateLabel(item.date, today)} Reminder${item.time ? ` - ${formatTime(item.time)}` : ""}`, id: item.id, collection: "reminders", completable: true });
   });
 
   return items.filter(item => view !== "all" || !item.time || new Date(`${item.date}T${item.end || item.time}`) >= new Date()).sort((a, b) => (a.sortKey || `${a.date} ${a.time}`).localeCompare(b.sortKey || `${b.date} ${b.time}`));

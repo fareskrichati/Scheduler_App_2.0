@@ -1,4 +1,28 @@
-// Study data remains local, scoped to the signed-in account and selected class.
+// Study plans share the authenticated planner's cloud document.
+function studyPlanKey(course, assessmentId = '') {
+ return encodeURIComponent(course) + (assessmentId ? ':assessment:' + encodeURIComponent(assessmentId) : '');
+}
+function importLocalStudyPlans(context) {
+ if (!context.userId) return;
+ const prefix = 'uniplan-study:' + context.userId + ':';
+ const plans = {...state.data.studyPlans};
+ let changed = false;
+ try {
+  for (let i = 0; i < localStorage.length; i++) {
+   const key = localStorage.key(i);
+   if (!key?.startsWith(prefix)) continue;
+   let plan;
+   try { plan = JSON.parse(localStorage.getItem(key)); } catch { continue; }
+   if (!plan || !context.courses.includes(plan.course) || typeof plan.notes !== 'string' || !Array.isArray(plan.sessions)) continue;
+   const id = typeof plan.assessmentId === 'string' ? plan.assessmentId : '';
+   const planKey = studyPlanKey(plan.course, id);
+   if (key !== prefix + planKey || Object.hasOwn(plans, planKey)) continue;
+   plans[planKey] = {...plan, assessmentId:id};
+   changed = true;
+  }
+ } catch { /* Browser storage may be disabled. */ }
+ if (changed) { state.data.studyPlans = plans; saveData(); }
+}
 window.getUniPlanStudyContext=()=>{
  const exams=state.data?.exams||[];
  const quizzes=(state.data?.homework||[]).filter(item=>/\bquiz\b/i.test(item.title||''));
@@ -22,7 +46,7 @@ function renderV2Study(){
  const {studySessions,...identityContext}=context;
  const identity=JSON.stringify(identityContext);
  if(frame.dataset.studyOwner!==identity){frame.dataset.studyOwner=identity;frame.src='study/index.html';}
- else frame.contentWindow?.postMessage({type:'uniplan-study-sessions',sessions:studySessions},location.protocol==='file:'?'*':location.origin);
+ else frame.contentWindow?.postMessage({type:'uniplan-study-sessions',sessions:studySessions,plans:state.data.studyPlans||{}},location.protocol==='file:'?'*':location.origin);
 }
 window.addEventListener('message',event=>{
  const frame=document.querySelector('#study-workspace');
@@ -30,7 +54,21 @@ window.addEventListener('message',event=>{
  if(!trustedOrigin||event.source!==frame?.contentWindow)return;
  if(event.data?.type==='uniplan-study-context-request'){
   if(!authState.isAuthenticated||!authState.userId)return;
-  frame.contentWindow.postMessage({type:'uniplan-study-context',context:window.getUniPlanStudyContext()},location.protocol==='file:'?'*':location.origin);
+  const context=window.getUniPlanStudyContext();
+  importLocalStudyPlans(context);
+  frame.contentWindow.postMessage({type:'uniplan-study-context',context:{...context,plans:state.data.studyPlans||{}}},location.protocol==='file:'?'*':location.origin);
+  return;
+ }
+ if(event.data?.type==='uniplan-study-save'){
+  if(!authState.isAuthenticated||!authState.userId||authState.userId!==event.data.userId)return;
+  const plan=event.data.plan;
+  if(!plan||typeof plan.course!=='string'||typeof plan.assessmentId!=='string'||typeof plan.notes!=='string'||!Array.isArray(plan.sessions))return;
+  const context=window.getUniPlanStudyContext();
+  if(!context.courses.includes(plan.course)||(plan.assessmentId&&!context.assessments.some(item=>item.id===plan.assessmentId&&item.course===plan.course)))return;
+  const key=studyPlanKey(plan.course,plan.assessmentId);
+  if(JSON.stringify(state.data.studyPlans?.[key])===JSON.stringify(plan))return;
+  state.data.studyPlans={...state.data.studyPlans,[key]:plan};
+  saveData();
   return;
  }
  if(event.data?.type==='uniplan-study-schedule'){

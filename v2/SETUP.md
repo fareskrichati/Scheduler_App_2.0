@@ -22,7 +22,7 @@ The background worker adds new items only. Planner updates use optimistic concur
 
 ## Study workspace and Tesla destinations
 
-Study is in the desktop sidebar and mobile More menu. Its embedded workspace uses the current account's class names and saves notes, exam focus, homework questions, responses, and progress in browser localStorage, scoped by account and class name. These materials do not sync to the planner database. Renaming a class creates a new study space; the prior class-name key remains in browser storage. The standalone study-mockup folder remains separate.
+Study is in the desktop sidebar and mobile More menu. Plans, topics, sessions, and progress notes sync with your signed-in planner account. Open Study once on the device that has a browser-only plan to import it; a plan already synced for that class and assessment is kept. The standalone study-mockup folder remains separate.
 
 Study imports `.pdf`/`.txt`/`.md` files up to 20 MB each, or pasted text. PDF.js 6.4.299 is bundled locally with worker, CMaps, and standard font data. Text PDFs are extracted in the browser (up to 150 pages / 600,000 characters); scanned PDFs without a text layer require OCR first. Numbered homework questions become a selectable bank; optional `Answer:` lines become a review key. Sets shuffle source questions; they do not generate new AI variations or auto-grade. Plans use local topic and keyword rules. Word and photo/OCR extraction is not included.
 

@@ -28,7 +28,8 @@ test('invalid dates, windows and durations do not schedule',()=>{
 function bridge(){
  let handler;const messages=[];const frame={contentWindow:{postMessage:value=>messages.push(value)}};
  const state={data:{schedule:[{id:'class',type:'class',date:request.date,start:'11:00',end:'12:00'}],exams:[]}};
- const ctx={state,location:{origin:'https://planner.test',protocol:'https:'},window:{addEventListener:(type,fn)=>handler=fn},document:{querySelector:()=>frame},authState:{isAuthenticated:true,userId:'one'},getImportableClasses:()=>[{title:'Physics'}],colorForSelectedClass:()=> '#123456',crypto:require('node:crypto').webcrypto,persistAndRender(){}};
+ class FixedDate extends Date { constructor(...args){ super(...(args.length?args:[now.getTime()])); } }
+ const ctx={state,Date:FixedDate,location:{origin:'https://planner.test',protocol:'https:'},window:{addEventListener:(type,fn)=>handler=fn},document:{querySelector:()=>frame},authState:{isAuthenticated:true,userId:'one'},getImportableClasses:()=>[{title:'Physics'}],colorForSelectedClass:()=> '#123456',crypto:require('node:crypto').webcrypto,persistAndRender(){}};
  vm.createContext(ctx);vm.runInContext(fs.readFileSync('v2/js/study-scheduler.js','utf8'),ctx);vm.runInContext(fs.readFileSync('v2/js/study-integration.js','utf8'),ctx);
  return{state,ctx,messages,send:(changes={})=>handler({origin:'https://planner.test',source:frame.contentWindow,data:{type:'uniplan-study-schedule',requestId:'r',userId:'one',request:{...request,course:'Physics',title:'Review',sessionId:'session-1'},...changes}})};
 }
@@ -75,4 +76,29 @@ test('Study completion from the frame changes the shared calendar record',()=>{
  assert.equal(f.ctx.window.getUniPlanStudyContext().studySessions[0].status,'done');
  f.send({request:{action:'complete',course:'Physics',eventId,done:false}});
  assert.equal(f.state.data.schedule.find(item=>item.id===eventId).status,'pending');
+});
+
+test('Study imports existing plans for the signed-in account without replacing cloud plans',()=>{
+ const f=bridge();
+ const plan={course:'Physics',assessmentId:'',notes:'Existing notes',sessions:[]};
+ const entries=new Map([['uniplan-study:one:Physics',JSON.stringify(plan)],['uniplan-study:two:Physics',JSON.stringify({...plan,notes:'Other account'})]]);
+ f.ctx.localStorage={length:entries.size,key:i=>[...entries.keys()][i],getItem:key=>entries.get(key)};
+ let saves=0;f.ctx.saveData=()=>saves++;
+ f.send({type:'uniplan-study-context-request'});
+ assert.equal(f.messages[0].context.plans.Physics.notes,'Existing notes');
+ f.state.data.studyPlans.Physics={...plan,notes:'Cloud edit'};
+ f.send({type:'uniplan-study-context-request'});
+ assert.equal(f.messages[1].context.plans.Physics.notes,'Cloud edit');
+ assert.equal(saves,1);
+});
+test('Study sends only authenticated edits to planner sync and a fresh frame sees them',()=>{
+ const f=bridge();let saves=0;f.ctx.saveData=()=>saves++;
+ const plan={course:'Physics',assessmentId:'',notes:'Notes from laptop',sessions:[]};
+ f.send({type:'uniplan-study-save',userId:'two',plan});
+ f.send({type:'uniplan-study-save',plan:{...plan,course:'Other class'}});
+ assert.equal(saves,0);
+ f.send({type:'uniplan-study-save',plan});
+ assert.equal(saves,1);
+ f.send({type:'uniplan-study-context-request'});
+ assert.equal(f.messages[0].context.plans.Physics.notes,'Notes from laptop');
 });

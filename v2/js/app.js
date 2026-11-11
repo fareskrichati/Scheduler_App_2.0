@@ -1936,6 +1936,12 @@ async function applySupabaseUser(user) {
     const shortcut = user.user_metadata?.canvasShortcut;
     if (shortcut) state.data.settings.canvasShortcut = { school: typeof shortcut.school === "string" ? shortcut.school : "", url: normalizeCanvasShortcutUrl(shortcut.url) };
   }
+  try {
+    const pending = JSON.parse(localStorage.getItem('uniplan-study-pending:' + user.id));
+    if (pending?.plans && pending?.base) {
+      state.data.studyPlans = UniPlanMerge.merge(pending.base, pending.plans, state.data.studyPlans || {});
+    }
+  } catch { /* Ignore invalid local study drafts. */ }
   const pendingCanvas = localStorage.getItem(`uniplan-canvas-setup:${user.id}`);
   if (pendingCanvas) {
     try {
@@ -1945,6 +1951,7 @@ async function applySupabaseUser(user) {
     } catch { /* Ignore invalid pending setup data. */ }
   }
   if (!cloudData || pendingCanvas) await saveDataToSupabase();
+  else if (hasPendingStudySync()) scheduleCloudSave();
 
   syncSettingsFromAuthProfile();
   saveDataLocally();
@@ -1959,7 +1966,7 @@ function subscribeToPlannerChanges() {
   realtimeChannel = supabaseClient
     .channel(`planner-${authState.userId}`)
     .on("postgres_changes", { event: "UPDATE", schema: "public", table: SUPABASE_TABLE, filter: `user_id=eq.${authState.userId}` }, (payload) => {
-      if (cloudSaveTimer || v2SavePromise || Date.now() - lastLocalSaveAt < 1500 || !payload.new?.data) return;
+      if (cloudSaveTimer || v2SavePromise || hasPendingStudySync() || Date.now() - lastLocalSaveAt < 1500 || !payload.new?.data) return;
       v2CloudBaseline = structuredClone(payload.new.data);
       state.data = normalizePlannerData(payload.new.data);
       saveDataLocally();
@@ -1969,12 +1976,14 @@ function subscribeToPlannerChanges() {
     .subscribe();
 }
 
-async function loadDataFromSupabase(userId) {
+async function loadDataFromSupabase(userId, accept = () => true) {
   const { data, error } = await supabaseClient
     .from(SUPABASE_TABLE)
     .select("profile,data")
     .eq("user_id", userId)
     .maybeSingle();
+
+  if (!accept()) return null;
 
   if (error) {
     console.error("Failed to load Supabase planner data", error);
@@ -1985,6 +1994,7 @@ async function loadDataFromSupabase(userId) {
   }
 
   if (!data?.data) {
+    v2CloudBaseline = null;
     return null;
   }
 
@@ -2030,6 +2040,10 @@ async function saveDataToSupabase() {
   finally {v2SavePromise=null;}
 }
 
+function hasPendingStudySync() {
+  return JSON.stringify(state.data?.studyPlans || {}) !== JSON.stringify(v2CloudBaseline?.studyPlans || {});
+}
+
 async function syncNow() {
   if (syncInProgress) {
     return;
@@ -2046,7 +2060,7 @@ async function syncNow() {
   }
 
   syncInProgress = true;
-  const hadPendingLocalChanges = Boolean(cloudSaveTimer);
+  const hadPendingLocalChanges = Boolean(cloudSaveTimer || v2SavePromise || hasPendingStudySync());
   if (cloudSaveTimer) {
     window.clearTimeout(cloudSaveTimer);
     cloudSaveTimer = null;
@@ -2054,7 +2068,11 @@ async function syncNow() {
   setSyncButtonsDisabled(true);
   elements.settingsStatus.textContent = "Syncing...";
   if (hadPendingLocalChanges) await saveDataToSupabase();
-  const cloudData = await loadDataFromSupabase(authState.userId);
+  const userId = authState.userId;
+  const baseline = v2CloudBaseline;
+  const cloudData = await loadDataFromSupabase(userId, () =>
+    authState.userId === userId && v2CloudBaseline === baseline &&
+    !cloudSaveTimer && !v2SavePromise && !hasPendingStudySync());
   if (cloudData) {
     state.data = cloudData;
     syncSettingsFromAuthProfile();
@@ -2109,7 +2127,11 @@ async function refreshCloudData() {
     return;
   }
 
-  const cloudData = await loadDataFromSupabase(authState.userId);
+  const userId = authState.userId;
+  const baseline = v2CloudBaseline;
+  const cloudData = await loadDataFromSupabase(userId, () =>
+    authState.userId === userId && v2CloudBaseline === baseline &&
+    !cloudSaveTimer && !v2SavePromise && !hasPendingStudySync());
   if (!cloudData) {
     return;
   }
@@ -4627,6 +4649,12 @@ function scheduleCloudSave() {
 
 function saveDataLocally() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
+  if (authState.userId && hasPendingStudySync()) {
+    const key = 'uniplan-study-pending:' + authState.userId;
+    localStorage.setItem(key, JSON.stringify({base:v2CloudBaseline?.studyPlans || {}, plans:state.data.studyPlans || {}}));
+  } else if (authState.userId) {
+    localStorage.removeItem('uniplan-study-pending:' + authState.userId);
+  }
 }
 
 function loadData() {

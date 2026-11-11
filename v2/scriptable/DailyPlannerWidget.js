@@ -347,7 +347,7 @@ function readSession() {
 
 function buildPlannerWidget(data, view, cached, preferences = getWidgetPreferences(data)) {
   const widget = new ListWidget();
-  widget.setPadding(8, 8, 8, 8);
+  widget.setPadding(10, 12, 10, 12);
   const appearance = widgetAppearance(data.settings || {}, Device.isUsingDarkAppearance());
   const gradient = new LinearGradient();
   gradient.colors = [new Color(appearance.bg), new Color(appearance.end)];
@@ -363,16 +363,14 @@ function buildPlannerWidget(data, view, cached, preferences = getWidgetPreferenc
   title.textColor = new Color(appearance.deep);
   header.addSpacer();
   const pet = header.addText(({cat:"🐱",dog:"🐶",fox:"🦊",robot:"🤖"})[data.settings?.pet?.species] || "🐱");
-  pet.font = Font.systemFont(22);
+  pet.font = Font.systemFont(18);
   pet.url = `${URLScheme.forRunningScript()}?action=open-pet`;
   header.addSpacer(5);
   const date = header.addText(shortDate(new Date()));
   date.font = Font.mediumSystemFont(9);
   date.textColor = new Color(appearance.muted);
   const items = getWidgetItems(data, view, preferences).sort((a,b) => Number(widgetCountdown(b).startsWith('Ends in')) - Number(widgetCountdown(a).startsWith('Ends in')));
-  const columns = 1;
-  const rows = config.widgetFamily === "large" ? 6 : config.widgetFamily === "medium" ? 4 : 2;
-  const familyLimit = columns * rows;
+  const familyLimit = config.widgetFamily === "large" ? 6 : config.widgetFamily === "medium" ? 4 : 2;
   const limit = preferences.itemLimit === "auto" ? familyLimit : Math.min(preferences.itemLimit, familyLimit);
   widget.addSpacer(4);
 
@@ -382,12 +380,25 @@ function buildPlannerWidget(data, view, cached, preferences = getWidgetPreferenc
     empty.textColor = new Color(appearance.muted);
   } else {
     const content = widget.addStack();
-    content.spacing = 0;
     content.layoutVertically();
-    items.slice(0,limit).forEach((item,index) => {
-      if(index) content.addSpacer(2);
-      addItemRow(content,item,appearance,index === 0);
-    });
+    content.spacing = 3;
+    addItemRow(content, items[0], appearance, true);
+    const remaining = items.slice(1, limit);
+    if (config.widgetFamily === "medium") {
+      for (let i = 0; i < remaining.length; i += 2) {
+        const pair = content.addStack();
+        pair.spacing = 8;
+        const width = typeof Device.screenSize === "function" ? Math.min(Device.screenSize().width, Device.screenSize().height) : 390;
+        const slot = Math.floor((width * .83 - 32) / 2);
+        remaining.slice(i, i + 2).forEach(item => {
+          const cell = pair.addStack();
+          cell.size = new Size(slot, 0);
+          addItemRow(cell, item, appearance);
+        });
+      }
+    } else {
+      remaining.forEach(item => addItemRow(content, item, appearance));
+    }
   }
 
   widget.addSpacer();
@@ -415,8 +426,7 @@ function addItemRow(widget, item, appearance, featured = false) {
   const row = widget.addStack();
   row.centerAlignContent();
   row.spacing = 4;
-  row.setPadding(1, 0, 1, 0);
-  row.size = new Size(0, featured ? 42 : 23);
+  row.setPadding(0, 0, 0, 0);
   row.cornerRadius = 12;
   if (item.nested) row.addSpacer(5);
   if (item.completable) {
@@ -437,9 +447,11 @@ function addItemRow(widget, item, appearance, featured = false) {
   timing.textColor = new Color(appearance.deep);
   timing.lineLimit = 1;
   const name = text.addText(item.title);
-  name.font = Font.semiboldSystemFont(featured ? 18 : 10);
+  name.font = Font.semiboldSystemFont(featured ? 15 : 10);
   name.textColor = new Color(appearance.ink);
-  name.lineLimit = featured ? 2 : 1;
+  name.lineLimit = 1;
+  name.minimumScaleFactor = 0.75;
+  if (!featured) return;
   const meta = text.addText(item.meta);
   meta.font = Font.mediumSystemFont(8);
   meta.textColor = new Color(appearance.muted);

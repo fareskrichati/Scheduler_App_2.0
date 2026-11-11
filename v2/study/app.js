@@ -49,7 +49,9 @@ const later=new Date(today);later.setDate(later.getDate()+7);
 const escapeHTML=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const assessments=(context.assessments||[]).filter(item=>item.date>=dateValue(today)).sort((a,b)=>a.date.localeCompare(b.date));
 const assessmentsFor=course=>assessments.filter(item=>item.course===course);
-const keyFor=(course,id='')=>accountKey+':'+encodeURIComponent(course)+(id?':assessment:'+encodeURIComponent(id):'');
+const planKey=(course,id='')=>encodeURIComponent(course)+(id?':assessment:'+encodeURIComponent(id):'');
+const keyFor=(course,id='')=>accountKey+':'+planKey(course,id);
+let plans={...context.plans};
 function emptyState(course){return{course,goal:'',examFocus:'',exam:dateValue(later),minutes:'30',preference:'midday',afterTime:'17:00',beforeTime:'23:59',notes:'',sources:[],sessions:[],generated:false};}
 function syncCalendarSession(session){
  const calendar=(context.studySessions||[]).find(item=>item.id===session.eventId);
@@ -57,7 +59,7 @@ function syncCalendarSession(session){
 }
 function loadClass(course,id=''){
  const base={...emptyState(course),assessmentId:id};
- try{const saved=JSON.parse(localStorage.getItem(keyFor(course,id)));if(saved&&saved.course===course&&typeof saved.notes==='string'){
+ try{const saved=structuredClone(plans[planKey(course,id)]);if(saved&&saved.course===course&&typeof saved.notes==='string'){
   return {...base,...saved,sources:Array.isArray(saved.sources)?saved.sources:[],sessions:Array.isArray(saved.sessions)?saved.sessions.filter(s=>s&&typeof s.id==='string'&&typeof s.title==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s.date)&&Number(s.minutes)>0).map(syncCalendarSession):[]};
  }}catch{}
  return base;
@@ -74,8 +76,13 @@ let state=loadClass(initialCourse,launchAssessment?.id||preferredAssessment(init
 window.addEventListener('message',event=>{
  const trustedOrigin=location.protocol==='file:'?event.origin==='null':event.origin===location.origin;
  if(!trustedOrigin||event.source!==window.parent||event.data?.type!=='uniplan-study-sessions'||!Array.isArray(event.data.sessions))return;
- context.studySessions=event.data.sessions;
- state.sessions=state.sessions.map(syncCalendarSession);save();render();
+  context.studySessions=event.data.sessions;
+ const key=planKey(state.course,state.assessmentId);
+ const changed=event.data.plans && JSON.stringify(plans[key])!==JSON.stringify(event.data.plans[key]);
+ if(event.data.plans)plans={...event.data.plans};
+ if(changed&&!scheduling){state=loadClass(state.course,state.assessmentId);syncAssessment();hydrate();}
+ else state.sessions=state.sessions.map(syncCalendarSession);
+ if(!scheduling)render();
 });
 function selectedAssessment(){return assessmentsFor(state.course).find(item=>item.id===state.assessmentId);}
 function syncAssessment(){
@@ -85,11 +92,15 @@ function syncAssessment(){
 }
 function selectAssessment(id){
  if(scheduling)return;
- editingScheduledSession=null;save();state=loadClass(state.course,id);syncAssessment();
+ editingScheduledSession=null;state=loadClass(state.course,id);syncAssessment();
  try{localStorage.setItem(keyFor(state.course)+':assessment',id);}catch{}
  hydrate();render();
 }
-function save(){try{localStorage.setItem(keyFor(state.course,state.assessmentId),JSON.stringify(state));}catch{$('status').textContent='Browser storage is unavailable. Keep this page open to retain your work.';}}
+function save(){
+ const plan=structuredClone(state);
+ plans[planKey(plan.course,plan.assessmentId)]=plan;
+ window.parent.postMessage({type:'uniplan-study-save',userId:context.userId,plan},studyTargetOrigin);
+}
 function buildSessions(plan,start){
  const target=new Date(plan.exam+'T00:00:00');
  // Count calendar days rather than 24-hour periods across daylight-saving changes.
@@ -181,7 +192,7 @@ function render(){
 }
 function openClass(course){
  if(scheduling)return;
- editingScheduledSession=null;save();state=loadClass(course,preferredAssessment(course));syncAssessment();try{localStorage.setItem(accountKey+':selected',course);}catch{}
+ editingScheduledSession=null;state=loadClass(course,preferredAssessment(course));syncAssessment();try{localStorage.setItem(accountKey+':selected',course);}catch{}
  hydrate();render();$('status').textContent='Opened your plan for '+course+'.';
 }
 $('course').replaceChildren(...classes.map(title=>{const option=document.createElement('option');option.value=title;option.textContent=title;return option;}));

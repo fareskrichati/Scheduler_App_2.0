@@ -22,8 +22,8 @@ No OpenAI or Anthropic API key is required for this connector. Existing hosting/
 
 ## Connect an AI app
 
-- **ChatGPT:** Open Plugins → Add custom MCP server, enter the UniPlan `/mcp` URL, and choose OAuth if prompted. Your account/workspace must allow custom MCP servers. Follow the [official setup guide](https://developers.openai.com/api/docs/guides/custom-mcp-server).
-- **Claude:** Open Settings → Connectors → Add custom connector and enter the same URL. Use automatic/dynamic OAuth client registration if asked to choose an OAuth client; this server advertises a registration endpoint. Follow the [official connector guide](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).
+- **ChatGPT:** Open Plugins and select **+ → Add custom MCP server** if your account shows that option. Name it UniPlan, paste the `/mcp` URL, use OAuth, and select **Create as a plugin**. The Plugins directory is available on Free. Creating a plugin from an external MCP URL depends on your account and workspace permissions. [OpenAI plugin setup](https://developers.openai.com/plugins/quickstart) · [Custom MCP availability](https://help.openai.com/en/articles/12584461-connecting-custom-mcp-servers-in-chatgpt)
+- **Claude:** Open **Customize → Connectors → Add custom connector** and enter the same URL. If asked how to register the OAuth client, choose **Register automatically**. Claude Free supports one custom connector. [Claude connector guide](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp)
 - Sign in on the UniPlan consent page, review the app name and return destination, and approve the connection. Uncheck permission to change the planner for a read-only connection.
 - To disconnect, use UniPlan Settings → **Disconnect**. Revocation immediately invalidates that connection's access and refresh tokens.
 

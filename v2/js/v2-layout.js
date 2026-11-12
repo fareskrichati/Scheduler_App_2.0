@@ -25,6 +25,15 @@
   const main=document.createElement('div');main.className='v2-main';const header=document.createElement('header');header.className='v2-topline';header.innerHTML='<div class="v2-breadcrumb">My planner <span>/</span> <b id="v2-current-section">Today</b></div><a class="v2-mobile-brand v2-brand" href="index.html"><span class="brand-mark">U</span>UniPlan <small>3.5.5</small></a><div class="v2-actions"></div>';
   const add=document.querySelector('#quick-add');add.innerHTML='<span aria-hidden="true">+</span> Add new';header.querySelector('.v2-actions').append(document.querySelector('#open-canvas'),document.querySelector('#open-settings'),add);
   const customize=document.createElement('button');customize.type='button';customize.id='open-customize';customize.className='icon-button';customize.setAttribute('aria-label','Customize app');customize.title='Customize app';customize.innerHTML=icon('customize');header.querySelector('.v2-actions').append(customize);
+  const chatgpt = document.createElement('a');
+  chatgpt.id = 'open-chatgpt';
+  chatgpt.href = 'https://chatgpt.com/';
+  chatgpt.target = '_blank';
+  chatgpt.rel = 'noopener noreferrer';
+  chatgpt.title = 'Open ChatGPT';
+  chatgpt.setAttribute('aria-label', 'Open ChatGPT in a new tab');
+  chatgpt.innerHTML = '<img src="assets/chatgpt-logo.png" alt="" width="22" height="22">';
+  header.querySelector('#open-canvas').after(chatgpt);
   add.innerHTML='<span aria-hidden="true">+</span>';add.title='Add new';
   const heading=document.createElement('div');heading.className='v2-heading';heading.innerHTML='<h1 id="v2-date"></h1><p id="v2-section-description">Your classes, plans, and deadlines. One place.</p><p id="v2-sync-status" role="status"></p>';
   legacyHeader.hidden=true;main.append(header,heading,dashboard);shell.prepend(sidebar);shell.append(main);
@@ -34,6 +43,18 @@
   const fullDay = today.querySelector('#v2-day-list').closest('.panel-card');
   fullDay.classList.add('v2-full-day');
   today.querySelector('.v2-today-columns').after(fullDay);
+  fullDay.insertAdjacentHTML('afterend', `
+    <article class="panel-card connector-promo" id="connector-promo" hidden>
+      <div>
+        <h3>Ask AI about your schedule</h3>
+        <p>Connect ChatGPT or Claude to ask “What’s due this week?” or add an assignment from a chat.</p>
+      </div>
+      <div class="connector-promo-actions">
+        <button type="button" class="primary-button" data-connector-setup>Connect your planner</button>
+        <button type="button" class="ghost-button" data-connector-dismiss>Dismiss</button>
+      </div>
+    </article>
+  `);
   today.querySelector('#v2-attention').closest('.panel-card').classList.add('v2-attention-card');
   panels.prepend(today);
   const more=document.createElement('section');more.className='tab-panel';more.id='panel-more';more.dataset.panel='more';more.setAttribute('role','tabpanel');more.setAttribute('aria-label','More planner tools');more.innerHTML='<div class="v2-more-grid">'+['study','homework','exams','events','reminders','settings'].map(k=>`<button type="button" data-v2-page="${k}">${icon(k)}<strong>${labels[k]}</strong></button>`).join('')+'</div>';panels.append(more);

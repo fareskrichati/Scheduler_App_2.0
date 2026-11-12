@@ -6,3 +6,39 @@
 .connector-settings .connector-app-links a{display:inline-flex;align-items:center;justify-content:center;flex:1 1 140px;margin:0;min-height:44px;box-sizing:border-box;white-space:nowrap;word-break:normal;overflow-wrap:normal;text-decoration:none}
 .connector-settings button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;max-width:100%;box-sizing:border-box;white-space:normal;word-break:normal;overflow-wrap:normal}
 @media(max-width:760px){.connector-settings{padding:12px;margin:12px 0}.connector-settings>button{width:100%;margin:8px 0}.connector-settings ol{padding-left:20px}.connector-settings .connector-app-links{flex-direction:column}.connector-settings .connector-app-links a{flex:auto;width:100%}}
+
+#open-chatgpt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface-strong);
+}
+#open-chatgpt:hover { background: var(--accent-soft); }
+#open-chatgpt img {
+  display: block;
+  border-radius: 4px;
+}
+#panel-today > .connector-promo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  margin-top: 18px;
+  background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface-strong));
+}
+.connector-promo h3 { margin: 0 0 4px; }
+.connector-promo p { margin: 0; color: var(--muted); }
+.connector-promo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+@media (max-width: 760px), (max-width: 1366px) and (any-pointer: coarse) {
+  #open-chatgpt { width: 38px; height: 38px; border-radius: 11px; }
+}

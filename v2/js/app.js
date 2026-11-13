@@ -2222,6 +2222,14 @@ function render() {
   prefillForms();
 }
 
+function getTodoOverdueLabel(item, today) {
+  // UTC midnights keep the local calendar-day count stable across daylight saving changes.
+  const days = (Date.parse(today) - Date.parse(item.date)) / 86400000;
+  return item.status !== "done" && days > 0
+    ? `${days} ${days === 1 ? "day" : "days"} overdue`
+    : "";
+}
+
 function getTodoItems() {
   return [
     ...state.data.schedule.filter(item=>item.studySessionId).map(item=>({...item,time:item.start,color:getStoredItemColor("schedule",item),kind:"study",label:item.course?"Study · "+item.course:"Study"})),
@@ -2233,6 +2241,7 @@ function getTodoItems() {
 
 function renderTodoList() {
   const allItems = getTodoItems();
+  const today = todayString();
   const courses = [...new Set(allItems.map((item) => item.course).filter(Boolean))].sort();
   const selectedCourse = courses.includes(todoClassFilter) ? todoClassFilter : "all";
   todoClassFilter = selectedCourse;
@@ -2256,12 +2265,14 @@ function renderTodoList() {
     elements.todoList.innerHTML = '<div class="empty-state">Nothing upcoming. You’re all caught up.</div>';
   }
   items.forEach((item) => {
+    const overdueLabel = getTodoOverdueLabel(item, today);
+    const overdueWarning = overdueLabel ? `<span class="todo-overdue">${overdueLabel}</span>` : "";
     const row = document.createElement("article");
     row.className = `todo-item${item.status === "done" ? " is-complete" : ""}`;
     row.dataset.plannerSourceId = item.id;
     row.dataset.plannerKind = item.kind;
     applyItemColor(row, item.color);
-    row.innerHTML = `<button class="todo-check" type="button" aria-label="${item.status === "done" ? "Mark pending" : "Mark done"}">${item.status === "done" ? "✓" : ""}</button><div class="todo-copy"><div class="todo-title-line"><strong>${escapeHtml(item.title)}</strong>${item.priority ? '<span class="priority-label">Priority</span>' : ""}</div><span>${escapeHtml(item.label)} · ${formatShortDate(item.date)}${item.time ? ` · ${formatTime(item.time)}` : ""}</span></div>`;
+    row.innerHTML = `<button class="todo-check" type="button" aria-label="${item.status === "done" ? "Mark pending" : "Mark done"}">${item.status === "done" ? "✓" : ""}</button><div class="todo-copy"><div class="todo-title-line"><strong>${escapeHtml(item.title)}</strong>${item.priority ? '<span class="priority-label">Priority</span>' : ""}${overdueWarning}</div><span>${escapeHtml(item.label)} · ${formatShortDate(item.date)}${item.time ? ` · ${formatTime(item.time)}` : ""}</span></div>`;
     row.querySelector(".todo-check").addEventListener("click", () => {
       if (item.kind === "homework") toggleHomeworkStatus(item.id);
       else if (item.kind === "exam") toggleExamStatus(item.id);

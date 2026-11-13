@@ -19,7 +19,18 @@ function setupV2() {
   document.querySelector('#v2-save-import-mode').addEventListener('click',saveV2CanvasPreference);
   document.querySelector('#v2-import-now').addEventListener('click',runV2CanvasNow);
   document.querySelectorAll('[name="v2-canvas-mode"]').forEach(r=>r.addEventListener('change',()=>{document.querySelector('#v2-canvas-status').textContent='Choose Save import preference to apply this change.'}));
-  setInterval(()=>{const old=document.querySelector('#v2-date').textContent;renderV2Date();if(old!==document.querySelector('#v2-date').textContent){v2TodayDate=todayString();renderV2Today()}renderV2Today();renderV2Sync()},30000);
+  let currentDate = v2TodayDate;
+  setInterval(() => {
+    const today = todayString();
+    renderV2Date();
+    if (today !== currentDate) {
+      currentDate = today;
+      v2TodayDate = today;
+      renderTodoList();
+    }
+    renderV2Today();
+    renderV2Sync();
+  }, 30000);
   matchMedia("(max-width: 760px), (max-width: 1366px) and (any-pointer: coarse)").addEventListener("change",()=>renderCalendar());
   renderV2Date();
 }

@@ -29,6 +29,30 @@ test('ambiguous edit requires choosing an item and retains saved data',()=>{cons
 test('logout and account switch clear conversations and stale actions',()=>{const f=fixture();f.pet.answer('What do I have today?');f.ctx.authState.isAuthenticated=false;f.pet.refresh();assert.equal(f.messages(),'');f.ctx.authState.isAuthenticated=true;f.ctx.authState.userId='two';f.pet.refresh();assert.doesNotMatch(f.messages(),/Nothing is scheduled/)});
 test('assistant code contains no network or AI API entrypoints',()=>{assert.doesNotMatch(source,/\bfetch\s*\(|XMLHttpRequest|api\.openai|WebSocket\s*\(/)});
 const appSource=fs.readFileSync('v2/js/app.js','utf8');
+test('overdue questions show pending To-Do cards oldest first with calendar days late', () => {
+ const f = fixture();
+ vm.runInContext(appSource.slice(appSource.indexOf('function getTodoOverdueLabel('), appSource.indexOf('function getTodoItems(')), f.ctx);
+ f.pet.answer("What's overdue?");
+ assert.match(f.messages(), /You have no overdue to-dos/);
+ f.state.data.homework.push({ date: f.offset(f.today, -1), title: 'Reading' });
+ f.state.data.exams.push({ date: f.offset(f.today, -3), title: 'Quiz' });
+ f.state.data.reminders.push({ date: f.today, title: 'Due today' }, { date: f.offset(f.today, -4), title: 'Finished', status: 'done' });
+ f.ctx.getTodoItems = () => [
+   ...f.state.data.homework.map(item => ({ ...item, kind: 'homework' })),
+   ...f.state.data.exams.map(item => ({ ...item, kind: 'exam' })),
+   ...f.state.data.reminders.map(item => ({ ...item, kind: 'reminder' })),
+   { date: f.offset(f.today, -2), title: 'Study session', kind: 'study' },
+ ];
+ f.pet.answer("What's overdue?");
+ const cards = f.nodes.filter(node => node.className === 'pet-agenda-item');
+ assert.deepEqual(cards.map(card => card.attributes['aria-label']), [
+   'Quiz, 3 days overdue — open in To-Do',
+   'Study session, 2 days overdue — open in To-Do',
+   'Reading, 1 day overdue — open in To-Do',
+ ]);
+ cards[1].events.click();
+ assert.ok(f.calls.includes('todo'));
+});
 for(const session of [null,{}])test(`active app signup preserves pet metadata with ${session?'immediate session':'email confirmation'}`,async()=>{
  let request;const saved=new Map();const pet={species:'robot',hidden:false,tourOffered:false};
  const ctx={window:{UniPlanPet:{signupChoice:()=>pet,refresh(){}}},elements:{setupStatus:{},loginForm:{},profileSetupForm:{},loginStatus:{}},supabaseClient:{auth:{signUp:async args=>{request=args;return{data:{user:{id:'new-user',email:'test@example.test'},session}}}}},pendingFirstLogin:{email:'test@example.test',password:'fixture-only'},state:{data:{settings:{}}},authState:{},localStorage:{setItem:(k,v)=>saved.set(k,v)},syncSettingsFromAuthProfile(){},saveDataToSupabase:async()=>{},saveLoginSession(){},renderSettings(){},updateAuthView(){}};

@@ -28,15 +28,15 @@
     const row = document.createElement('div'); row.className = user ? 'pet-message pet-user' : 'pet-message';
     const p = document.createElement('p'); p.textContent = text; row.append(p);
     items.forEach(item => {
-      const task = ['homework', 'reminder', 'exam'].includes(item.kind);
+      const task = isTodoItem(item);
       const destination = task ? 'To-Do' : 'month view';
       const link = button('', () => { if (authState.isAuthenticated) navigateItem(item); }, row);
       link.className = 'pet-agenda-item';
-      link.setAttribute('aria-label', `${item.title} — open in ${destination}`);
+      link.setAttribute('aria-label', `${item.title}${item.overdueLabel ? ', ' + item.overdueLabel : ''} — open in ${destination}`);
       const title = document.createElement('strong'); title.textContent = item.title;
       const detail = document.createElement('span');
       const time = item.displayTime || (item.start ? `${formatTime(item.start)}${item.end?' – '+formatTime(item.end):''}` : item.time ? formatTime(item.time) : 'No time set');
-      detail.textContent = `${item.date ? readableDate(item.date) + ' · ' : ''}${time}`;
+      detail.textContent = `${item.overdueLabel ? item.overdueLabel + ' · ' : ''}${item.date ? readableDate(item.date) + ' · ' : ''}${time}`;
       const hint = document.createElement('span'); hint.className = 'pet-agenda-destination'; hint.textContent = `View in ${destination} ↗`;
       link.append(title, detail, hint);
     });
@@ -106,9 +106,11 @@
   }
   function dayItems(date) { return getItemsForDate(date).filter(i => i.status !== 'done' && (i.kind !== 'class' || isActiveClassDate(date))); }
   function readableDate(date) { return new Date(date+'T12:00:00').toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
+  function isTodoItem(item) { return ['homework', 'reminder', 'exam', 'study'].includes(item.kind); }
   function navigateItem(item) {
     show(false);
-    if (['homework','reminder','exam'].includes(item.kind)) {
+    const task = isTodoItem(item);
+    if (task) {
       todoTypeFilter = 'all'; todoClassFilter = 'all';
       setActiveTab('todo'); renderTodoList();
     } else {
@@ -117,7 +119,6 @@
     }
     requestAnimationFrame(() => {
       const id = item.sourceId || item.id;
-      const task = ['homework','reminder','exam'].includes(item.kind);
       const nodes = document.querySelectorAll(`${task?'#panel-todo':'#panel-calendar'} [data-planner-source-id]`);
       const target = [...nodes].find(node => node.dataset.plannerSourceId === id && node.dataset.plannerKind === item.kind)
         || document.querySelector(task?'#todo-list':`[data-calendar-date="${state.selectedDate}"]`);
@@ -288,6 +289,15 @@
         say(items.length?'Choose the item to edit. Review the details and use Save to apply changes.':'I could not find a matching item. Try its title in quotes or choose a different date.',items.slice(0,30).map(i=>({label:`${i.title} · ${i.date}${i.start?' · '+i.start:''}`,run:()=>edit(kind,i.id)})));
         if(items.length>30)say('Showing the first 30 matches. Include a date or a title in quotes to narrow the list.');
       } else {beginAdd(kind,raw);} return;
+    }
+    if (/\b(overdue|past due)\b/.test(text)) {
+      const currentDate = today();
+      const items = getTodoItems()
+        .map(item => ({ ...item, overdueLabel: getTodoOverdueLabel(item, currentDate) }))
+        .filter(item => item.overdueLabel)
+        .sort(compareByDateTime);
+      say(items.length ? 'Overdue to-dos' : 'You have no overdue to-dos.', [], false, items);
+      return;
     }
     if (/\b(free|available|busy)\b/.test(text)) {
       const time=timeFrom(text);

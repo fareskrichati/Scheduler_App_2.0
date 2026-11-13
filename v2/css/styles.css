@@ -520,6 +520,14 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-markers {
 .todo-copy strong { white-space: normal; font-size: 0.92rem; }
 .todo-copy span { color: var(--muted); font-size: 0.74rem; }
 .todo-copy .priority-label { flex: 0 0 auto; padding: 2px 7px; border-radius: 999px; background: #c93434; color: #fff; font-size: 0.64rem; font-weight: 600; line-height: 1.35; }
+.todo-copy .todo-overdue {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #fde8e7;
+  color: #922323;
+  font-weight: 700;
+  line-height: 1.35;
+}
 .todo-item.is-complete { opacity: 0.55; }
 .todo-item.is-complete .todo-check { background: var(--item-color, #7eaed6); }
 .todo-item.is-complete strong { text-decoration: line-through; }

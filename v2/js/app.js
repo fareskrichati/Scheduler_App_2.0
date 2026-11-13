@@ -9,8 +9,8 @@ const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_DELAY_MS = 1000;
 const FOREVER_REPEAT_YEARS = 5;
 const SUPABASE_TABLE = "planner_profiles";
-const WHATS_NEW_VERSION = "3.5.5";
-const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-3.5.5";
+const WHATS_NEW_VERSION = "3.5.6";
+const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-3.5.6";
 const PLANNER_TABS = ["study", "today", "more", "calendar", "todo", "classes", "events", "homework", "exams", "reminders", "settings"];
 
 if (new URLSearchParams(window.location.search).get("scriptable") === "1") {

@@ -39,10 +39,10 @@ The AI can interpret screenshots, email text, or other data available in its own
 
 ## Behavior and access
 
-- Seven tools: planner context, date-range schedule, create item, update one occurrence, set to-do status, delete one occurrence or a series, and import a weekly class schedule.
+- Eight tools: planner context, date-range schedule, create item, update one occurrence, set to-do status, delete one occurrence or a series, update the school calendar, and import a weekly class schedule.
 - All planner access is bound to the UniPlan account that approved OAuth. There is no tool argument for choosing a user ID.
 - Read responses return item fields, course colors, and academic dates. Account credentials, private Canvas feed links and other settings are excluded.
-- Course code matches preserve colors across lecture/discussion sections. Imports respect school breaks and do not replace the existing school term. Update term dates in UniPlan first if importing a new term.
+- Course code matches preserve colors across lecture/discussion sections. Imports respect school breaks and do not replace the existing school term. When the user requests a term change, use the school calendar tool before importing. Calendar updates keep saved class records, and schedule reads show classes within the configured term outside its breaks.
 - Repeated creates/imports skip matching existing items. Status updates are idempotent. Updates affect one occurrence, not an entire series.
 - Writes compare the planner's cloud revision and reject a concurrent change instead of overwriting it. The AI should re-read after a conflict.
 - Authorization codes expire in 5 minutes and are single-use with S256 PKCE. Access tokens last 1 hour; rotating refresh tokens expire after 30 days without refresh. Only hashes of authorization codes and refresh secrets are stored.

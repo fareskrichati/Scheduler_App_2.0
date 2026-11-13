@@ -34,7 +34,7 @@ test('authorization rejects unsafe redirects, tampered clients, bad state, and p
 test('authorization codes are one-use and require the original verifier and redirect',async t=>{const f=fixture(t);const token=await f.connect();assert.equal((await f.request('token',token.exchange)).statusCode,400);const registered=JSON.parse((await f.request('register',{redirect_uris:['https://client.test/callback']})).body);const params={...token.params,client_id:registered.client_id};const approved=await f.request('approve',{request:params,allow_write:true},'POST',true);const code=new URL(JSON.parse(approved.body).redirect_url).searchParams.get('code');assert.equal((await f.request('token',{...token.exchange,client_id:registered.client_id,code,code_verifier:s.random()})).statusCode,400)});
 test('refresh tokens rotate and revoked connections immediately lose access',async t=>{const f=fixture(t);const token=await f.connect();const refresh={client_id:token.client,grant_type:'refresh_token',refresh_token:token.refresh_token};const updated=await f.request('token',refresh);assert.equal(updated.statusCode,200);assert.equal((await f.request('token',refresh)).statusCode,400);const id=f.tables.planner_connector_grants[0].id;assert.equal((await f.request('connections',{id},'POST',true)).statusCode,200);assert.equal((await f.rpc(token.access_token,'tools/list')).statusCode,401);assert.equal((await f.request('token',{...refresh,refresh_token:JSON.parse(updated.body).refresh_token})).statusCode,400)});
 test('MCP rejects missing auth, expired tokens, wrong audience, and hostile origins',async t=>{const f=fixture(t);const token=await f.connect();const missing=await f.rpc(null,'tools/list');assert.equal(missing.statusCode,401);assert.match(missing.headers['WWW-Authenticate'],/oauth-protected-resource/);const grant=f.tables.planner_connector_grants[0];for(const payload of [{exp:1,aud:'https://planner.test/mcp'},{exp:Math.floor(Date.now()/1000)+1000,aud:'https://other.test/mcp'}]){const bad=s.sign('access',{sub:dbUser,gid:grant.id,scope:grant.scopes,...payload});assert.equal((await f.rpc(bad,'tools/list')).statusCode,401)}const hostile=await mcp({httpMethod:'POST',headers:{origin:'https://evil.test',authorization:'Bearer '+token.access_token},body:'{}'});assert.equal(hostile.statusCode,403)});
-test('MCP initializes, lists seven tools, and accepts notifications without a session ID',async t=>{const f=fixture(t);const token=await f.connect();const init=await f.rpc(token.access_token,'initialize',{protocolVersion:'2025-06-18'});assert.equal(init.value.result.protocolVersion,'2025-06-18');assert.equal((await f.rpc(token.access_token,'tools/list')).value.result.tools.length,7);const notified=await mcp({httpMethod:'POST',headers:{authorization:'Bearer '+token.access_token},body:JSON.stringify({jsonrpc:'2.0',method:'notifications/initialized'})});assert.equal(notified.statusCode,202)});
+test('MCP initializes, lists eight tools, and accepts notifications without a session ID',async t=>{const f=fixture(t);const token=await f.connect();const init=await f.rpc(token.access_token,'initialize',{protocolVersion:'2025-06-18'});assert.equal(init.value.result.protocolVersion,'2025-06-18');assert.equal((await f.rpc(token.access_token,'tools/list')).value.result.tools.length,8);const notified=await mcp({httpMethod:'POST',headers:{authorization:'Bearer '+token.access_token},body:JSON.stringify({jsonrpc:'2.0',method:'notifications/initialized'})});assert.equal(notified.statusCode,202)});
 test('read-only connections cannot modify the planner or escalate refresh scopes',async t=>{const f=fixture(t);const token=await f.connect(false);const before=JSON.stringify(f.tables.planner_profiles);const result=await f.call(token.access_token,'create_item',{kind:'reminder',title:'No',date:'2026-10-27'});assert.equal(result.isError,true);assert.equal(JSON.stringify(f.tables.planner_profiles),before);assert.equal((await f.request('token',{client_id:token.client,grant_type:'refresh_token',refresh_token:token.refresh_token,scope:'planner:read planner:write'})).statusCode,400)});
 test('planner reads do not expose settings secrets or another user’s data',async t=>{const f=fixture(t);const token=await f.connect();f.tables.planner_profiles.push({user_id:'someone-else',data:{homework:[{title:'PRIVATE_OTHER_USER'}]}});const context=await f.call(token.access_token,'get_planner_context');const schedule=await f.call(token.access_token,'get_schedule',{start_date:'2026-10-01',end_date:'2026-10-31'});assert.doesNotMatch(JSON.stringify([context,schedule]),/PRIVATE_/);const result=await f.call(token.access_token,'get_schedule',{user_id:'someone-else'});assert.equal(result.isError,true)});
 test('adding items reuses course colors and repeated requests do not duplicate',async t=>{const f=fixture(t);const token=await f.connect();const input={kind:'homework',title:'Problem set',course:'Algebra',date:'2026-10-28',request_id:'request-one'};const result=JSON.parse((await f.call(token.access_token,'create_item',input)).content[0].text);assert.equal(result.item.color,'#a995c6');assert.equal(result.created,true);assert.equal(JSON.parse((await f.call(token.access_token,'create_item',input)).content[0].text).created,false);assert.equal(f.tables.planner_profiles[0].data.homework.length,2)});
@@ -64,4 +64,42 @@ test('delete supports occurrences and series, isolates kinds, and requires write
  assert.equal((await remove('e2','series')).deleted_count,1);
  assert.ok(f.tables.planner_profiles[0].data.schedule.some(i=>i.id==='c2'));
  assert.equal((await remove('e2','series')).deleted_count,0);
+});
+
+test('a requested term change enables import and preserves saved planner data', async t => {
+ const f = fixture(t);
+ const writer = await f.connect();
+ const reader = await f.connect(false);
+ const profile = f.tables.planner_profiles[0];
+ const before = structuredClone(profile.data);
+ const calendar = {
+   termName: 'Spring 2027',
+   start: '2027-01-18',
+   end: '2027-02-01',
+   breaks: [{name:'Break',start:'2027-01-25',end:'2027-01-25'}]
+ };
+ const importArgs = {
+   term_start: calendar.start,
+   term_end: calendar.end,
+   classes: [{title:'Algebra',days:[1],start:'10:00',end:'11:00'}]
+ };
+ const update = (token, args) => f.call(token.access_token, 'update_academic_calendar', args);
+ assert.equal((await f.call(writer.access_token, 'import_class_schedule', importArgs)).isError, true);
+ assert.equal((await update(reader, calendar)).isError, true);
+ assert.equal((await update(writer, {...calendar, start:'2027-02-30'})).isError, true);
+ assert.equal((await update(writer, {...calendar, breaks:[{...calendar.breaks[0], end:'2027-01-24'}]})).isError, true);
+ f.setConflict();
+ assert.equal((await update(writer, calendar)).isError, true);
+ assert.deepEqual(profile.data, before);
+
+ assert.equal(JSON.parse((await update(writer, calendar)).content[0].text).updated, true);
+ assert.equal(JSON.parse((await update(writer, {termName:calendar.termName})).content[0].text).updated, false);
+ const context = JSON.parse((await f.call(writer.access_token, 'get_planner_context')).content[0].text);
+ assert.deepEqual(context.academic_calendar, calendar);
+ assert.deepEqual(profile.data.schedule, before.schedule);
+ assert.equal(profile.data.settings.canvasFeedUrl, before.settings.canvasFeedUrl);
+
+ const imported = JSON.parse((await f.call(writer.access_token, 'import_class_schedule', importArgs)).content[0].text);
+ assert.equal(imported.added, 2);
+ assert.deepEqual(profile.data.schedule.slice(1).map(item => item.date), ['2027-01-18','2027-02-01']);
 });

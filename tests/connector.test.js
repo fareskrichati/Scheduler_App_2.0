@@ -102,4 +102,13 @@ test('a requested term change enables import and preserves saved planner data', 
  const imported = JSON.parse((await f.call(writer.access_token, 'import_class_schedule', importArgs)).content[0].text);
  assert.equal(imported.added, 2);
  assert.deepEqual(profile.data.schedule.slice(1).map(item => item.date), ['2027-01-18','2027-02-01']);
+ assert.deepEqual(context.academic_calendars.map(term => term.start), ['2026-10-01', '2027-01-18']);
+ const reimported = JSON.parse((await f.call(writer.access_token, 'import_class_schedule', importArgs)).content[0].text);
+ assert.equal(reimported.added, 0);
+ assert.equal(reimported.duplicates_skipped, 2);
+ const schedule = JSON.parse((await f.call(writer.access_token, 'get_schedule', {
+   start_date:'2026-10-01',end_date:'2027-02-10',kind:'class'
+ })).content[0].text);
+ assert.deepEqual(schedule.items.map(item => item.date), ['2026-10-26','2027-01-18','2027-02-01']);
+
 });

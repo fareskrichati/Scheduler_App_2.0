@@ -805,8 +805,6 @@ body:not(.mobile-preview) .calendar-grid[data-view="day"] .calendar-markers {
 .academic-break-list { display: grid; gap: 10px; margin-bottom: 16px; }
 .academic-break-row { display: grid; grid-template-columns: 1.4fr 1fr 1fr auto; gap: 10px; align-items: end; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.68); }
 .academic-break-row .field { margin-bottom: 0; }
-.academic-calendar-sources { display: grid; gap: 6px; margin: 8px 0 14px; }
-.academic-calendar-sources a { color: var(--accent-deep); font-size: .84rem; font-weight: 600; }
 .schedule-import-primary-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
 .schedule-import-card > .subsection-header:first-child h3 { font-family: "Avenir Next", "Segoe UI", sans-serif; font-size: 1.2rem; font-weight: 650; }
 .schedule-import-card .subsection-header { align-items: center; }

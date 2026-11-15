@@ -11,7 +11,7 @@
       name="description"
       content="UniPlan helps you track homework, class schedules, daily plans, and reminders in one calendar."
     />
-    <title>UniPlan 3.5.6 | Student Planner</title>
+    <title>UniPlan 4.0 | Student Planner</title>
     <link rel="stylesheet" href="css/styles.css" />
     <link rel="stylesheet" href="css/mobile.css" media="(max-width: 760px), (max-width: 1366px) and (any-pointer: coarse)" />
     <link rel="stylesheet" href="css/customization.css" />
@@ -227,6 +227,8 @@
                     <button class="ghost-button" id="share-school-schedule" type="button"><span aria-hidden="true">↗</span> Share schedule</button>
                   </div>
 
+                  <p class="settings-note connector-entry-note">You can also use the <a href="#connected-ai-apps" data-connector-setup>UniPlan connector</a> to import your weekly class schedule from a connected AI app.</p>
+
                   <form class="entry-form" id="class-form">
                     <input type="hidden" id="class-id" />
 
@@ -342,11 +344,12 @@
                   <div class="panel-header">
                     <div>
                       <p class="panel-label">Class list</p>
-                      <h3>Add or remove classes</h3>
+                      <h3 id="current-class-term">Current classes</h3>
                     </div>
                   </div>
 
                   <div class="item-list" id="class-list"></div>
+                  <div id="upcoming-class-terms"></div>
                 </article>
               </div>
             </section>
@@ -360,6 +363,8 @@
                       <h3>Events outside of class</h3>
                     </div>
                   </div>
+
+                  <p class="settings-note connector-entry-note">You can also ask a connected AI app to add an event through the <a href="#connected-ai-apps" data-connector-setup>UniPlan connector</a>.</p>
 
                   <form class="entry-form" id="event-form">
                     <input type="hidden" id="event-id" />
@@ -498,6 +503,8 @@
                       </div>
                     </div>
                   </details>
+
+                  <p class="settings-note connector-entry-note">Use Canvas import when available for the quickest setup. Otherwise, the <a href="#connected-ai-apps" data-connector-setup>UniPlan connector</a> can add homework from the details you share in your AI app.</p>
 
                   <form class="entry-form" id="homework-form">
                     <input type="hidden" id="homework-id" />
@@ -641,6 +648,8 @@
                       </div>
                     </div>
                   </details>
+
+                  <p class="settings-note connector-entry-note">Use Canvas import when available for the quickest setup. Otherwise, the <a href="#connected-ai-apps" data-connector-setup>UniPlan connector</a> can add exams from the details you share in your AI app.</p>
 
                   <form class="entry-form" id="exam-form">
                     <input type="hidden" id="exam-id" />
@@ -1103,7 +1112,7 @@
 
                     <div class="subsection whats-new-setting">
                       <div class="subsection-header"><p class="panel-label">Latest updates</p></div>
-                      <p class="settings-note">Read update 3.5.6 and previous release notes.</p>
+                      <p class="settings-note">Read update 4.0 and previous release notes.</p>
                       <button class="ghost-button" id="settings-whats-new" type="button">View what’s new</button>
                     </div>
 
@@ -1149,7 +1158,14 @@
       </main>
     </div>
 
-    <dialog class="whats-new-dialog" id="whats-new-dialog" aria-labelledby="whats-new-title"><div class="whats-new-card"><div class="whats-new-header"><div><p class="panel-label">Latest update</p><h2 id="whats-new-title">What’s new in update 3.5.6</h2><p>some mcp changes</p></div><button class="icon-button" id="whats-new-close" type="button" aria-label="Close what’s new">×</button></div>
+    <dialog class="whats-new-dialog" id="whats-new-dialog" aria-labelledby="whats-new-title"><div class="whats-new-card"><div class="whats-new-header"><div><p class="panel-label">Latest update</p><h2 id="whats-new-title">What’s new in update 4.0</h2><p>Plan your next term while finishing the one you’re in.</p></div><button class="icon-button" id="whats-new-close" type="button" aria-label="Close what’s new">×</button></div>
+    <div class="whats-new-list">
+      <article><span aria-hidden="true">▦</span><div><h3>Separate schedules for each term</h3><p>Save dates, finals, and breaks for each semester, quarter, or trimester. Expand an upcoming term in Classes to review it. Its meetings appear on the calendar as soon as you import them, and past meetings and finals stay on their original dates. Imports skip breaks and duplicate meetings.</p></div></article>
+      <article><span aria-hidden="true">↗</span><div><h3>Find term dates and add events</h3><p>Use Find calendar manually to look up your school’s dates. Use Add event to enter an event, or ask your connected AI app to add it.</p></div></article>
+      <article><span aria-hidden="true">✦</span><div><h3>See what your AI connector can do</h3><p>Open Why connect? under Connected AI apps for example prompts and permissions. Classes, Events, Homework, and Exams now link to setup. Homework and Exams point to Canvas import when available.</p></div></article>
+      <article><span aria-hidden="true">✓</span><div><h3>Weekdays in To-Do</h3><p>To-Do dates now include the weekday, like Sunday, Nov 15.</p></div></article>
+    </div>
+    <details class="v2-update-history"><summary>Update 3.5.6 — Connector updates</summary><p>Updated the UniPlan connector.</p></details>
     <details class="v2-update-history"><summary>Update 3.5.5 — Widget and Study improvements</summary>
     <div class="whats-new-list">
       <article><span aria-hidden="true">⚠</span><div><h3>Overdue to-do warnings</h3><p>Overdue items show how many days late they are. Ask your pet “What’s overdue?” to see the list and open any item in To-Do.</p></div></article>
@@ -1275,6 +1291,7 @@
     <script src="js/tesla-share.js"></script>
     <script src="js/pet-assistant.js"></script>
     <script src="js/connector-settings.js"></script>
+    <script src="js/academic-terms.js"></script>
     <script src="js/app.js"></script>
   </body>
 </html>

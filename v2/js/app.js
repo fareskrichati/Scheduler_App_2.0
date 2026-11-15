@@ -9,8 +9,8 @@ const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_SAVE_DELAY_MS = 1000;
 const FOREVER_REPEAT_YEARS = 5;
 const SUPABASE_TABLE = "planner_profiles";
-const WHATS_NEW_VERSION = "3.5.6";
-const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-3.5.6";
+const WHATS_NEW_VERSION = "4.0";
+const WHATS_NEW_STORAGE_PREFIX = "uniplan-whats-new-4.0";
 const PLANNER_TABS = ["study", "today", "more", "calendar", "todo", "classes", "events", "homework", "exams", "reminders", "settings"];
 
 if (new URLSearchParams(window.location.search).get("scriptable") === "1") {
@@ -30,7 +30,6 @@ let schoolImportItems = [];
 let detectedScheduleClasses = [];
 let detectedHomeworkItems = [];
 let detectedExamItems = [];
-let detectedEventItems = [];
 let pendingFirstLogin = null;
 let lastCloudSyncMessage = "";
 let supabaseSetupMessage = "";
@@ -124,6 +123,8 @@ const elements = {
   daySchedulerTitle: document.querySelector("#day-scheduler-title"),
   daySchedulerSummary: document.querySelector("#day-scheduler-summary"),
   classList: document.querySelector("#class-list"),
+  currentClassTerm: document.querySelector("#current-class-term"),
+  upcomingClassTerms: document.querySelector("#upcoming-class-terms"),
   eventList: document.querySelector("#event-list"),
   homeworkList: document.querySelector("#homework-list"),
   examList: document.querySelector("#exam-list"),
@@ -307,6 +308,13 @@ async function initialize() {
   pruneExpiredCompletedItems();
   renderWeekdays();
   bindEvents();
+  let classListDate = todayString();
+  window.setInterval(() => {
+    const today = todayString();
+    if (classListDate === today) return;
+    classListDate = today;
+    renderClassList();
+  }, 30000);
   PlannerCustomization.init(getSettings, (appearance, resetView) => {
     const previous = getSettings();
     const viewChanged = previous.customization.defaultView !== appearance.customization.defaultView;
@@ -319,7 +327,6 @@ async function initialize() {
   setupClassScheduleImport();
   setupHomeworkPhotoImport();
   setupExamPhotoImport();
-  setupEventPhotoImport();
   setupWidgetSettingsPreview();
   setupWeeklyScheduleReminderSettings();
   setupSettingsAccordions();
@@ -943,26 +950,6 @@ function saveDetectedHomework() {
   status.textContent = `${count} coursework item${count === 1 ? "" : "s"} added.${skipped ? ` ${skipped} already existed with the same name and date.` : ""}`;
 }
 
-function setupEventPhotoImport() {
-  const eventPanel = elements.eventForm?.closest(".panel-card");
-  if (!eventPanel || document.querySelector("#event-photo-importer")) return;
-  const importer = document.createElement("section");
-  importer.id = "event-photo-importer";
-  importer.className = "homework-photo-importer";
-  importer.dataset.desktopAccordionLabel = "Import events from screenshots";
-  importer.innerHTML = `
-    <div class="subsection-header"><div><p class="panel-label">Event screenshots</p><h3>Import an event schedule</h3></div></div>
-    <p class="settings-note">Upload screenshots of a sports, club, work, or other event schedule. The photo reader finds event names, dates, times, and locations. Review every event before saving.</p>
-    <label class="field"><span>Schedule screenshots</span><input id="event-photo-files" type="file" accept="image/*" multiple /></label>
-    <button class="primary-button" id="read-event-photos" type="button">Read event schedule</button>
-    <p class="settings-note" id="event-photo-status" role="status"></p>
-    <div id="event-photo-review" hidden><div class="subsection-header"><div><p class="panel-label">Review</p><h3>Events found</h3></div></div><div id="detected-event-list" class="detected-class-list"></div><button class="primary-button" id="save-detected-events" type="button">Add reviewed events</button></div>`;
-  eventPanel.insertBefore(importer, elements.eventForm);
-  document.querySelector("#read-event-photos").addEventListener("click", readEventPhotos);
-  document.querySelector("#save-detected-events").addEventListener("click", saveDetectedEvents);
-  setupMobileSectionPopup(importer, eventPanel, "Import event schedule");
-}
-
 function setupExamPhotoImport() {
   const examPanel = elements.examForm?.closest(".panel-card");
   if (!examPanel || document.querySelector("#exam-photo-importer")) return;
@@ -1028,40 +1015,6 @@ function saveDetectedExams() {
   const count = detectedExamItems.length; detectedExamItems = []; document.querySelector("#exam-photo-review").hidden = true; persistAndRender(); status.textContent = `${count} exam or quiz item${count === 1 ? "" : "s"} added.`;
 }
 
-async function readEventPhotos() {
-  const files = Array.from(document.querySelector("#event-photo-files").files || []);
-  const status = document.querySelector("#event-photo-status");
-  const button = document.querySelector("#read-event-photos");
-  if (!files.length) { status.textContent = "Choose at least one schedule screenshot."; return; }
-  if (files.length > 4) { status.textContent = "Choose up to 4 screenshots at a time."; return; }
-  button.disabled = true;
-  status.textContent = "Reading the text in your event photos…";
-  try {
-    if (window.location.protocol === "file:") throw new Error("Photo import needs the deployed Netlify site or Netlify Dev.");
-    const accessToken = await getValidAccessToken();
-    if (!accessToken) throw new Error("Sign in before importing an event schedule.");
-    const images = [];
-    for (const file of files) images.push(await resizeImageForImport(file));
-    const response = await fetch("/.netlify/functions/event-photo-import", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({ images, currentDate: todayString(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" }),
-    });
-    const result = await response.json().catch(() => ({}));
-    if (response.status === 404) throw new Error("The event-photo-import function is not deployed yet. Redeploy the latest project first.");
-    if (!response.ok) throw new Error(result.error || `Event schedule import failed (${response.status}).`);
-    detectedEventItems = Array.isArray(result.events) ? result.events.map((item, index) => ({ ...item, color: classColorForIndex(index), notes: item.notes || "Pulled from text read in an event photo." })) : [];
-    if (!detectedEventItems.length) throw new Error("No dated events were found. Try a clearer screenshot that includes the schedule heading and dates.");
-    renderDetectedEvents();
-    document.querySelector("#event-photo-review").hidden = false;
-    status.textContent = `Read the photo text and found ${detectedEventItems.length} event${detectedEventItems.length === 1 ? "" : "s"}. Review them before adding.`;
-  } catch (error) {
-    status.textContent = error.message || "The event screenshots could not be read.";
-  } finally {
-    button.disabled = false;
-  }
-}
-
 function resizeImageForImport(file) {
   return new Promise((resolve, reject) => {
     const image = new Image();
@@ -1078,31 +1031,6 @@ function resizeImageForImport(file) {
     image.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error(`Could not read ${file.name}.`)); };
     image.src = objectUrl;
   });
-}
-
-function renderDetectedEvents() {
-  const list = document.querySelector("#detected-event-list");
-  list.innerHTML = "";
-  detectedEventItems.forEach((item, index) => {
-    const card = document.createElement("article");
-    card.className = "detected-class-card";
-    card.innerHTML = `<label class="field"><span>Event</span><input data-event-field="title" value="${escapeHtml(item.title || "")}" /></label><div class="field-row"><label class="field"><span>Date</span><input data-event-field="date" type="date" value="${item.date || ""}" /></label><label class="field"><span>Location</span><input data-event-field="location" value="${escapeHtml(item.location || "")}" /></label></div><div class="field-row"><label class="field"><span>Start</span><input data-event-field="start" type="time" value="${item.start || ""}" /></label><label class="field"><span>End</span><input data-event-field="end" type="time" value="${item.end || ""}" /></label><label class="field color-field"><span>Color</span><input data-event-field="color" type="color" value="${item.color}" /></label></div><label class="field"><span>Notes</span><textarea data-event-field="notes" rows="2">${escapeHtml(item.notes || "")}</textarea></label><button class="small-button" type="button" data-remove-event="${index}">Remove</button>`;
-    card.querySelectorAll("[data-event-field]").forEach((input) => input.addEventListener("input", () => { detectedEventItems[index][input.dataset.eventField] = input.value; }));
-    card.querySelector("[data-remove-event]").addEventListener("click", () => { detectedEventItems.splice(index, 1); renderDetectedEvents(); });
-    list.appendChild(card);
-  });
-}
-
-function saveDetectedEvents() {
-  const invalid = detectedEventItems.find((item) => !item.title?.trim() || !item.date || !item.start || !item.end || item.end <= item.start);
-  const status = document.querySelector("#event-photo-status");
-  if (invalid) { status.textContent = "Each event needs a name, date, and an end time after its start time."; return; }
-  detectedEventItems.forEach((item) => state.data.schedule.push({ id: crypto.randomUUID(), type: "event", title: item.title.trim(), date: item.date, start: item.start, end: item.end, location: (item.location || "").trim(), color: normalizeColor(item.color, "#7eaed6"), status: "pending", notes: (item.notes || "").trim() }));
-  const count = detectedEventItems.length;
-  detectedEventItems = [];
-  document.querySelector("#event-photo-review").hidden = true;
-  persistAndRender();
-  status.textContent = `${count} event${count === 1 ? "" : "s"} added to your schedule.`;
 }
 
 function setupMobileSectionPopup(section, panel, label) {
@@ -1125,19 +1053,20 @@ function setupClassScheduleImport() {
   importer.innerHTML = `
     <div class="subsection-header"><div><p class="panel-label">Schedule importer</p><h3>Upload your class schedule</h3></div></div>
     <p class="settings-note">Upload a PDF, photo, or text file. You will review everything before classes are added.</p>
+    <label class="field"><span>Academic term</span><select id="academic-term-select"></select></label>
     <div class="schedule-import-primary-fields">
       <label class="field"><span>School name</span><input id="academic-school-name" type="text" placeholder="University or school name" /></label>
       <label class="field"><span>Academic year</span><input id="academic-year" type="text" placeholder="2026-2027" /></label>
       <label class="field"><span>Schedule system</span><select id="academic-term-system"><option value="semester">Semester</option><option value="quarter">Quarter</option><option value="trimester">Trimester</option></select></label>
       <label class="field"><span>Term name</span><input id="academic-term-name" type="text" placeholder="Fall 2026" /></label>
     </div>
-    <div class="form-actions"><button class="ghost-button" id="find-school-calendar" type="button">Research and autofill official dates</button><button class="ghost-button" id="search-school-calendar-manually" type="button">Find calendar manually</button></div>
-    <div id="academic-calendar-sources" class="academic-calendar-sources"></div>
-    <p class="settings-note">The backend searches official school sources, fills the dates below, and leaves them editable for your review.</p>
+    <div class="form-actions"><button class="ghost-button" id="search-school-calendar-manually" type="button">Find calendar manually</button></div>
+    <p class="settings-note">Find your school’s academic calendar to look up term dates, finals, and breaks.</p>
     <div class="field-row">
       <label class="field"><span>Term starts</span><input id="semester-start" type="date" required /></label>
-      <label class="field"><span>Term ends</span><input id="semester-end" type="date" required /></label>
+      <label class="field"><span>Last day of classes</span><input id="semester-end" type="date" required /></label>
     </div>
+    <label class="field"><span>Last day of finals</span><input id="semester-finals-end" type="date" /></label>
     <div class="subsection-header"><div><p class="panel-label">No-class dates</p><h3>Named breaks</h3></div><button class="ghost-button" id="add-academic-break" type="button">Add break</button></div>
     <div id="academic-break-list" class="academic-break-list"></div>
     <label class="field"><span>Schedule files</span><input id="schedule-files" type="file" accept=".pdf,image/*,.txt,.csv,.tsv" multiple /></label>
@@ -1157,25 +1086,15 @@ function setupClassScheduleImport() {
   document.querySelector("#extract-schedule").addEventListener("click", extractScheduleFiles);
   document.querySelector("#save-academic-calendar").addEventListener("click", saveAcademicCalendar);
   document.querySelector("#add-academic-break").addEventListener("click", () => addAcademicBreakRow());
-  document.querySelector("#find-school-calendar").addEventListener("click", researchOfficialSchoolCalendar);
   document.querySelector("#search-school-calendar-manually").addEventListener("click", searchOfficialSchoolCalendarManually);
   document.querySelector("#detect-schedule-classes").addEventListener("click", detectScheduleClasses);
   document.querySelector("#save-detected-classes").addEventListener("click", saveDetectedClasses);
+  document.querySelector("#academic-term-select").addEventListener("change", (event) => {
+    syncAcademicCalendarInputs(event.target.value);
+    clearScheduleReview();
+  });
   syncAcademicCalendarInputs();
   setupMobileImporterPopup(importer, classPanel);
-  checkAcademicCalendarBackend();
-}
-
-async function checkAcademicCalendarBackend() {
-  const status = document.querySelector("#schedule-import-status");
-  try {
-    const response = await fetch("/.netlify/functions/academic-calendar", { headers: { Accept: "application/json" } });
-    if (response.status === 404) { status.textContent = "Automatic research backend was not deployed. Redeploy the site with Netlify Functions enabled."; return; }
-    const result = await response.json();
-    if (!result.configured) status.textContent = `Automatic research is missing these Netlify environment variables: ${(result.missing || []).join(", ") || "backend configuration"}.`;
-  } catch (_) {
-    status.textContent = "Automatic research is unavailable in this local/static preview. It works through the deployed Netlify backend.";
-  }
 }
 
 function setupMobileImporterPopup(importer, classPanel) {
@@ -1197,35 +1116,61 @@ function readAcademicCalendarInputs() {
   const start = document.querySelector("#semester-start").value;
   const end = document.querySelector("#semester-end").value;
   const breaks = Array.from(document.querySelectorAll(".academic-break-row")).map((row) => ({ name: row.querySelector('[data-break="name"]').value.trim(), start: row.querySelector('[data-break="start"]').value, end: row.querySelector('[data-break="end"]').value })).filter((range) => range.start && range.end);
-  return { schoolName: document.querySelector("#academic-school-name").value.trim(), academicYear: document.querySelector("#academic-year").value.trim(), termSystem: document.querySelector("#academic-term-system").value, termName: document.querySelector("#academic-term-name").value.trim(), start, end, breaks };
+  const finalsEnd = document.querySelector("#semester-finals-end").value;
+  const selectedId = document.querySelector("#academic-term-select").value;
+  const selected = UniPlanTerms.savedTerms(state.data.settings).find((term) => term.id === selectedId);
+  const disjoint = selected && (end < selected.start || start > (selected.finalsEnd || selected.end));
+  const id = selected && !disjoint ? selectedId : crypto.randomUUID();
+  return { id, schoolName: document.querySelector("#academic-school-name").value.trim(), academicYear: document.querySelector("#academic-year").value.trim(), termSystem: document.querySelector("#academic-term-system").value, termName: document.querySelector("#academic-term-name").value.trim(), start, end, finalsEnd, breaks };
+}
+
+function validateAcademicCalendar(calendar) {
+  const { start, end, finalsEnd } = calendar;
+  if (!start || !end || end < start || (finalsEnd && finalsEnd < end)) {
+    return "Enter class dates in order and a finals end date on or after the last day of classes.";
+  }
+  if (calendar.breaks.some((range) => !range.name || range.end < range.start)) {
+    return "Each break needs a name and a valid start and end date.";
+  }
+  const overlap = UniPlanTerms.savedTerms(state.data.settings).some((term) =>
+    term.id !== calendar.id && start <= (term.finalsEnd || term.end) && term.start <= (finalsEnd || end));
+  return overlap ? "These dates overlap an existing term. Choose that term to edit its dates." : "";
 }
 
 function saveAcademicCalendar() {
   const calendar = readAcademicCalendarInputs();
   const status = document.querySelector("#schedule-import-status");
-  if (!calendar.start || !calendar.end || calendar.end < calendar.start) {
-    status.textContent = "Enter a valid semester start and end date.";
-    return false;
+  const error = validateAcademicCalendar(calendar);
+  if (error) {
+    status.textContent = error;
+    return;
   }
-  if (calendar.breaks.some((range) => !range.name || range.end < range.start)) {
-    status.textContent = "Each break needs a name and a valid start and end date.";
-    return false;
-  }
-  state.data.settings.academicCalendar = calendar;
-  state.data.schedule = state.data.schedule.filter((item) => item.type !== "class" || isActiveClassDate(item.date, calendar));
+  state.data.settings = UniPlanTerms.saveTerm(state.data.settings, calendar);
+  syncAcademicCalendarInputs(calendar.id);
   persistAndRender();
-  status.textContent = "School dates saved. Classes during breaks or after the semester were removed; other events were untouched.";
-  return true;
+  status.textContent = "School dates saved.";
 }
 
-function isActiveClassDate(date, calendar = state.data.settings.academicCalendar) {
-  if (!calendar?.start || !calendar?.end) return true;
-  if (date < calendar.start || date > calendar.end) return false;
-  return !(calendar.breaks || []).some((range) => date >= range.start && date <= range.end);
+function isActiveClassDate(date) {
+  return UniPlanTerms.allowsClassDate(state.data.settings, date);
 }
 
-function syncAcademicCalendarInputs() {
-  const calendar = state.data.settings.academicCalendar || {};
+function syncAcademicCalendarInputs(termId) {
+  const terms = UniPlanTerms.savedTerms(state.data.settings);
+  const current = state.data.settings.academicCalendar || {};
+  const selected = termId ?? current.id ?? terms[0]?.id ?? "";
+  const calendar = terms.find((term) => term.id === selected) || {
+    schoolName: current.schoolName, academicYear: current.academicYear, termSystem: current.termSystem,
+  };
+  const picker = document.querySelector("#academic-term-select");
+  picker.dataset.calendar = JSON.stringify([current, terms]);
+  picker.replaceChildren();
+  for (const term of terms) {
+    picker.add(new Option(term.termName || term.start, term.id));
+  }
+  picker.add(new Option("Add a term", ""));
+  picker.value = selected;
+  document.querySelector("#semester-finals-end").value = calendar.finalsEnd || "";
   document.querySelector("#semester-start").value = calendar.start || "";
   document.querySelector("#semester-end").value = calendar.end || "";
   document.querySelector("#academic-school-name").value = calendar.schoolName || "";
@@ -1244,35 +1189,6 @@ function addAcademicBreakRow(range = {}) {
   row.querySelector("button").addEventListener("click", () => row.remove()); list.appendChild(row);
 }
 
-async function researchOfficialSchoolCalendar() {
-  const school = document.querySelector("#academic-school-name").value.trim();
-  const academicYear = document.querySelector("#academic-year").value.trim();
-  const term = document.querySelector("#academic-term-name").value.trim();
-  const status = document.querySelector("#schedule-import-status");
-  const button = document.querySelector("#find-school-calendar");
-  if (!school || !academicYear) { status.textContent = "Enter your school name and academic year first."; return; }
-  button.disabled = true; status.textContent = "Researching official school sources…";
-  try {
-    if (window.location.protocol === "file:") throw new Error("Research needs the Netlify backend. Open the deployed Netlify site, or run the project with Netlify Dev instead of opening the HTML file directly.");
-    const accessToken = await getValidAccessToken();
-    if (!accessToken) throw new Error("Sign in before researching a school calendar.");
-    const response = await fetch("/.netlify/functions/academic-calendar", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ schoolName: school, academicYear, termSystem: document.querySelector("#academic-term-system").value, termName: term }) });
-    const result = await response.json().catch(() => ({}));
-    if (response.status === 404) throw new Error("The academic-calendar Netlify Function was not deployed. Trigger a new Netlify deploy from the latest code.");
-    if (!response.ok) throw new Error(result.error || `School-calendar research failed (${response.status}).`);
-    document.querySelector("#academic-school-name").value = result.schoolName || school;
-    document.querySelector("#academic-year").value = result.academicYear || academicYear;
-    document.querySelector("#academic-term-system").value = result.termSystem;
-    document.querySelector("#academic-term-name").value = result.termName;
-    document.querySelector("#semester-start").value = result.start;
-    document.querySelector("#semester-end").value = result.end;
-    const list = document.querySelector("#academic-break-list"); list.innerHTML = ""; result.breaks.forEach(addAcademicBreakRow); if (!result.breaks.length) addAcademicBreakRow();
-    document.querySelector("#academic-calendar-sources").innerHTML = `<p class="settings-note"><strong>Confidence:</strong> ${escapeHtml(result.confidence)}. ${escapeHtml(result.notes)}</p>${result.sources.map((source) => `<a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.title)}</a>`).join("")}`;
-    status.textContent = "Official dates found and autofilled. Review them, then save school dates.";
-  } catch (error) { status.textContent = error.message || "School-calendar research failed."; }
-  finally { button.disabled = false; }
-}
-
 function searchOfficialSchoolCalendarManually() {
   const school = document.querySelector("#academic-school-name").value.trim();
   const academicYear = document.querySelector("#academic-year").value.trim();
@@ -1289,7 +1205,7 @@ function searchOfficialSchoolCalendarManually() {
     return;
   }
   searchWindow.opener = null;
-  status.textContent = "Official-calendar search opened. Use the school's own website, then enter the term dates and named breaks below and click Save school dates.";
+  status.textContent = "Official-calendar search opened. Use your school’s calendar to enter term dates, the last day of finals, and breaks. Then select Save school dates.";
 }
 
 async function extractScheduleFiles() {
@@ -1468,31 +1384,55 @@ function renderDetectedClasses() {
   list.appendChild(add);
 }
 
+function clearScheduleReview() {
+  detectedScheduleClasses = [];
+  document.querySelector("#schedule-extraction-review").hidden = true;
+  document.querySelector("#schedule-class-review").hidden = true;
+}
+
 function saveDetectedClasses() {
-  if (!saveAcademicCalendar()) return;
-  const calendar = state.data.settings.academicCalendar;
-  const invalid = detectedScheduleClasses.find((item) => !item.title.trim() || !item.days.length || !item.start || !item.end);
+  const calendar = readAcademicCalendarInputs();
+  const error = validateAcademicCalendar(calendar);
+  const status = document.querySelector("#schedule-import-status");
+  if (error) {
+    status.textContent = error;
+    return;
+  }
+  const invalid = detectedScheduleClasses.find((item) => !item.title.trim() || !item.days.length || !item.start || !item.end || item.end <= item.start);
   if (invalid) {
     document.querySelector("#schedule-import-status").textContent = "Every class needs a name, at least one weekday, a start time, and an end time.";
     return;
   }
+  const meetings = new Set(state.data.schedule.filter((item) => item.type === "class").map(UniPlanTerms.meetingKey));
+  const courses = getImportableClasses();
+  let added = 0;
+  let skipped = 0;
   detectedScheduleClasses.forEach((item) => {
+    const color = courses.find((course) => course.key === importedCourseKey(item.title))?.color || item.color;
     const seriesId = crypto.randomUUID();
     let date = new Date(`${calendar.start}T12:00:00`);
     const end = new Date(`${calendar.end}T12:00:00`);
     while (date <= end) {
       const dateString = isoDate(date);
-      if (item.days.includes(date.getDay()) && isActiveClassDate(dateString, calendar)) {
-        state.data.schedule.push({ id: crypto.randomUUID(), type: "class", title: item.title.trim(), date: dateString, start: item.start, end: item.end, location: item.location.trim(), color: item.color, notes: "Imported from uploaded class schedule.", status: "pending", repeatMode: "weekly", repeatForever: false, seriesId });
+      if (item.days.includes(date.getDay()) && UniPlanTerms.isClassDay(calendar, dateString)) {
+        const meeting = { type: "class", title: item.title.trim(), date: dateString, start: item.start, end: item.end };
+        const key = UniPlanTerms.meetingKey(meeting);
+        if (meetings.has(key)) skipped++;
+        else {
+          meetings.add(key);
+          state.data.schedule.push({ ...meeting, id: crypto.randomUUID(), location: item.location.trim(), color, notes: "Imported from uploaded class schedule.", status: "pending", repeatMode: "weekly", repeatUntil: calendar.end, repeatDays: [...item.days], repeatForever: false, seriesId });
+          added++;
+        }
       }
       date.setDate(date.getDate() + 1);
     }
   });
-  const count = detectedScheduleClasses.length;
+  state.data.settings = UniPlanTerms.saveTerm(state.data.settings, calendar);
+  syncAcademicCalendarInputs(calendar.id);
   detectedScheduleClasses = [];
   document.querySelector("#schedule-class-review").hidden = true;
   persistAndRender();
-  document.querySelector("#schedule-import-status").textContent = `${count} class${count === 1 ? "" : "es"} added with consistent colors and school breaks excluded.`;
+  status.textContent = `${added} meetings added. ${skipped} duplicates skipped.`;
 }
 
 function loadExternalScript(src, isModule = false) {
@@ -2203,6 +2143,11 @@ function clearLegacyLocalLogin() {
 }
 
 function render() {
+  const termPicker = document.querySelector("#academic-term-select");
+  const settings = state.data.settings;
+  if (termPicker && termPicker.dataset.calendar !== JSON.stringify([settings.academicCalendar || {}, UniPlanTerms.savedTerms(settings)])) {
+    syncAcademicCalendarInputs();
+  }
   window.UniPlanConnector?.refresh();
   window.UniPlanPet?.refresh();
   renderV2Today();
@@ -2272,7 +2217,7 @@ function renderTodoList() {
     row.dataset.plannerSourceId = item.id;
     row.dataset.plannerKind = item.kind;
     applyItemColor(row, item.color);
-    row.innerHTML = `<button class="todo-check" type="button" aria-label="${item.status === "done" ? "Mark pending" : "Mark done"}">${item.status === "done" ? "✓" : ""}</button><div class="todo-copy"><div class="todo-title-line"><strong>${escapeHtml(item.title)}</strong>${item.priority ? '<span class="priority-label">Priority</span>' : ""}${overdueWarning}</div><span>${escapeHtml(item.label)} · ${formatShortDate(item.date)}${item.time ? ` · ${formatTime(item.time)}` : ""}</span></div>`;
+    row.innerHTML = `<button class="todo-check" type="button" aria-label="${item.status === "done" ? "Mark pending" : "Mark done"}">${item.status === "done" ? "✓" : ""}</button><div class="todo-copy"><div class="todo-title-line"><strong>${escapeHtml(item.title)}</strong>${item.priority ? '<span class="priority-label">Priority</span>' : ""}${overdueWarning}</div><span>${escapeHtml(item.label)} · ${formatShortDate(item.date, { weekday: "long" })}${item.time ? ` · ${formatTime(item.time)}` : ""}</span></div>`;
     row.querySelector(".todo-check").addEventListener("click", () => {
       if (item.kind === "homework") toggleHomeworkStatus(item.id);
       else if (item.kind === "exam") toggleExamStatus(item.id);
@@ -3011,25 +2956,57 @@ function renderClassFilter(select, items, selectedValue) {
 }
 
 function renderClassList() {
-  const sorted = groupScheduleEntries("class");
-  const online = state.data.courses.map((item) => ({ ...item, online: true, status: "pending" }));
+  const terms = UniPlanTerms.savedTerms(state.data.settings);
+  const today = todayString();
+  const termFor = (item) => terms.find((term) => term.id === item.termId)
+    || terms.find((term) => UniPlanTerms.contains(term, item.date, term.finalsEnd || term.end));
+  const classesFor = (include) => [
+    ...state.data.courses.filter(include).map((item) => ({ ...item, online: true, status: "pending" })),
+    ...groupScheduleEntries("class", include),
+  ];
+  const termLabel = (term) => term.termName
+    || `${({ quarter: "Quarter", trimester: "Trimester" })[term.termSystem] || "Semester"} starting ${formatShortDate(term.start)}`;
+  const config = {
+    category: "Class",
+    meta: (item) =>
+      item.online
+        ? "Online · No scheduled meeting time"
+        : item.grouped
+        ? `${item.repeatSummary} • ${formatShortDate(item.date)} - ${formatShortDate(item.lastDate)} • ${formatTime(item.start)} - ${formatTime(item.end)}${item.location ? ` • ${item.location}` : ""}`
+        : `${formatShortDate(item.date)} • ${formatTime(item.start)} - ${formatTime(item.end)}${item.location ? ` • ${item.location}` : ""}`,
+    notes: (item) => item.notes,
+    onEdit: editClassItem,
+    onDelete: deleteClassItem,
+  };
+
+  const current = terms.find((term) => UniPlanTerms.isActiveTerm(term, today));
+  elements.currentClassTerm.textContent = current ? `${termLabel(current)} · Current` : "Current classes";
   renderCollection({
     target: elements.classList,
-    items: [...online, ...sorted],
-    emptyMessage: "No classes added yet.",
-    config: {
-      category: "Class",
-      meta: (item) =>
-        item.online
-          ? "Online · No scheduled meeting time"
-          : item.grouped
-          ? `${item.repeatSummary} • ${formatShortDate(item.date)} - ${formatShortDate(item.lastDate)} • ${formatTime(item.start)} - ${formatTime(item.end)}${item.location ? ` • ${item.location}` : ""}`
-          : `${formatShortDate(item.date)} • ${formatTime(item.start)} - ${formatTime(item.end)}${item.location ? ` • ${item.location}` : ""}`,
-      notes: (item) => item.notes,
-      onEdit: editClassItem,
-      onDelete: deleteClassItem,
-    },
+    items: classesFor((item) => UniPlanTerms.isActiveTerm(termFor(item), today)),
+    emptyMessage: terms.length ? "No current classes." : "No classes added yet.",
+    config,
   });
+
+  const upcoming = elements.upcomingClassTerms;
+  const openTerms = new Set(Array.from(upcoming.children).filter((section) => section.open).map((section) => section.dataset.termId));
+  const sections = [];
+  for (const term of terms.filter((entry) => entry.start > today)) {
+    const items = classesFor((item) => termFor(item)?.id === term.id);
+    if (!items.length) continue;
+    const section = document.createElement("details");
+    section.className = "completed-section";
+    section.dataset.termId = term.id;
+    section.open = openTerms.has(term.id);
+    const summary = document.createElement("summary");
+    summary.textContent = `${termLabel(term)} · Upcoming`;
+    const list = document.createElement("div");
+    list.className = "item-list";
+    section.append(summary, list);
+    renderCollection({ target: list, items, config });
+    sections.push(section);
+  }
+  upcoming.replaceChildren(...sections);
 }
 
 function renderEventList() {
@@ -3090,12 +3067,12 @@ function groupReminderEntries() {
     .sort(compareByDateTime);
 }
 
-function groupScheduleEntries(type) {
+function groupScheduleEntries(type, include = () => true) {
   const singles = [];
   const seriesMap = new Map();
 
   state.data.schedule
-    .filter((item) => item.type === type)
+    .filter((item) => item.type === type && include(item))
     .sort(compareByDateTime)
     .forEach((item) => {
       if (!item.seriesId) {
@@ -3265,7 +3242,10 @@ function saveClassItem() {
   if (elements.classOnline.checked) {
     if (!item.title) return;
     state.data.schedule = state.data.schedule.filter((entry) => entry.id !== id && entry.seriesId !== editingSeriesId);
-    const course = { id, title: item.title, color: item.color, notes: item.notes, online: true };
+    const existing = state.data.courses.find((course) => course.id === id);
+    const term = UniPlanTerms.savedTerms(state.data.settings).find((entry) =>
+      UniPlanTerms.contains(entry, item.date || todayString(), entry.finalsEnd || entry.end));
+    const course = { ...existing, id, title: item.title, color: item.color, notes: item.notes, online: true, termId: existing?.termId || term?.id };
     upsertItem(state.data.courses, course);
     persistAndRender();
     resetClassForm();
@@ -4746,6 +4726,7 @@ function normalizeSettings(settings) {
     notificationPreference,
     notificationSchedule: normalizeNotificationSchedule(settings.notificationSchedule),
     academicCalendar: normalizeAcademicCalendar(settings.academicCalendar),
+    academicCalendars: UniPlanTerms.savedTerms(settings).map(normalizeAcademicCalendar),
     school: typeof settings.school === "string" ? settings.school : defaults.school,
     canvasUrl:
       typeof settings.canvasUrl === "string" ? normalizeUrl(settings.canvasUrl) : defaults.canvasUrl,
@@ -4821,6 +4802,8 @@ function getDefaultSettings() {
 function normalizeAcademicCalendar(calendar) {
   if (!calendar || typeof calendar !== "object") return { schoolName: "", academicYear: "", termSystem: "semester", termName: "", start: "", end: "", breaks: [] };
   return {
+    id: calendar.id || calendar.start || "",
+    finalsEnd: /^\d{4}-\d{2}-\d{2}$/.test(calendar.finalsEnd || "") ? calendar.finalsEnd : "",
     schoolName: typeof calendar.schoolName === "string" ? calendar.schoolName : "",
     academicYear: typeof calendar.academicYear === "string" ? calendar.academicYear : "",
     termSystem: ["quarter", "semester", "trimester"].includes(calendar.termSystem) ? calendar.termSystem : "semester",
@@ -5682,10 +5665,11 @@ function formatLongDate(dateString) {
   });
 }
 
-function formatShortDate(dateString) {
+function formatShortDate(dateString, options = {}) {
   return new Date(`${dateString}T00:00:00`).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
+    ...options,
   });
 }
 

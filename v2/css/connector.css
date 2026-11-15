@@ -42,3 +42,6 @@
 @media (max-width: 760px), (max-width: 1366px) and (any-pointer: coarse) {
   #open-chatgpt { width: 38px; height: 38px; border-radius: 11px; }
 }
+
+.connector-entry-note a { color: var(--accent-deep); font-weight: 600; }
+.connector-settings .completed-section > summary { color: var(--accent-deep); }

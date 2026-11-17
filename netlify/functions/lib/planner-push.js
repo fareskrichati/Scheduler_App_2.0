@@ -58,7 +58,8 @@ async function database(path, options = {}) {
     signal: AbortSignal.timeout(5000),
   });
   if (!response.ok) throw new Error(`Push storage returned ${response.status}`);
-  return response.status === 204 ? null : response.json();
+  const body = await response.text();
+  return body ? JSON.parse(body) : null;
 }
 
 // Resolve the local planner time in its IANA timezone. If a clock change skips

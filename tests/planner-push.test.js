@@ -70,7 +70,8 @@ test("device registration limits destinations and derives ownership from the ses
   const calls = [];
   t.mock.method(global, "fetch", async (url, options) => {
     calls.push([url, options]);
-    return url.endsWith("/auth/v1/user") ? Response.json({ id: "owner" }) : new Response(null, { status: 204 });
+    if (url.endsWith("/auth/v1/user")) return Response.json({ id: "owner" });
+    return new Response(null, { status: options.method === "POST" ? 201 : 204 });
   });
 
   const body = JSON.stringify({ user_id: "other", timezone: "UTC", subscription: subscription(endpoint) });

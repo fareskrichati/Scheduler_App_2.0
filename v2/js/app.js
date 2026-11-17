@@ -350,6 +350,9 @@ async function initialize() {
 }
 
 function bindEvents() {
+  for (const kind of ["event", "homework", "exam"]) {
+    document.querySelector(`#${kind}-push-preset`)?.addEventListener("change", () => syncItemPushFields(kind));
+  }
   document.querySelector("#forgot-password").addEventListener("click", () => {
     passwordRecoveryMode = "email";
     document.querySelector("#recovery-email").value = elements.loginEmail.value;
@@ -1624,6 +1627,7 @@ async function finishFirstLoginSetup() {
 }
 
 async function logout() {
+  await window.UniPlanPush?.disableOnLogout();
   if(cloudSaveTimer){clearTimeout(cloudSaveTimer);cloudSaveTimer=null;}
   if(realtimeChannel){supabaseClient?.removeChannel(realtimeChannel);realtimeChannel=null;}
   v2CloudBaseline=null;
@@ -1662,6 +1666,7 @@ function setAuthMode(mode, options = {}) {
 }
 
 function updateAuthView() {
+  window.UniPlanPush?.render();
   window.UniPlanConnector?.refresh();
   window.UniPlanPet?.refresh();
   document.body.classList.toggle("is-authenticated", authState.isAuthenticated && !passwordRecoveryMode);
@@ -3301,6 +3306,36 @@ function saveClassItem() {
   resetClassForm();
 }
 
+function readItemPushSettings(kind, defaultLead) {
+  const input = document.querySelector(`#${kind}-push-minutes`);
+  const preset = document.querySelector(`#${kind}-push-preset`)?.value;
+  const custom = preset !== "off" && !["day", "threeDays", "week", "month"].includes(preset);
+  return {
+    pushLeadMinutes: custom ? (input ? (input.value === "" ? null : Number(input.value)) : defaultLead) : null,
+    pushLeadPreset: !custom && preset !== "off" ? preset : null,
+    pushTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+  };
+}
+
+function setItemPushLead(kind, item, defaultLead) {
+  const input = document.querySelector(`#${kind}-push-minutes`);
+  const select = document.querySelector(`#${kind}-push-preset`);
+  if (!input || !select) return;
+  const lead = item.pushLeadMinutes === undefined ? defaultLead : item.pushLeadMinutes;
+  select.value = item.pushLeadPreset || (item.pushLeadMinutes === undefined && kind === "exam" ? "day" : lead === null ? "off" : "custom");
+  input.value = lead ?? defaultLead;
+  syncItemPushFields(kind);
+}
+
+function syncItemPushFields(kind) {
+  const select = document.querySelector(`#${kind}-push-preset`);
+  const input = document.querySelector(`#${kind}-push-minutes`);
+  const custom = document.querySelector(`#${kind}-push-custom`);
+  if (!select || !input || !custom) return;
+  custom.hidden = select.value !== "custom";
+  input.disabled = custom.hidden;
+}
+
 function saveEventItem() {
   const editingSeriesId = elements.eventForm.dataset.seriesId || "";
   const id = elements.eventId.value || crypto.randomUUID();
@@ -3322,6 +3357,7 @@ function saveEventItem() {
       status,
     ),
     matchSourceKey: getMatchSourceValue("event"),
+    ...readItemPushSettings("event", 15),
     notes: elements.eventNotes.value.trim(),
   };
 
@@ -3391,6 +3427,7 @@ function saveHomework() {
     priority: elements.homeworkPriority.checked,
     repeatMode: elements.homeworkRepeatMode.value,
     matchSourceKey: getMatchSourceValue("homework"),
+    ...readItemPushSettings("homework", 60),
     notes: elements.homeworkNotes.value.trim(),
   };
 
@@ -3448,6 +3485,7 @@ function saveExam() {
     status,
     completedAt: getExistingCompletedAt(state.data.exams, elements.examId.value, status),
     matchSourceKey: getMatchSourceValue("exam"),
+    ...readItemPushSettings("exam", 1440),
     notes: elements.examNotes.value.trim(),
   };
 
@@ -3556,6 +3594,7 @@ function editHomework(id, inline = false) {
     : "";
   setRepeatDaysFromSeries("homework", sortedMatches);
   toggleRepeatOptions("homework");
+  setItemPushLead("homework", item, 60);
   elements.homeworkNotes.value = item.notes || "";
 }
 
@@ -3577,6 +3616,7 @@ function editExam(id, inline = false) {
   elements.examColor.value = normalizeColor(item.color, "#7eaed6");
   elements.examPriority.checked = Boolean(item.priority);
   setMatchSelection("exam", item.matchSourceKey || "");
+  setItemPushLead("exam", item, 1440);
   elements.examNotes.value = item.notes || "";
 }
 
@@ -3666,6 +3706,7 @@ function editEventItem(id, inline = false) {
     : "";
   setRepeatDaysFromSeries("event", sortedMatches);
   toggleRepeatOptions("event");
+  setItemPushLead("event", item, 15);
   elements.eventNotes.value = item.notes || "";
 }
 
@@ -3954,6 +3995,7 @@ function toggleOnlineClassFields() {
 
 function resetEventForm() {
   elements.eventForm.reset();
+  syncItemPushFields("event");
   delete elements.eventForm.dataset.seriesId;
   elements.eventId.value = "";
   elements.eventDate.value = state.selectedDate;
@@ -3969,6 +4011,7 @@ function resetEventForm() {
 
 function resetHomeworkForm() {
   elements.homeworkForm.reset();
+  syncItemPushFields("homework");
   delete elements.homeworkForm.dataset.seriesId;
   elements.homeworkId.value = "";
   elements.homeworkDate.value = state.selectedDate;
@@ -3985,6 +4028,7 @@ function resetHomeworkForm() {
 
 function resetExamForm() {
   elements.examForm.reset();
+  syncItemPushFields("exam");
   elements.examId.value = "";
   elements.examDate.value = state.selectedDate;
   elements.examColor.value = "#7eaed6";
@@ -4582,6 +4626,9 @@ function addSchoolItemAsHomework(item) {
     matchSourceKey: match?.matchSourceKey || item.matchSourceKey,
     priority: existing?.priority || false,
     notes: existing?.notes || [item.notes, item.url].filter(Boolean).join(" "),
+    pushLeadMinutes: existing?.pushLeadMinutes,
+    pushLeadPreset: existing?.pushLeadPreset,
+    pushTimezone: existing?.pushTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     canvasFeedUid: item.uid || undefined,
     schoolImportId: item.id,
   };

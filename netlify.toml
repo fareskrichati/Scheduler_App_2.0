@@ -22,3 +22,6 @@
   for = "/js/*"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
+
+[functions."planner-push-dispatch"]
+  schedule = "* * * * *"

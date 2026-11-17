@@ -1,0 +1,10 @@
+{
+  "id": "./",
+  "name": "UniPlan",
+  "short_name": "UniPlan",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff"
+}

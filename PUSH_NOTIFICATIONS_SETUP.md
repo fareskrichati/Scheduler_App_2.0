@@ -1,0 +1,9 @@
+# UniPlan push notifications
+
+1. Apply [supabase-push.sql](supabase-push.sql) in the Supabase SQL Editor after the existing planner schema.
+2. Run `npm ci`, then `npm exec -- web-push generate-vapid-keys` once. Save the public and private keys in Netlify as `PUSH_VAPID_PUBLIC_KEY` and `PUSH_VAPID_PRIVATE_KEY`. Set `PUSH_VAPID_SUBJECT` to a real administrative contact such as `mailto:admin@example.com`. Keep the private key server-side and keep the keypair stable across deploys.
+3. Confirm Netlify Functions have `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, then deploy to production. The scheduled sender checks for due reminders every minute on the published site.
+4. Sign in to the deployed planner, open **Settings → Push notifications**, and choose **Enable push on this device**. On iPhone or iPad, add UniPlan to the Home Screen and open it there first.
+5. Create an event a few minutes ahead and choose **Custom minutes before** under **Push reminder** and enter `1`. Close UniPlan and check that the notification appears. Tap it to reopen the planner.
+
+Once a device is enabled, saved events default to 15 minutes before, homework to 60 minutes before, and exams to 1 day before. Choose 1 day, 3 days, 1 week, or 1 calendar month before the item, or enter custom minutes. Enter `0` under custom minutes to send at the scheduled time, or choose **Off** to turn off that item’s reminder. Calendar presets keep the item’s local time. If the previous month is shorter, the month preset uses its last day. Date-only homework uses 11:59 PM and date-only exams use 9:00 AM. Repeating events and homework use the same lead time for each occurrence. Devices can be opted in individually.

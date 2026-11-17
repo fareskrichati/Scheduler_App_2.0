@@ -35,7 +35,7 @@ fs.mkdirSync(resolvePath("deploy/js"), { recursive: true });
 fs.copyFileSync(resolvePath("css/widget-preview.css"), resolvePath("deploy/css/widget-preview.css"));
 fs.copyFileSync(resolvePath("js/widget-preview.js"), resolvePath("deploy/js/widget-preview.js"));
 
-fs.writeFileSync(resolvePath("deploy/netlify.toml"), '[build]\n  publish = "."\n\n[functions]\n  directory = "netlify/functions"\n\n[functions."weekly-schedule-reminders"]\n  schedule = "*/15 * * * *"\n');
+fs.writeFileSync(resolvePath("deploy/netlify.toml"), '[build]\n  publish = "."\n\n[functions]\n  directory = "netlify/functions"\n\n[functions."weekly-schedule-reminders"]\n  schedule = "*/15 * * * *"\n\n[functions."planner-push-dispatch"]\n  schedule = "* * * * *"\n');
 fs.copyFileSync(resolvePath("netlify/functions/academic-calendar.js"), resolvePath("deploy/netlify/functions/academic-calendar.js"));
 fs.copyFileSync(resolvePath("netlify/functions/event-photo-import.js"), resolvePath("deploy/netlify/functions/event-photo-import.js"));
 fs.copyFileSync(resolvePath("netlify/functions/homework-photo-import.js"), resolvePath("deploy/netlify/functions/homework-photo-import.js"));
@@ -106,7 +106,8 @@ function buildPage({ source, target, extraCss, includeRedirect }) {
 // Publish 2.0 as the main app and retain the frozen 1.5.1 archive.
 // Include the connector's backend and discovery routes in the downloadable build.
 fs.cpSync(resolvePath('netlify/functions/lib'), resolvePath('deploy/netlify/functions/lib'), {recursive:true});
-for (const name of ['connector-auth.js', 'planner-mcp.js']) fs.copyFileSync(resolvePath('netlify/functions/'+name), resolvePath('deploy/netlify/functions/'+name));
+for (const name of ['connector-auth.js', 'planner-mcp.js', 'push-registration.js', 'planner-push-dispatch.js']) fs.copyFileSync(resolvePath('netlify/functions/'+name), resolvePath('deploy/netlify/functions/'+name));
+for (const name of ['package.json', 'package-lock.json']) fs.copyFileSync(resolvePath(name), resolvePath('deploy/'+name));
 fs.copyFileSync(resolvePath('netlify/connector-redirects'), resolvePath('deploy/_redirects'));
 fs.copyFileSync(resolvePath('netlify/connector-headers'), resolvePath('deploy/_headers'));
 require('./build-v2').buildV2();

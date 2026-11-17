@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <link rel="manifest" href="manifest.webmanifest" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#7eaed6" />
@@ -462,6 +463,24 @@
                       <span>Notes</span>
                       <textarea id="event-notes" rows="4" maxlength="240" placeholder="Anything important for this event"></textarea>
                     </label>
+                    <div class="field-row">
+                      <label class="field">
+                        <span>Push reminder</span>
+                        <select id="event-push-preset">
+                          <option value="off">Off</option>
+                          <option value="custom" selected>Custom minutes before</option>
+                          <option value="day">1 day before</option>
+                          <option value="threeDays">3 days before</option>
+                          <option value="week">1 week before</option>
+                          <option value="month">1 month before</option>
+                        </select>
+                        <small>Enable push notifications in Settings.</small>
+                      </label>
+                      <label class="field" id="event-push-custom">
+                        <span>Minutes before</span>
+                        <input id="event-push-minutes" type="number" min="0" max="10080" step="1" value="15" />
+                      </label>
+                    </div>
 
                     <div class="form-actions">
                       <button class="ghost-button" id="event-reset" type="button">Clear</button>
@@ -605,6 +624,24 @@
                       <span>Notes</span>
                       <textarea id="homework-notes" rows="4" maxlength="240" placeholder="Chapter, problems, or submission details"></textarea>
                     </label>
+                    <div class="field-row">
+                      <label class="field">
+                        <span>Push reminder</span>
+                        <select id="homework-push-preset">
+                          <option value="off">Off</option>
+                          <option value="custom" selected>Custom minutes before</option>
+                          <option value="day">1 day before</option>
+                          <option value="threeDays">3 days before</option>
+                          <option value="week">1 week before</option>
+                          <option value="month">1 month before</option>
+                        </select>
+                        <small>Homework without a due time uses 11:59 PM. Enable push notifications in Settings.</small>
+                      </label>
+                      <label class="field" id="homework-push-custom">
+                        <span>Minutes before</span>
+                        <input id="homework-push-minutes" type="number" min="0" max="10080" step="1" value="60" />
+                      </label>
+                    </div>
 
                     <div class="form-actions">
                       <button class="ghost-button" id="homework-reset" type="button">Clear</button>
@@ -702,6 +739,24 @@
                       <span>Notes</span>
                       <textarea id="exam-notes" rows="4" maxlength="240" placeholder="Room, chapters, or study notes"></textarea>
                     </label>
+                    <div class="field-row">
+                      <label class="field">
+                        <span>Push reminder</span>
+                        <select id="exam-push-preset">
+                          <option value="off">Off</option>
+                          <option value="custom">Custom minutes before</option>
+                          <option value="day" selected>1 day before</option>
+                          <option value="threeDays">3 days before</option>
+                          <option value="week">1 week before</option>
+                          <option value="month">1 month before</option>
+                        </select>
+                        <small>Exams without a time use 9:00 AM. Enable push notifications in Settings.</small>
+                      </label>
+                      <label class="field" id="exam-push-custom" hidden>
+                        <span>Minutes before</span>
+                        <input id="exam-push-minutes" type="number" min="0" max="10080" step="1" value="1440" disabled />
+                      </label>
+                    </div>
 
                     <div class="form-actions">
                       <button class="ghost-button" id="exam-reset" type="button">Clear</button>
@@ -992,6 +1047,15 @@
                           Update calendar
                         </label>
                       </div>
+                    </div>
+
+                    <div class="subsection">
+                      <div class="subsection-header">
+                        <h3>Push notifications</h3>
+                      </div>
+                      <p class="settings-note">Get event, homework, and exam reminders even when UniPlan is closed.</p>
+                      <button class="ghost-button" id="planner-push-toggle" type="button">Enable push on this device</button>
+                      <p class="settings-note" id="planner-push-status" role="status"></p>
                     </div>
 
                     <div class="subsection widget-settings">
@@ -1293,5 +1357,6 @@
     <script src="js/connector-settings.js"></script>
     <script src="js/academic-terms.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/push-settings.js"></script>
   </body>
 </html>

@@ -10,9 +10,6 @@
 [functions]
   directory = "netlify/functions"
 
-[functions."weekly-schedule-reminders"]
-  schedule = "*/15 * * * *"
-
 [[headers]]
   for = "/css/*"
   [headers.values]

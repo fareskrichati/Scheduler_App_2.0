@@ -328,7 +328,7 @@ async function initialize() {
   setupHomeworkPhotoImport();
   setupExamPhotoImport();
   setupWidgetSettingsPreview();
-  setupWeeklyScheduleReminderSettings();
+  setupPushDefaultsSettings();
   setupSettingsAccordions();
   // Add forms use the same accessible dialog at every screen size.
   setupMobileAddForms();
@@ -350,7 +350,7 @@ async function initialize() {
 }
 
 function bindEvents() {
-  for (const kind of ["event", "homework", "exam"]) {
+  for (const kind of ["class", "event", "homework", "exam", "reminder"]) {
     document.querySelector(`#${kind}-push-preset`)?.addEventListener("change", () => syncItemPushFields(kind));
   }
   document.querySelector("#forgot-password").addEventListener("click", () => {
@@ -658,25 +658,35 @@ function setupWidgetSettingsPreview() {
   dialog.querySelector("button").addEventListener("click", () => dialog.close());
 }
 
-function setupWeeklyScheduleReminderSettings() {
-  const widgetSettings = elements.widgetDefaultView?.closest(".widget-settings");
-  if (!widgetSettings || document.querySelector("#weekly-schedule-reminder")) return;
-  const section = document.createElement("div"); section.className = "subsection weekly-reminder-settings";
-  section.innerHTML = `<div class="subsection-header"><div><p class="panel-label">Weekly reminder</p><h3>Remember to review your schedule</h3></div></div><label class="checkbox-row"><input id="weekly-schedule-reminder" type="checkbox" /><span>Send me a reminder every week</span></label><div class="weekly-reminder-options"><div class="field-row"><label class="field"><span>Send by</span><select id="weekly-reminder-delivery"><option value="email">Email</option><option value="text">Text</option><option value="both">Email and text</option></select></label><label class="field"><span>Day</span><select id="weekly-reminder-day"><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></label><label class="field"><span>Time</span><input id="weekly-reminder-time" type="time" value="18:00" /></label></div><p class="settings-note">Email requires a valid email above. Text messages require a valid mobile number and may be subject to carrier messaging rates.</p></div>`;
-  widgetSettings.parentElement.insertBefore(section, widgetSettings);
-  section.querySelector("#weekly-schedule-reminder").addEventListener("change", toggleWeeklyReminderOptions);
+function setupPushDefaultsSettings() {
+  const pushSection = document.querySelector("#planner-push-toggle")?.closest(".subsection");
+  if (!pushSection) return;
+  const title = document.createElement("h4");
+  title.textContent = "Notification defaults";
+  const note = document.createElement("p");
+  note.className = "settings-note";
+  note.textContent = "Choose when each type should notify you. Changes apply to items using the notification default. Set a different time on an individual item whenever you need.";
+  pushSection.append(title, note);
+  for (const [kind, label] of [["class", "Classes"], ["event", "Events"], ["homework", "Homework"], ["exam", "Exams"], ["reminder", "Reminders"]]) {
+    const source = document.querySelector(`#${kind}-push-preset`).closest(".field-row");
+    const row = source.cloneNode(true);
+    row.querySelectorAll("[id]").forEach((element) => { element.id = "default-" + element.id; });
+    row.querySelector("span").textContent = label;
+    row.querySelector('option[value="default"]').remove();
+    row.querySelector("small")?.remove();
+    row.querySelector("select").addEventListener("change", () => syncItemPushFields("default-" + kind));
+    pushSection.append(row);
+  }
   const save = document.createElement("button");
-  save.type = "button"; save.className = "primary-button"; save.textContent = "Save weekly reminder";
-  save.addEventListener("click", async () => { save.disabled = true; try { await saveSettings(); } finally { save.disabled = false; } });
-  const help = document.createElement("p"); help.className = "settings-note";
-  help.textContent = "Save after changing these options. Times use your device’s time zone. Delivery runs every 15 minutes after the selected time and requires the reminder service to be configured.";
-  section.append(help, save);
-}
-
-function toggleWeeklyReminderOptions() {
-  const enabled = document.querySelector("#weekly-schedule-reminder")?.checked;
-  document.querySelector(".weekly-reminder-options")?.classList.toggle("is-disabled", !enabled);
-  document.querySelectorAll(".weekly-reminder-options input, .weekly-reminder-options select").forEach((input) => { input.disabled = !enabled; });
+  save.type = "button";
+  save.className = "primary-button";
+  save.textContent = "Save notification defaults";
+  save.addEventListener("click", async () => {
+    if (!elements.settingsForm.reportValidity()) return;
+    save.disabled = true;
+    try { await saveSettings(); } finally { save.disabled = false; }
+  });
+  pushSection.append(save);
 }
 
 function setupSettingsAccordions() {
@@ -3241,6 +3251,7 @@ function saveClassItem() {
     location: elements.classLocation.value.trim(),
     color: normalizeColor(elements.classColor.value, "#7eaed6"),
     matchSourceKey: getMatchSourceValue("class"),
+    ...readItemPushSettings("class", 15),
     notes: elements.classNotes.value.trim(),
   };
 
@@ -3311,6 +3322,7 @@ function readItemPushSettings(kind, defaultLead) {
   const preset = document.querySelector(`#${kind}-push-preset`)?.value;
   const custom = preset !== "off" && !["day", "threeDays", "week", "month"].includes(preset);
   return {
+    pushUseDefault: preset === "default",
     pushLeadMinutes: custom ? (input ? (input.value === "" ? null : Number(input.value)) : defaultLead) : null,
     pushLeadPreset: !custom && preset !== "off" ? preset : null,
     pushTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
@@ -3322,7 +3334,8 @@ function setItemPushLead(kind, item, defaultLead) {
   const select = document.querySelector(`#${kind}-push-preset`);
   if (!input || !select) return;
   const lead = item.pushLeadMinutes === undefined ? defaultLead : item.pushLeadMinutes;
-  select.value = item.pushLeadPreset || (item.pushLeadMinutes === undefined && kind === "exam" ? "day" : lead === null ? "off" : "custom");
+  select.value = item.pushUseDefault || (!kind.startsWith("default-") && item.pushLeadMinutes === undefined && !item.pushLeadPreset)
+    ? "default" : item.pushLeadPreset || (item.pushLeadMinutes === undefined && kind === "exam" ? "day" : lead === null ? "off" : "custom");
   input.value = lead ?? defaultLead;
   syncItemPushFields(kind);
 }
@@ -3515,6 +3528,7 @@ function saveReminder() {
     completedAt: getExistingCompletedAt(state.data.reminders, elements.reminderId.value, status),
     repeatMode: elements.reminderRepeatMode.value,
     matchSourceKey: getMatchSourceValue("reminder"),
+    ...readItemPushSettings("reminder", 15),
     notes: elements.reminderNotes.value.trim(),
   };
 
@@ -3669,6 +3683,7 @@ function editClassItem(id, inline = false) {
     : "";
   setRepeatDaysFromSeries("class", sortedMatches);
   toggleRepeatOptions("class");
+  setItemPushLead("class", item, 15);
   elements.classNotes.value = item.notes || "";
 }
 
@@ -3743,6 +3758,7 @@ function editReminder(id, inline = false) {
     : "";
   setRepeatDaysFromSeries("reminder", sortedMatches);
   toggleRepeatOptions("reminder");
+  setItemPushLead("reminder", item, 15);
   elements.reminderNotes.value = item.notes || "";
 }
 
@@ -3967,6 +3983,7 @@ function renderColorMatchOptions() {
 
 function resetClassForm() {
   elements.classForm.reset();
+  syncItemPushFields("class");
   toggleOnlineClassFields();
   delete elements.classForm.dataset.seriesId;
   elements.classId.value = "";
@@ -4037,6 +4054,7 @@ function resetExamForm() {
 
 function resetReminderForm() {
   elements.reminderForm.reset();
+  syncItemPushFields("reminder");
   delete elements.reminderForm.dataset.seriesId;
   elements.reminderId.value = "";
   elements.reminderDate.value = state.selectedDate;
@@ -4072,20 +4090,13 @@ async function saveSettings() {
     elements.settingsStatus.textContent = "Enter a valid Canvas calendar feed ending in .ics.";
     return;
   }
-  if (document.querySelector("#weekly-schedule-reminder")?.checked) {
-    const delivery = document.querySelector("#weekly-reminder-delivery").value;
-    const email = elements.settingsEmail.value.trim();
-    const phone = elements.settingsPhone.value.trim();
-    let error = "";
-    if (!authState.isAuthenticated) error = "Sign in before enabling weekly reminders.";
-    else if (["email", "both"].includes(delivery) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) error = "Enter a valid email above for weekly reminders.";
-    else if (["text", "both"].includes(delivery) && !/^\+[1-9]\d{7,14}$/.test(phone)) error = "Enter your phone number with + and country code, for example +15551234567.";
-    if (error) { elements.settingsStatus.textContent = error; elements.settingsStatus.scrollIntoView({block: "nearest"}); return; }
-  }
   state.data.settings = {
     ...currentSettings,
     theme: currentSettings.theme,
     customization: currentSettings.customization,
+    pushDefaults: Object.fromEntries(["class", "event", "homework", "exam", "reminder"].map((kind) => [
+      kind, readItemPushSettings("default-" + kind, kind === "homework" ? 60 : kind === "exam" ? 1440 : 15),
+    ])),
     name: elements.settingsName.value.trim(),
     email: elements.settingsEmail.value.trim(),
     phone: elements.settingsPhone.value.trim(),
@@ -4117,14 +4128,7 @@ async function saveSettings() {
       schoolImports: elements.notifySchoolImports.checked,
       settings: elements.notifySettings.checked,
       calendar: elements.notifyCalendar.checked,
-      weeklyScheduleReminder: {
-        ...currentSettings.notificationSchedule.weeklyScheduleReminder,
-        enabled: Boolean(document.querySelector("#weekly-schedule-reminder")?.checked),
-        delivery: document.querySelector("#weekly-reminder-delivery")?.value || "email",
-        day: Number(document.querySelector("#weekly-reminder-day")?.value || 0),
-        time: document.querySelector("#weekly-reminder-time")?.value || "18:00",
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-      },
+      weeklyScheduleReminder: { enabled: false },
     },
     school: currentSettings.school,
     canvasUrl: currentSettings.canvasUrl,
@@ -4199,12 +4203,13 @@ function renderSettings(statusMessage = "") {
   elements.notifySchoolImports.checked = settings.notificationSchedule.schoolImports;
   elements.notifySettings.checked = settings.notificationSchedule.settings;
   elements.notifyCalendar.checked = settings.notificationSchedule.calendar;
-  const weeklyReminder = settings.notificationSchedule.weeklyScheduleReminder;
-  document.querySelector("#weekly-schedule-reminder").checked = weeklyReminder.enabled;
-  document.querySelector("#weekly-reminder-delivery").value = weeklyReminder.delivery;
-  document.querySelector("#weekly-reminder-day").value = String(weeklyReminder.day);
-  document.querySelector("#weekly-reminder-time").value = weeklyReminder.time;
-  toggleWeeklyReminderOptions();
+  for (const kind of ["class", "event", "homework", "exam", "reminder"]) {
+    const fallback = kind === "homework" ? 60 : kind === "exam" ? 1440 : 15;
+    const value = settings.pushDefaults?.[kind] || (kind === "exam"
+      ? { pushLeadPreset: "day", pushLeadMinutes: null }
+      : { pushLeadMinutes: fallback });
+    setItemPushLead("default-" + kind, value, fallback);
+  }
 
   elements.settingsSummaryTitle.textContent = settings.name || "Your planner";
   elements.settingsSummary.innerHTML = "";
@@ -4626,6 +4631,7 @@ function addSchoolItemAsHomework(item) {
     matchSourceKey: match?.matchSourceKey || item.matchSourceKey,
     priority: existing?.priority || false,
     notes: existing?.notes || [item.notes, item.url].filter(Boolean).join(" "),
+    pushUseDefault: existing?.pushUseDefault,
     pushLeadMinutes: existing?.pushLeadMinutes,
     pushLeadPreset: existing?.pushLeadPreset,
     pushTimezone: existing?.pushTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",

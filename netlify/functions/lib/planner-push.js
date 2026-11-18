@@ -4,9 +4,11 @@ const minute = 60_000;
 const dayMs = 1440 * minute;
 const presetDays = new Map([["day", 1], ["threeDays", 3], ["week", 7]]);
 const kinds = [
-  { collection: "schedule", label: "Event", minutes: 15, timeField: "start" },
-  { collection: "homework", label: "Homework", minutes: 60, fallback: "23:59", timeField: "time" },
-  { collection: "exams", label: "Exam", minutes: 1440, fallback: "09:00", timeField: "time" },
+  { collection: "schedule", type: "event", key: "event", label: "Event", minutes: 15, timeField: "start" },
+  { collection: "schedule", type: "class", key: "class", label: "Class", minutes: 15, timeField: "start" },
+  { collection: "reminders", key: "reminder", label: "Reminder", minutes: 15, fallback: "09:00", timeField: "time" },
+  { collection: "homework", key: "homework", label: "Homework", minutes: 60, fallback: "23:59", timeField: "time" },
+  { collection: "exams", key: "exam", label: "Exam", minutes: 1440, fallback: "09:00", timeField: "time" },
 ];
 
 function validTimezone(timezone) {
@@ -98,10 +100,12 @@ function dueNotifications(data, deviceZone, now, userId) {
     const items = data?.[kind.collection];
     if (!Array.isArray(items)) continue;
     for (const item of items) {
-      if (!item?.id || item.status === "done" || (kind.collection === "schedule" && item.type !== "event")) continue;
-      const preset = item.pushLeadPreset || (item.pushLeadMinutes === undefined && kind.collection === "exams" ? "day" : null);
+      if (!item?.id || item.status === "done" || (kind.type && item.type !== kind.type)) continue;
+      const inherits = item.pushUseDefault || (item.pushLeadMinutes === undefined && !item.pushLeadPreset);
+      const preference = inherits ? data.settings?.pushDefaults?.[kind.key] || {} : item;
+      const preset = preference.pushLeadPreset || (preference.pushLeadMinutes === undefined && kind.key === "exam" ? "day" : null);
       const calendarLead = preset === "month" || presetDays.has(preset);
-      const lead = item.pushLeadMinutes === undefined ? kind.minutes : item.pushLeadMinutes;
+      const lead = preference.pushLeadMinutes === undefined ? kind.minutes : preference.pushLeadMinutes;
       if (!calendarLead && (!Number.isInteger(lead) || lead < 0 || lead > 10080)) continue;
       // Include the largest calendar offset plus timezones on either side of UTC.
       const day = typeof item.date === "string" ? Date.parse(item.date + "T00:00:00Z") : NaN;

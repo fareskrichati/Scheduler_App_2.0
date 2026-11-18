@@ -12,7 +12,7 @@ function reminders(data, now, timezone = "America/Los_Angeles") {
 test("event lead time is interpreted in the item's timezone", () => {
   const event = { id: "meeting", type: "event", title: "Meeting", date: "2026-11-17", start: "10:00",
     pushLeadMinutes: 35, pushTimezone: "America/Los_Angeles" };
-  const data = { schedule: [event, { ...event, id: "class", type: "class" }] };
+  const data = { schedule: [event, { ...event, id: "class", type: "study" }] };
   assert.deepEqual(reminders(data, "2026-11-17T17:24:59Z", "UTC"), []);
   assert.deepEqual(reminders(data, "2026-11-17T17:25:00Z", "UTC").map(({ body }) => body), ["Meeting"]);
   assert.deepEqual(reminders(data, "2026-11-17T18:00:00Z", "UTC"), []);
@@ -58,6 +58,35 @@ test("month preset clamps to the last day of the previous month", () => {
     pushLeadMinutes: null }] };
   assert.equal(reminders(data, "2026-02-28T16:59:00Z").length, 0);
   assert.equal(reminders(data, "2026-02-28T17:00:00Z").length, 1);
+});
+
+test("classes and personal reminders use configurable defaults with per-item overrides", () => {
+  const data = {
+    settings: { pushDefaults: {
+      class: { pushLeadMinutes: 30 },
+      event: { pushLeadMinutes: null },
+      reminder: { pushLeadPreset: "day", pushLeadMinutes: null },
+      homework: { pushLeadMinutes: 10 },
+      exam: { pushLeadMinutes: 60 },
+    } },
+    schedule: [
+      { id: "class", type: "class", title: "Algebra", date: "2026-11-17", start: "10:00" },
+      { id: "event", type: "event", title: "Hidden", date: "2026-11-17", start: "10:00", pushUseDefault: true, pushLeadMinutes: 15 },
+      { id: "override", type: "event", title: "Custom event", date: "2026-11-17", start: "10:00", pushLeadMinutes: 30 },
+      { id: "online", type: "class", title: "Online", date: "2026-11-17" },
+    ],
+    reminders: [
+      { id: "reminder", title: "Call advisor", date: "2026-11-18", time: "09:30" },
+      { id: "done", title: "Done", date: "2026-11-18", time: "09:30", status: "done" },
+      { id: "off", title: "Off", date: "2026-11-18", time: "09:30", pushLeadMinutes: null },
+    ],
+    homework: [{ id: "homework", title: "Reading", date: "2026-11-17", time: "09:40" }],
+    exams: [{ id: "exam", title: "Quiz", date: "2026-11-17", time: "10:30" }],
+  };
+  const due = reminders(data, "2026-11-17T17:30:00Z");
+  assert.deepEqual(due.map(({body}) => body).sort(), ["Algebra", "Call advisor", "Custom event", "Quiz", "Reading"]);
+  data.settings.pushDefaults.class.pushLeadMinutes = 10;
+  assert.equal(reminders(data, "2026-11-17T17:30:00Z").some(({body}) => body === "Algebra"), false);
 });
 
 test("device registration limits destinations and derives ownership from the session", async (t) => {

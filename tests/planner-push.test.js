@@ -14,15 +14,15 @@ test("event lead time is interpreted in the item's timezone", () => {
     pushLeadMinutes: 35, pushTimezone: "America/Los_Angeles" };
   const data = { schedule: [event, { ...event, id: "class", type: "study" }] };
   assert.deepEqual(reminders(data, "2026-11-17T17:24:59Z", "UTC"), []);
-  assert.deepEqual(reminders(data, "2026-11-17T17:25:00Z", "UTC").map(({ body }) => body), ["Meeting"]);
+  assert.deepEqual(reminders(data, "2026-11-17T17:25:00Z", "UTC").map(({ body }) => body.split("\n")[0]), ["Meeting"]);
   assert.deepEqual(reminders(data, "2026-11-17T18:00:00Z", "UTC"), []);
 });
 
 test("homework and exams use defaults only when the override is absent", () => {
   const homework = { id: "assignment", title: "Reading", date: "2026-11-17" };
   const exam = { id: "exam", title: "Midterm", date: "2026-11-18" };
-  assert.deepEqual(reminders({ homework: [homework] }, "2026-11-18T06:59:00Z").map(({ body }) => body), ["Reading"]);
-  assert.deepEqual(reminders({ exams: [exam] }, "2026-11-17T17:00:00Z").map(({ body }) => body), ["Midterm"]);
+  assert.deepEqual(reminders({ homework: [homework] }, "2026-11-18T06:59:00Z").map(({ body }) => body.split("\n")[0]), ["Reading"]);
+  assert.deepEqual(reminders({ exams: [exam] }, "2026-11-17T17:00:00Z").map(({ body }) => body.split("\n")[0]), ["Midterm"]);
   assert.deepEqual(reminders({ exams: [{ ...exam, pushLeadMinutes: null }, { ...exam, status: "done" }] },
     "2026-11-17T17:00:00Z"), []);
   assert.equal(reminders({ exams: [{ ...exam, pushLeadMinutes: 0 }] }, "2026-11-18T17:00:00Z").length, 1);
@@ -84,9 +84,27 @@ test("classes and personal reminders use configurable defaults with per-item ove
     exams: [{ id: "exam", title: "Quiz", date: "2026-11-17", time: "10:30" }],
   };
   const due = reminders(data, "2026-11-17T17:30:00Z");
-  assert.deepEqual(due.map(({body}) => body).sort(), ["Algebra", "Call advisor", "Custom event", "Quiz", "Reading"]);
+  assert.deepEqual(due.map(({body}) => body.split("\n")[0]).sort(), ["Algebra", "Call advisor", "Custom event", "Quiz", "Reading"]);
   data.settings.pushDefaults.class.pushLeadMinutes = 10;
-  assert.equal(reminders(data, "2026-11-17T17:30:00Z").some(({body}) => body === "Algebra"), false);
+  assert.equal(reminders(data, "2026-11-17T17:30:00Z").some(({body}) => body.startsWith("Algebra\n")), false);
+});
+
+test("notifications show start and due times in the item timezone and identify date-only items", () => {
+  const event = { id: "event", type: "event", title: "Meeting", date: "2026-11-17", start: "10:00",
+    pushTimezone: "America/Los_Angeles", pushLeadMinutes: 30 };
+  assert.equal(reminders({ schedule: [event] }, "2026-11-17T17:30:00Z", "UTC")[0].body,
+    "Meeting\nStarts Tue, Nov 17, 10:00 AM PST");
+  const homework = { id: "homework", title: "Reading", date: "2026-11-17", time: "10:30", pushLeadMinutes: 60 };
+  assert.equal(reminders({ homework: [homework] }, "2026-11-17T17:30:00Z")[0].body,
+    "Reading\nDue Tue, Nov 17, 10:30 AM PST");
+  const reminder = { id: "reminder", title: "Call advisor", date: "2026-11-17", time: "10:00", pushLeadMinutes: 30 };
+  assert.equal(reminders({ reminders: [reminder] }, "2026-11-17T17:30:00Z")[0].body,
+    "Call advisor\nCheck off by Tue, Nov 17, 10:00 AM PST");
+  assert.equal(reminders({ homework: [{ ...homework, time: "" }] }, "2026-11-18T06:59:00Z")[0].body,
+    "Reading\nDue Tue, Nov 17 · Time not set");
+  const exam = { id: "exam", title: "Midterm", date: "2026-11-18", time: "10:00" };
+  assert.equal(reminders({ exams: [exam] }, "2026-11-17T18:00:00Z")[0].body,
+    "Midterm\nStarts Wed, Nov 18, 10:00 AM PST");
 });
 
 test("device registration limits destinations and derives ownership from the session", async (t) => {
@@ -133,7 +151,7 @@ test("dispatch retries provider failures, then uses the database claim to skip d
   let sent = 0;
   t.mock.method(console, "error", () => {});
   t.mock.method(webPush, "sendNotification", async (_, body) => {
-    assert.equal(JSON.parse(body).body, "Meeting");
+    assert.match(JSON.parse(body).body, /^Meeting\nStarts Tue, Nov 17, 10:00 AM UTC$/);
     sent++;
     if (sent === 1) throw Object.assign(new Error("Try again"), { statusCode: 503 });
   });

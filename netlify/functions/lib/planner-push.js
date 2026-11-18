@@ -93,6 +93,17 @@ function reminderDate(day, preset) {
   return previousMonthEnd.toISOString().slice(0, 10);
 }
 
+function notificationBody(item, kind, scheduledAt, timezone) {
+  const hasTime = Boolean(item[kind.timeField]);
+  const dateOptions = { timeZone: timezone, weekday: "short", month: "short", day: "numeric" };
+  const when = new Intl.DateTimeFormat("en-US", hasTime
+    ? { ...dateOptions, hour: "numeric", minute: "2-digit", timeZoneName: "short" }
+    : dateOptions).format(scheduledAt);
+  const action = kind.key === "homework" ? "Due" : kind.key === "reminder" ? "Check off by" : "Starts";
+  const timing = hasTime ? `${action} ${when}` : `${action} ${when} · Time not set`;
+  return `${String(item.title || "").slice(0, 120)}\n${timing}`;
+}
+
 function dueNotifications(data, deviceZone, now, userId) {
   const formatters = new Map();
   const due = [];
@@ -130,7 +141,7 @@ function dueNotifications(data, deviceZone, now, userId) {
       const key = createHash("sha256").update(JSON.stringify([
         userId, kind.collection, item.seriesId || item.id, item.date, scheduledAt, notifyAt,
       ])).digest("base64url").slice(0, 32);
-      due.push({ key, title: `${kind.label} reminder`, body: String(item.title || "").slice(0, 120) });
+      due.push({ key, title: `${kind.label} reminder`, body: notificationBody(item, kind, scheduledAt, formatter.resolvedOptions().timeZone) });
     }
   }
   return due;
